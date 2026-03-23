@@ -28,9 +28,18 @@ export function RestauranteSidebar({
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        <div className="rounded-lg bg-primary/15 px-3 py-2.5 text-sm font-medium text-primary-light">
+        <Link
+          href="/restaurante"
+          className="flex items-center rounded-lg bg-primary/15 px-3 py-2.5 text-sm font-medium text-primary-light"
+        >
           <span className="mr-2">📋</span> Pedidos
-        </div>
+        </Link>
+        <Link
+          href="/restaurante/analytics"
+          className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"
+        >
+          <span className="mr-2">📊</span> Analíticas
+        </Link>
         <Link
           href={`/${slug}`}
           target="_blank"
