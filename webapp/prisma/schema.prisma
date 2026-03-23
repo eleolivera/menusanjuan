@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth & Account ───
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "dealer"
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dealer Dealer?
+
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ─── Restaurant (Dealer) ───
+
+model Dealer {
+  id          String   @id @default(cuid())
+  accountId   String   @unique
+  name        String                         // Restaurant display name
+  slug        String   @unique               // URL slug: menusanjuan.com/{slug}
+  description String?
+  phone       String                         // WhatsApp number
+  address     String?
+  city        String   @default("San Juan")
+  latitude    Float?
+  longitude   Float?
+  logoUrl     String?
+  coverUrl    String?
+  cuisineType String   @default("General")   // Comida Rápida, Parrilla, Pizzería, etc.
+  isActive    Boolean  @default(true)
+  openHours   String?                        // JSON string of hours
+  mercadoPagoAlias String?
+  mercadoPagoCvu   String?
+  bankInfo    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account    Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categories MenuCategory[]
+  orders     Order[]
+
+  @@index([slug])
+  @@index([cuisineType])
+  @@index([isActive])
+}
+
+// ─── Menu ───
+
+model MenuCategory {
+  id       String @id @default(cuid())
+  dealerId String
+  name     String            // "Lomitos", "Bebidas", etc.
+  emoji    String?           // Category icon emoji
+  sortOrder Int   @default(0)
+
+  dealer Dealer     @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  items  MenuItem[]
+
+  @@index([dealerId, sortOrder])
+}
+
+model MenuItem {
+  id          String  @id @default(cuid())
+  categoryId  String
+  name        String
+  description String?
+  price       Float                // Price in ARS
+  priceUsd    Float?               // Optional USD price
+  imageUrl    String?
+  badge       String?              // "Popular", "Nuevo", etc.
+  rating      Float?
+  available   Boolean @default(true)
+  sortOrder   Int     @default(0)
+  stock       Int?                 // null = unlimited
+  minStock    Int?                 // Alert threshold
+
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId, sortOrder])
+  @@index([available])
+}
+
+// ─── Orders ───
+
+model Order {
+  id               String      @id @default(cuid())
+  orderNumber      String      @unique              // ORD-1001 style
+  restauranteSlug  String                            // Links to restaurant by slug
+  dealerId         String?                           // Optional FK for when Dealer records exist
+  status           OrderStatus @default(GENERATED)
+  customerName     String
+  customerPhone    String
+  customerAddress  String?
+  latitude         Float?
+  longitude        Float?
+  items            Json                              // OrderItem[] as JSON
+  total            Float
+  paymentMethod    String?                           // "mercadopago", "cash", "transfer"
+  whatsappSent     Boolean     @default(false)
+  notes            String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  dealer Dealer? @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+
+  @@index([restauranteSlug, status])
+  @@index([restauranteSlug, createdAt])
+  @@index([orderNumber])
+}
+
+enum OrderStatus {
+  GENERATED   // Generado — order placed
+  PAID        // Pagado — payment confirmed
+  PROCESSING  // Procesado — kitchen working
+  DELIVERED   // Entregado — delivered/picked up
+  CANCELLED   // Cancelado
+}
