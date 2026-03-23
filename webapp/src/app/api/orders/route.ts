@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createOrder, getOrdersByRestaurante, getAllOrders } from "@/lib/orders-store";
+import {
+  createOrder,
+  getOrdersByRestaurante,
+  getOrdersByDateRange,
+  getBusinessDayStart,
+  getBusinessDayEnd,
+  getAllOrders,
+} from "@/lib/orders-store";
 
 // POST — create a new order
 export async function POST(request: NextRequest) {
@@ -31,14 +38,34 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET — list orders (optionally by restaurante slug)
+// GET — list orders (optionally by restaurante slug + date)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const restaurante = searchParams.get("restaurante");
+  const dateParam = searchParams.get("date"); // YYYY-MM-DD for specific business day
   const allDays = searchParams.get("all") === "true";
 
-  const orders = restaurante
-    ? await getOrdersByRestaurante(restaurante, !allDays)
-    : await getAllOrders();
+  if (!restaurante) {
+    const orders = await getAllOrders();
+    return NextResponse.json(orders);
+  }
+
+  if (allDays) {
+    const orders = await getOrdersByRestaurante(restaurante, false);
+    return NextResponse.json(orders);
+  }
+
+  if (dateParam) {
+    // Specific business day: parse date, get business day range
+    // dateParam is YYYY-MM-DD in AR time, business day starts at 8am AR
+    const targetDate = new Date(`${dateParam}T11:00:00.000Z`); // 8am AR = 11:00 UTC
+    const start = getBusinessDayStart(targetDate);
+    const end = getBusinessDayEnd(targetDate);
+    const orders = await getOrdersByDateRange(restaurante, start, end);
+    return NextResponse.json(orders);
+  }
+
+  // Default: today's business day
+  const orders = await getOrdersByRestaurante(restaurante, true);
   return NextResponse.json(orders);
 }
