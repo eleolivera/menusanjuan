@@ -293,6 +293,9 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        {/* Account — Email + Password (for handoff) */}
+        <AccountSection email={email} onEmailChange={setEmail} />
+
         {/* Save button (bottom) */}
         <div className="flex justify-end pb-8">
           <button
@@ -305,5 +308,130 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Separate component to manage email + password changes
+function AccountSection({ email, onEmailChange }: { email: string; onEmailChange: (e: string) => void }) {
+  const [newEmail, setNewEmail] = useState(email);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [emailMsg, setEmailMsg] = useState("");
+  const [pwMsg, setPwMsg] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const isPlaceholder = email.endsWith("@menusanjuan.com");
+
+  async function handleChangeEmail() {
+    if (!newEmail.includes("@")) { setEmailMsg("Email inválido"); return; }
+    setSaving(true);
+    setEmailMsg("");
+    const res = await fetch("/api/restaurante/account", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "change_email", newEmail }),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (res.ok) {
+      setEmailMsg("Email actualizado");
+      onEmailChange(newEmail);
+    } else {
+      setEmailMsg(data.error || "Error");
+    }
+  }
+
+  async function handleChangePassword() {
+    if (newPassword.length < 6) { setPwMsg("Mínimo 6 caracteres"); return; }
+    if (newPassword !== confirmPassword) { setPwMsg("Las contraseñas no coinciden"); return; }
+    setSaving(true);
+    setPwMsg("");
+    const res = await fetch("/api/restaurante/account", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "change_password", currentPassword, newPassword }),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (res.ok) {
+      setPwMsg("Contraseña actualizada");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } else {
+      setPwMsg(data.error || "Error");
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+      <h2 className="text-sm font-bold text-white mb-1">Cuenta y Acceso</h2>
+      <p className="text-xs text-slate-500 mb-4">
+        {isPlaceholder
+          ? "Esta cuenta usa un email temporal. Cambialo al email real del dueño para hacer la entrega."
+          : "Modificá el email o la contraseña de acceso."}
+      </p>
+
+      {/* Handoff banner for placeholder accounts */}
+      {isPlaceholder && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 mb-4">
+          <div className="flex items-start gap-2">
+            <span className="text-amber-400 mt-0.5">🔑</span>
+            <div>
+              <p className="text-xs font-semibold text-amber-300">Cuenta pendiente de entrega</p>
+              <p className="text-[11px] text-amber-400/70 mt-0.5">
+                Cambiá el email al del dueño del restaurante y establecé una contraseña nueva. Con eso puede iniciar sesión y gestionar todo.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Email */}
+      <div className="mb-5">
+        <label className="mb-1.5 block text-xs font-medium text-slate-400">Email de acceso</label>
+        <div className="flex gap-2">
+          <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+            className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+          <button onClick={handleChangeEmail} disabled={saving || newEmail === email}
+            className="rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors disabled:opacity-30">
+            Cambiar
+          </button>
+        </div>
+        {emailMsg && (
+          <p className={`mt-1.5 text-xs font-medium ${emailMsg.includes("actualizado") ? "text-emerald-400" : "text-red-400"}`}>
+            {emailMsg}
+          </p>
+        )}
+      </div>
+
+      {/* Change Password */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-400">Cambiar contraseña</label>
+        <div className="space-y-2">
+          {!isPlaceholder && (
+            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Contraseña actual"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+          )}
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Nueva contraseña (mín. 6 caracteres)"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+          <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirmar nueva contraseña"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+          <button onClick={handleChangePassword} disabled={saving || !newPassword}
+            className="rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors disabled:opacity-30">
+            Actualizar Contraseña
+          </button>
+        </div>
+        {pwMsg && (
+          <p className={`mt-1.5 text-xs font-medium ${pwMsg.includes("actualizada") ? "text-emerald-400" : "text-red-400"}`}>
+            {pwMsg}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
