@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { ImageUpload } from "@/components/ImageUpload";
 
 const CUISINE_OPTIONS = [
   "Comida Rápida", "Parrilla", "Pizzería", "Cafetería", "Pastas",
@@ -390,22 +391,16 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text">Logo <span className="text-text-muted font-normal">(URL)</span></label>
-                <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text">Foto de portada <span className="text-text-muted font-normal">(URL)</span></label>
-                <input type="url" value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+              <div className="flex gap-6">
+                <ImageUpload value={logoUrl} onChange={setLogoUrl} type="logo" label="Logo" shape="logo" />
+                <div className="flex-1">
+                  <ImageUpload value={coverUrl} onChange={setCoverUrl} type="cover" label="Foto de portada" shape="cover" />
+                </div>
               </div>
               <div className="rounded-xl bg-surface-alt border border-border/50 p-4">
                 <h3 className="text-xs font-bold text-text mb-2">💡 ¿No tenés imágenes todavía?</h3>
                 <p className="text-xs text-text-muted leading-relaxed">
-                  No pasa nada, podés saltear este paso. Se pueden agregar después desde tu panel.
+                  No pasa nada, podés saltear este paso. Subí archivos, arrastralos, o pegá una URL. Se pueden agregar después desde tu panel.
                 </p>
               </div>
             </div>

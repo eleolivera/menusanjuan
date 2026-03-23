@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ImageUpload } from "@/components/ImageUpload";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 const CUISINE_OPTIONS = [
@@ -222,16 +223,22 @@ export default function ProfilePage() {
         {/* Images */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
           <h2 className="text-sm font-bold text-white mb-4">Imágenes</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Logo (URL)</label>
-              <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..."
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Foto de portada (URL)</label>
-              <input type="url" value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://..."
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+          <div className="flex gap-6">
+            <ImageUpload
+              value={logoUrl}
+              onChange={setLogoUrl}
+              type="logo"
+              label="Logo"
+              shape="logo"
+            />
+            <div className="flex-1">
+              <ImageUpload
+                value={coverUrl}
+                onChange={setCoverUrl}
+                type="cover"
+                label="Foto de portada"
+                shape="cover"
+              />
             </div>
           </div>
         </section>
