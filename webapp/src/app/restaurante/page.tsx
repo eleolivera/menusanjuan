@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { DEMO_RESTAURANTS } from "@/data/restaurants";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import { KanbanBoard } from "@/components/restaurante/KanbanBoard";
 import { RestauranteSidebar } from "@/components/restaurante/RestauranteSidebar";
@@ -41,6 +40,7 @@ function formatDateLabel(dateStr: string): string {
 export default function RestauranteDashboard() {
   const router = useRouter();
   const [slug, setSlug] = useState<string | null>(null);
+  const [restaurantName, setRestaurantName] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(getArDateString(0));
@@ -55,7 +55,10 @@ export default function RestauranteDashboard() {
         if (!r.ok) throw new Error("Not authenticated");
         return r.json();
       })
-      .then((data) => setSlug(data.slug))
+      .then((data) => {
+        setSlug(data.slug);
+        setRestaurantName(data.name || data.slug);
+      })
       .catch(() => router.push("/restaurante/login"));
   }, [router]);
 
@@ -121,7 +124,6 @@ export default function RestauranteDashboard() {
     router.push("/restaurante/login");
   }
 
-  const restaurant = DEMO_RESTAURANTS.find((r) => r.slug === slug);
   const newOrders = orders.filter((o) => o.status === "GENERATED").length;
 
   if (!slug) {
@@ -135,7 +137,7 @@ export default function RestauranteDashboard() {
   return (
     <div className="flex h-screen">
       <RestauranteSidebar
-        restaurantName={restaurant?.name || slug}
+        restaurantName={restaurantName || slug}
         slug={slug}
         onLogout={handleLogout}
       />
@@ -275,7 +277,7 @@ export default function RestauranteDashboard() {
               <OrderTotals orders={orders} />
 
               {/* Kanban */}
-              <KanbanBoard orders={orders} onUpdateStatus={updateStatus} restaurantName={restaurant?.name || slug} />
+              <KanbanBoard orders={orders} onUpdateStatus={updateStatus} restaurantName={restaurantName || slug} />
             </>
           )}
         </div>

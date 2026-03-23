@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { DEMO_RESTAURANTS } from "@/data/restaurants";
+import Link from "next/link";
 
 export default function RestauranteLoginPage() {
   const router = useRouter();
-  const [slug, setSlug] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export default function RestauranteLoginPage() {
       const res = await fetch("/api/restaurante/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!res.ok) {
@@ -49,7 +49,7 @@ export default function RestauranteLoginPage() {
             Panel de Restaurante
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Ingresá para gestionar tu restaurante
+            Ingresá con tu email y contraseña
           </p>
         </div>
 
@@ -60,20 +60,15 @@ export default function RestauranteLoginPage() {
           <div className="space-y-4 mb-6">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-text">
-                Restaurante
+                Email
               </label>
-              <select
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-              >
-                <option value="">Seleccioná tu restaurante</option>
-                {DEMO_RESTAURANTS.map((r) => (
-                  <option key={r.slug} value={r.slug}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@restaurante.com"
+                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-text">
@@ -83,7 +78,7 @@ export default function RestauranteLoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Ingresá la contraseña"
+                placeholder="Tu contraseña"
                 className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
               />
             </div>
@@ -97,7 +92,7 @@ export default function RestauranteLoginPage() {
 
           <button
             type="submit"
-            disabled={!slug || !password || loading}
+            disabled={!email || !password || loading}
             className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {loading ? (
@@ -111,14 +106,10 @@ export default function RestauranteLoginPage() {
           </button>
 
           <p className="mt-4 text-center text-xs text-text-muted">
-            Contraseña de demo: <code className="rounded bg-surface-alt px-1.5 py-0.5 font-mono text-primary">menusj2024</code>
-          </p>
-
-          <p className="mt-3 text-center text-xs text-text-muted">
             ¿Querés sumar tu restaurante?{" "}
-            <a href="/restaurante/register" className="font-medium text-primary hover:underline">
+            <Link href="/restaurante/register" className="font-medium text-primary hover:underline">
               Registrate gratis
-            </a>
+            </Link>
           </p>
         </form>
       </div>

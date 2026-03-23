@@ -41,6 +41,12 @@ export function RestauranteSidebar({
           <span className="mr-2">📊</span> Analíticas
         </Link>
         <Link
+          href="/restaurante/profile"
+          className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"
+        >
+          <span className="mr-2">⚙️</span> Mi Restaurante
+        </Link>
+        <Link
           href={`/${slug}`}
           target="_blank"
           className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"

@@ -1,8 +1,8 @@
-import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { DEMO_RESTAURANTS } from "@/data/restaurants";
 import { getMenuForRestaurant } from "@/data/menus";
+import { getRestaurantBySlug } from "@/lib/get-restaurant";
 import { StoreMenu } from "@/components/StoreMenu";
 
 export async function generateStaticParams() {
@@ -15,7 +15,7 @@ export async function generateMetadata({
   params: Promise<{ store: string }>;
 }) {
   const { store } = await params;
-  const restaurant = DEMO_RESTAURANTS.find((r) => r.slug === store);
+  const restaurant = await getRestaurantBySlug(store);
   if (!restaurant) return { title: "No encontrado" };
 
   return {
@@ -36,7 +36,7 @@ export default async function StorePage({
   params: Promise<{ store: string }>;
 }) {
   const { store } = await params;
-  const restaurant = DEMO_RESTAURANTS.find((r) => r.slug === store);
+  const restaurant = await getRestaurantBySlug(store);
 
   if (!restaurant) notFound();
 

@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createRestauranteSession } from "@/lib/restaurante-auth";
-
-function hashPassword(password: string): string {
-  const crypto = require("crypto");
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.createHash("sha256").update(password + salt).digest("hex");
-  return `${salt}:${hash}`;
-}
+import { createRestauranteSession, hashPassword } from "@/lib/restaurante-auth";
 
 function generateSlug(name: string): string {
   return name

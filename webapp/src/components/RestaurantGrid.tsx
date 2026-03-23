@@ -1,17 +1,27 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DEMO_RESTAURANTS } from "@/data/restaurants";
+import type { Restaurant } from "@/data/restaurants";
 import { RestaurantCard } from "./RestaurantCard";
 import { CuisineFilter } from "./CuisineFilter";
 import { SearchBar } from "./SearchBar";
 
 export function RestaurantGrid() {
+  const [restaurants, setRestaurants] = useState<Restaurant[]>(DEMO_RESTAURANTS);
   const [cuisine, setCuisine] = useState("all");
   const [search, setSearch] = useState("");
 
+  // Fetch real restaurants from API (merges DB + demo)
+  useEffect(() => {
+    fetch("/api/restaurants")
+      .then((r) => r.json())
+      .then((data) => setRestaurants(data))
+      .catch(() => {}); // fallback to demo data on error
+  }, []);
+
   const filtered = useMemo(() => {
-    return DEMO_RESTAURANTS.filter((r) => {
+    return restaurants.filter((r) => {
       const matchesCuisine = cuisine === "all" || r.cuisineType === cuisine;
       const matchesSearch =
         search === "" ||
@@ -21,12 +31,11 @@ export function RestaurantGrid() {
         r.address.toLowerCase().includes(search.toLowerCase());
       return matchesCuisine && matchesSearch;
     });
-  }, [cuisine, search]);
+  }, [restaurants, cuisine, search]);
 
   return (
     <section id="restaurantes" className="py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4">
-        {/* Section header */}
         <div className="mb-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-text tracking-tight">
             Restaurantes
@@ -37,13 +46,11 @@ export function RestaurantGrid() {
           </p>
         </div>
 
-        {/* Search + Filters */}
         <div className="space-y-4 mb-8">
           <SearchBar value={search} onChange={setSearch} />
           <CuisineFilter selected={cuisine} onChange={setCuisine} />
         </div>
 
-        {/* Grid */}
         {filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((restaurant, i) => (
