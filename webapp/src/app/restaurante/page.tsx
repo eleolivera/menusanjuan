@@ -275,7 +275,7 @@ export default function RestauranteDashboard() {
               <OrderTotals orders={orders} />
 
               {/* Kanban */}
-              <KanbanBoard orders={orders} onUpdateStatus={updateStatus} />
+              <KanbanBoard orders={orders} onUpdateStatus={updateStatus} restaurantName={restaurant?.name || slug} />
             </>
           )}
         </div>

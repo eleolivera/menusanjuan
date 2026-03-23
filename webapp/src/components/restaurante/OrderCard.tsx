@@ -49,9 +49,11 @@ const STATUS_CONFIG: Record<
 export function OrderCard({
   order,
   onUpdateStatus,
+  restaurantName,
 }: {
   order: Order;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
+  restaurantName: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -151,8 +153,7 @@ export function OrderCard({
           >
             {/* Header */}
             <div className="text-center mb-3">
-              <div className="text-lg font-bold tracking-tight">MenuSanJuan</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">menusanjuan.com</div>
+              <div className="text-lg font-bold tracking-tight">{restaurantName}</div>
               <div className="border-t-2 border-dashed border-slate-300 mt-3" />
             </div>
 

@@ -14,9 +14,11 @@ const COLUMNS: { status: OrderStatus; label: string; emoji: string; headerColor:
 export function KanbanBoard({
   orders,
   onUpdateStatus,
+  restaurantName,
 }: {
   orders: Order[];
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
+  restaurantName: string;
 }) {
   const [dragOverCol, setDragOverCol] = useState<OrderStatus | null>(null);
 
@@ -98,6 +100,7 @@ export function KanbanBoard({
                   <OrderCard
                     order={order}
                     onUpdateStatus={onUpdateStatus}
+                    restaurantName={restaurantName}
                   />
                 </div>
               ))}
