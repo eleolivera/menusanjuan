@@ -113,6 +113,13 @@ export default function RestauranteLoginPage() {
           <p className="mt-4 text-center text-xs text-text-muted">
             Contraseña de demo: <code className="rounded bg-surface-alt px-1.5 py-0.5 font-mono text-primary">menusj2024</code>
           </p>
+
+          <p className="mt-3 text-center text-xs text-text-muted">
+            ¿Querés sumar tu restaurante?{" "}
+            <a href="/restaurante/register" className="font-medium text-primary hover:underline">
+              Registrate gratis
+            </a>
+          </p>
         </form>
       </div>
     </div>

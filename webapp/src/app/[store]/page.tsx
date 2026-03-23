@@ -19,8 +19,14 @@ export async function generateMetadata({
   if (!restaurant) return { title: "No encontrado" };
 
   return {
-    title: `${restaurant.name} — Menú | MenuSanJuan`,
+    title: `${restaurant.name} — Menú`,
     description: restaurant.description,
+    openGraph: {
+      title: `${restaurant.name} — Menú | MenuSanJuan`,
+      description: restaurant.description,
+      images: [{ url: restaurant.coverUrl, width: 800, height: 400 }],
+      type: "website",
+    },
   };
 }
 
@@ -36,8 +42,52 @@ export default async function StorePage({
 
   const categories = getMenuForRestaurant(restaurant.slug);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    name: restaurant.name,
+    url: `https://menusanjuan.com/${restaurant.slug}`,
+    image: restaurant.coverUrl,
+    servesCuisine: restaurant.cuisineType,
+    telephone: restaurant.phone,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: restaurant.address,
+      addressLocality: "San Juan",
+      addressRegion: "San Juan",
+      addressCountry: "AR",
+    },
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: restaurant.rating,
+      bestRating: 5,
+      ratingCount: restaurant.itemCount,
+    },
+    hasMenu: {
+      "@type": "Menu",
+      hasMenuSection: categories.map((cat) => ({
+        "@type": "MenuSection",
+        name: cat.name,
+        hasMenuItem: cat.items.map((item) => ({
+          "@type": "MenuItem",
+          name: item.name,
+          description: item.description,
+          offers: {
+            "@type": "Offer",
+            price: item.price,
+            priceCurrency: "ARS",
+          },
+        })),
+      })),
+    },
+  };
+
   return (
     <div className="mesh-gradient min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Store Header / Cover */}
       <div className="relative h-48 sm:h-56 overflow-hidden bg-gradient-to-br from-slate-900 via-orange-950 to-red-950">
         <Image
