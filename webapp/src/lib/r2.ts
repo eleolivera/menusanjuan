@@ -11,10 +11,8 @@ const s3 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET || "menusanjuan-images";
 
-// Public URL base — for now use R2.dev or custom domain
-// We'll use the R2 public URL pattern
 function getPublicUrl(key: string): string {
-  return `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev/${key}`;
+  return `https://images.menusanjuan.com/${key}`;
 }
 
 export async function uploadToR2(
