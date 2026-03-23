@@ -27,7 +27,7 @@ function generateVerificationCode(): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, restaurantName, phone, address, cuisineType, description, logoUrl, coverUrl } = body;
+    const { email, password, restaurantName, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl } = body;
 
     if (!email || !password || !restaurantName || !phone) {
       return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
@@ -74,6 +74,8 @@ export async function POST(request: NextRequest) {
           slug,
           phone,
           address: address || null,
+          latitude: latitude ?? null,
+          longitude: longitude ?? null,
           cuisineType: cuisineType || "General",
           description: description || null,
           logoUrl: logoUrl || null,

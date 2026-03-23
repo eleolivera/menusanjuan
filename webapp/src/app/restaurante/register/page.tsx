@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 const CUISINE_OPTIONS = [
   "Comida Rápida", "Parrilla", "Pizzería", "Cafetería", "Pastas",
@@ -34,6 +35,10 @@ export default function RegisterPage() {
   const [address, setAddress] = useState("");
   const [cuisineType, setCuisineType] = useState("");
   const [description, setDescription] = useState("");
+
+  // Step 2 extra: coordinates from address autocomplete
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   // Step 3: Images
   const [logoUrl, setLogoUrl] = useState("");
@@ -81,6 +86,8 @@ export default function RegisterPage() {
           restaurantName,
           phone,
           address,
+          latitude,
+          longitude,
           cuisineType,
           description,
           logoUrl: logoUrl || null,
@@ -245,16 +252,17 @@ export default function RegisterPage() {
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text">Dirección <span className="text-text-muted font-normal">(opcional)</span></label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Calle y número, barrio"
-                  className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                />
-              </div>
+              <AddressAutocomplete
+                value={address}
+                onChange={setAddress}
+                onCoordinates={(lat, lng) => {
+                  setLatitude(lat);
+                  setLongitude(lng);
+                }}
+                label="Dirección del restaurante"
+                placeholder="Escribí la dirección..."
+                optional
+              />
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-text">Descripción <span className="text-text-muted font-normal">(opcional)</span></label>
                 <textarea
@@ -268,48 +276,81 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* Step 3: Images */}
+          {/* Step 3: Images + Live Preview */}
           {step === 3 && (
             <div className="space-y-4">
               <div className="text-center mb-2">
                 <div className="text-2xl mb-1">📸</div>
                 <h2 className="text-lg font-bold text-text">Dale imagen a tu restaurante</h2>
-                <p className="text-xs text-text-muted">Podés agregar esto después también</p>
+                <p className="text-xs text-text-muted">Así van a ver tu restaurante los clientes</p>
               </div>
+
+              {/* Live Preview Card */}
+              <div className="rounded-2xl border border-border/60 bg-surface shadow-sm overflow-hidden">
+                {/* Cover */}
+                <div className="relative h-28 bg-gradient-to-br from-slate-900 via-orange-950 to-red-950">
+                  {coverUrl && (
+                    <img src={coverUrl} alt="Portada" className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute bottom-3 left-3 flex items-end gap-3">
+                    {/* Logo */}
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white text-lg font-bold shadow-lg border-2 border-white/20 overflow-hidden">
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
+                      ) : (
+                        restaurantName?.charAt(0) || "R"
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">{restaurantName || "Tu Restaurante"}</div>
+                      <div className="flex items-center gap-2">
+                        {cuisineType && (
+                          <span className="rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{cuisineType}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <p className="text-xs text-text-secondary line-clamp-2">{description || "Descripción de tu restaurante..."}</p>
+                  {address && <p className="text-[10px] text-text-muted mt-1">📍 {address}</p>}
+                </div>
+              </div>
+
+              {/* Logo input */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-text">Logo <span className="text-text-muted font-normal">(URL de imagen)</span></label>
+                <label className="mb-1.5 block text-sm font-medium text-text">
+                  Logo <span className="text-text-muted font-normal">(URL de imagen)</span>
+                </label>
                 <input
                   type="url"
                   value={logoUrl}
                   onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://..."
+                  placeholder="https://tu-logo.com/logo.png"
                   className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                 />
-                {logoUrl && (
-                  <div className="mt-2 flex justify-center">
-                    <img src={logoUrl} alt="Logo preview" className="h-16 w-16 rounded-xl object-cover border border-border" />
-                  </div>
-                )}
               </div>
+
+              {/* Cover input */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-text">Foto de portada <span className="text-text-muted font-normal">(URL de imagen)</span></label>
+                <label className="mb-1.5 block text-sm font-medium text-text">
+                  Foto de portada <span className="text-text-muted font-normal">(URL de imagen)</span>
+                </label>
                 <input
                   type="url"
                   value={coverUrl}
                   onChange={(e) => setCoverUrl(e.target.value)}
-                  placeholder="https://..."
+                  placeholder="https://tu-restaurante.com/portada.jpg"
                   className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                 />
-                {coverUrl && (
-                  <div className="mt-2">
-                    <img src={coverUrl} alt="Cover preview" className="w-full h-32 rounded-xl object-cover border border-border" />
-                  </div>
-                )}
+                <p className="mt-1 text-[11px] text-text-muted">Una foto de tu local o tu mejor plato funciona perfecto</p>
               </div>
+
               <div className="rounded-xl bg-surface-alt border border-border/50 p-4">
                 <h3 className="text-xs font-bold text-text mb-2">💡 ¿No tenés imágenes todavía?</h3>
                 <p className="text-xs text-text-muted leading-relaxed">
-                  No te preocupes, podés saltear este paso y agregarlas después desde tu panel. Te recomendamos una foto de tu mejor plato como portada.
+                  No pasa nada, podés saltear este paso. Se va a usar la primera letra de tu restaurante como logo y un fondo por defecto. Podés cambiarlos después.
                 </p>
               </div>
             </div>
