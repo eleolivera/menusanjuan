@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { DEMO_RESTAURANTS } from "@/data/restaurants";
-import { getMenuForRestaurant } from "@/data/menus";
 import { getRestaurantBySlug } from "@/lib/get-restaurant";
+import { getMenuBySlug } from "@/lib/get-restaurant-menu";
 import { StoreMenu } from "@/components/StoreMenu";
 
 export async function generateStaticParams() {
@@ -40,7 +40,7 @@ export default async function StorePage({
 
   if (!restaurant) notFound();
 
-  const categories = getMenuForRestaurant(restaurant.slug);
+  const categories = await getMenuBySlug(restaurant.slug);
 
   const jsonLd = {
     "@context": "https://schema.org",

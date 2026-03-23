@@ -35,6 +35,12 @@ export function RestauranteSidebar({
           <span className="mr-2">📋</span> Pedidos
         </Link>
         <Link
+          href="/restaurante/menu"
+          className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"
+        >
+          <span className="mr-2">📋</span> Menú
+        </Link>
+        <Link
           href="/restaurante/analytics"
           className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"
         >
