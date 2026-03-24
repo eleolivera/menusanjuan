@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-const ADMIN_KEY = process.env.ADMIN_KEY || "admin-menusj-2024";
-
-function checkAdmin(request: NextRequest): boolean {
-  const key = request.headers.get("x-admin-key");
-  return key === ADMIN_KEY;
-}
+import { getAdminSession } from "@/lib/admin-auth";
 
 // GET — list all restaurants with ownership status
 export async function GET(request: NextRequest) {
-  if (!checkAdmin(request)) {
+  if (!(await getAdminSession())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 
-const ADMIN_KEY = "admin-menusj-2024";
-
 type Claim = {
   id: string;
   status: string;
@@ -35,18 +33,37 @@ type Restaurant = {
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
-  const [key, setKey] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
   const [tab, setTab] = useState<"claims" | "restaurants">("restaurants");
   const [claims, setClaims] = useState<Claim[]>([]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(false);
 
-  function headers() {
-    return { "x-admin-key": ADMIN_KEY, "Content-Type": "application/json" };
-  }
+  // Check if already logged in
+  useEffect(() => {
+    fetch("/api/admin/restaurants").then((r) => {
+      if (r.ok) setAuthed(true);
+    });
+  }, []);
 
-  function handleLogin() {
-    if (key === ADMIN_KEY) setAuthed(true);
+  async function handleLogin() {
+    setLoginLoading(true);
+    setLoginError("");
+    const res = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (res.ok) {
+      setAuthed(true);
+    } else {
+      const data = await res.json();
+      setLoginError(data.error || "Error");
+    }
+    setLoginLoading(false);
   }
 
   useEffect(() => {
@@ -57,11 +74,11 @@ export default function AdminPage() {
   async function fetchData() {
     setLoading(true);
     if (tab === "claims") {
-      const res = await fetch("/api/admin/claims", { headers: { "x-admin-key": ADMIN_KEY } });
-      setClaims(await res.json());
+      const res = await fetch("/api/admin/claims");
+      if (res.ok) setClaims(await res.json());
     } else {
-      const res = await fetch("/api/admin/restaurants", { headers: { "x-admin-key": ADMIN_KEY } });
-      setRestaurants(await res.json());
+      const res = await fetch("/api/admin/restaurants");
+      if (res.ok) setRestaurants(await res.json());
     }
     setLoading(false);
   }
@@ -69,7 +86,7 @@ export default function AdminPage() {
   async function handleGenerateCode(claimId: string) {
     await fetch("/api/admin/claims", {
       method: "PATCH",
-      headers: headers(),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ claimId, action: "generate_code" }),
     });
     fetchData();
@@ -79,7 +96,7 @@ export default function AdminPage() {
     const notes = prompt("Motivo del rechazo (opcional):");
     await fetch("/api/admin/claims", {
       method: "PATCH",
-      headers: headers(),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ claimId, action: "reject", notes }),
     });
     fetchData();
@@ -94,18 +111,28 @@ export default function AdminPage() {
             <h1 className="text-xl font-bold text-white">Admin Panel</h1>
             <p className="text-sm text-slate-500">MenuSanJuan</p>
           </div>
-          <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5 space-y-3">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email admin"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none"
+            />
             <input
               type="password"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              placeholder="Admin key"
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none mb-3"
+              placeholder="Contraseña"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none"
             />
-            <button onClick={handleLogin}
-              className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition-all">
-              Entrar
+            {loginError && (
+              <p className="text-xs text-red-400">{loginError}</p>
+            )}
+            <button onClick={handleLogin} disabled={loginLoading}
+              className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50">
+              {loginLoading ? "Ingresando..." : "Entrar"}
             </button>
           </div>
         </div>

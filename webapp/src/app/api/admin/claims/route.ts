@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAdminSession } from "@/lib/admin-auth";
 import crypto from "crypto";
 
-const ADMIN_KEY = process.env.ADMIN_KEY || "admin-menusj-2024";
 const CLAIM_SECRET = process.env.CLAIM_SECRET || "menusj-claim-2024";
-
-function checkAdmin(request: NextRequest): boolean {
-  const key = request.headers.get("x-admin-key");
-  return key === ADMIN_KEY;
-}
 
 function generateClaimCode(dealerId: string): string {
   return crypto
@@ -21,7 +16,7 @@ function generateClaimCode(dealerId: string): string {
 
 // GET — list all claim requests
 export async function GET(request: NextRequest) {
-  if (!checkAdmin(request)) {
+  if (!(await getAdminSession())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -38,7 +33,7 @@ export async function GET(request: NextRequest) {
 
 // PATCH — update claim (generate code, approve, reject)
 export async function PATCH(request: NextRequest) {
-  if (!checkAdmin(request)) {
+  if (!(await getAdminSession())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
