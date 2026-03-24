@@ -37,9 +37,10 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-  const [tab, setTab] = useState<"claims" | "restaurants">("restaurants");
+  const [tab, setTab] = useState<"claims" | "restaurants" | "users">("restaurants");
   const [claims, setClaims] = useState<Claim[]>([]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Check if already logged in
@@ -76,6 +77,9 @@ export default function AdminPage() {
     if (tab === "claims") {
       const res = await fetch("/api/admin/claims");
       if (res.ok) setClaims(await res.json());
+    } else if (tab === "users") {
+      const res = await fetch("/api/admin/users");
+      if (res.ok) setUsers(await res.json());
     } else {
       const res = await fetch("/api/admin/restaurants");
       if (res.ok) setRestaurants(await res.json());
@@ -172,6 +176,12 @@ export default function AdminPage() {
             }`}>
             📋 Reclamos {pendingClaims > 0 && <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{pendingClaims}</span>}
           </button>
+          <button onClick={() => setTab("users")}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+              tab === "users" ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"
+            }`}>
+            👥 Usuarios
+          </button>
         </div>
 
         {loading ? (
@@ -182,9 +192,7 @@ export default function AdminPage() {
           /* Restaurants Table */
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
             <div className="border-b border-white/5 px-5 py-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-white">
-                Todos los Restaurantes
-              </h2>
+              <h2 className="text-sm font-bold text-white">Todos los Restaurantes</h2>
               <div className="flex gap-3 text-xs text-slate-500">
                 <span>{unclaimedCount} sin dueño</span>
                 <span>{restaurants.length - unclaimedCount} con dueño</span>
@@ -214,20 +222,16 @@ export default function AdminPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-xs text-white">{r.ownerEmail}</div>
-                        {r.isPlaceholder && (
-                          <span className="text-[10px] text-amber-400">Sin reclamar</span>
-                        )}
+                        {r.isPlaceholder && <span className="text-[10px] text-amber-400">Sin reclamar</span>}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {r.isVerified ? (
-                            <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">Verificado</span>
-                          ) : r.isPlaceholder ? (
-                            <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400">Disponible</span>
-                          ) : (
-                            <span className="rounded-md bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-400">Registrado</span>
-                          )}
-                        </div>
+                        {r.isVerified ? (
+                          <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">Verificado</span>
+                        ) : r.isPlaceholder ? (
+                          <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400">Disponible</span>
+                        ) : (
+                          <span className="rounded-md bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-400">Registrado</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center text-xs text-slate-400">{r.categoryCount} cat</td>
                       <td className="px-4 py-3 text-center text-xs text-slate-400">{r.orderCount}</td>
@@ -237,7 +241,7 @@ export default function AdminPage() {
               </table>
             </div>
           </div>
-        ) : (
+        ) : tab === "claims" ? (
           /* Claims */
           <div className="space-y-4">
             {claims.length === 0 ? (
@@ -271,8 +275,8 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs text-slate-500">Restaurante: /{claim.dealer.slug}</div>
-                      <div className="text-xs text-slate-500">Tel: {claim.dealer.phone}</div>
+                      <div className="text-xs text-slate-500">/{claim.dealer.slug}</div>
+                      <div className="text-xs text-slate-500">{claim.dealer.phone}</div>
                     </div>
                   </div>
 
@@ -280,12 +284,8 @@ export default function AdminPage() {
                     <div className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-2 mb-3 flex items-center gap-2">
                       <span className="text-xs text-slate-400">Código:</span>
                       <span className="font-mono text-lg font-bold text-primary tracking-widest">{claim.code}</span>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(claim.code!)}
-                        className="ml-auto text-[10px] text-primary hover:underline"
-                      >
-                        Copiar
-                      </button>
+                      <button onClick={() => navigator.clipboard.writeText(claim.code!)}
+                        className="ml-auto text-[10px] text-primary hover:underline">Copiar</button>
                     </div>
                   )}
 
@@ -310,6 +310,57 @@ export default function AdminPage() {
                 </div>
               ))
             )}
+          </div>
+        ) : (
+          /* Users */
+          <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
+            <div className="border-b border-white/5 px-5 py-3">
+              <h2 className="text-sm font-bold text-white">Todos los Usuarios ({users.length})</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/5 text-xs text-slate-500">
+                    <th className="px-4 py-2.5 text-left font-semibold">Usuario</th>
+                    <th className="px-4 py-2.5 text-center font-semibold">Rol</th>
+                    <th className="px-4 py-2.5 text-center font-semibold">Email Verificado</th>
+                    <th className="px-4 py-2.5 text-center font-semibold">Negocios</th>
+                    <th className="px-4 py-2.5 text-center font-semibold">Reclamos</th>
+                    <th className="px-4 py-2.5 text-left font-semibold">Registrado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u: any) => (
+                    <tr key={u.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-semibold text-white">{u.name}</div>
+                        <div className="text-[11px] text-slate-500">{u.email}</div>
+                        {u.phone && <div className="text-[11px] text-slate-600">{u.phone}</div>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                          u.role === "ADMIN" ? "bg-purple-500/15 text-purple-400" :
+                          u.role === "BUSINESS" ? "bg-blue-500/15 text-blue-400" :
+                          "bg-slate-500/15 text-slate-400"
+                        }`}>{u.role}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {u.emailVerified ? (
+                          <span className="text-emerald-400 text-xs">✓</span>
+                        ) : (
+                          <span className="text-slate-600 text-xs">✗</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center text-xs text-slate-400">{u._count.accounts}</td>
+                      <td className="px-4 py-3 text-center text-xs text-slate-400">{u._count.claimRequests}</td>
+                      <td className="px-4 py-3 text-[11px] text-slate-500">
+                        {new Date(u.createdAt).toLocaleDateString("es-AR")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
