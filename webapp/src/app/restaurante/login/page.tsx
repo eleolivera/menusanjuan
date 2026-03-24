@@ -105,7 +105,13 @@ export default function RestauranteLoginPage() {
             )}
           </button>
 
-          <p className="mt-4 text-center text-xs text-text-muted">
+          <p className="mt-3 text-center">
+            <Link href="/restaurante/reset-password" className="text-xs text-text-muted hover:text-primary transition-colors">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </p>
+
+          <p className="mt-3 text-center text-xs text-text-muted">
             ¿Querés sumar tu restaurante?{" "}
             <Link href="/restaurante/register" className="font-medium text-primary hover:underline">
               Registrate gratis
