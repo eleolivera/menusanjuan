@@ -8,6 +8,8 @@ export async function GET() {
   }
   return NextResponse.json({
     authenticated: true,
+    userId: dealer.account.userId,
+    dealerId: dealer.id,
     slug: dealer.slug,
     name: dealer.name,
     phone: dealer.phone,

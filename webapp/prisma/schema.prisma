@@ -10,16 +10,25 @@ datasource db {
 // ─── Auth & Account ───
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  phone         String?
+  role          UserRole  @default(USER)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
+  accounts      Account[]
+  sessions      Session[]
+  claimRequests ClaimRequest[]
+}
+
+enum UserRole {
+  USER
+  BUSINESS
+  ADMIN
 }
 
 model Account {
@@ -64,6 +73,10 @@ model Dealer {
   coverUrl    String?
   cuisineType String   @default("General")   // Comida Rápida, Parrilla, Pizzería, etc.
   isActive    Boolean  @default(true)
+  isVerified  Boolean  @default(false)       // Owner identity verified
+  claimedAt   DateTime?                      // When a real owner claimed this
+  sourceProfileId String?                    // ID from scraped source
+  sourceSite  String?                        // "google-maps", "instagram", "manual", etc.
   openHours   String?                        // JSON string of hours
   mercadoPagoAlias String?
   mercadoPagoCvu   String?
@@ -71,13 +84,43 @@ model Dealer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  account    Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  categories MenuCategory[]
-  orders     Order[]
+  account       Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categories    MenuCategory[]
+  orders        Order[]
+  claimRequests ClaimRequest[]
 
   @@index([slug])
   @@index([cuisineType])
   @@index([isActive])
+  @@index([sourceProfileId])
+}
+
+// ─── Claim Requests ───
+
+model ClaimRequest {
+  id         String       @id @default(cuid())
+  dealerId   String                              // Restaurant being claimed
+  userId     String                              // User requesting the claim
+  status     ClaimStatus  @default(PENDING)
+  code       String?                             // 6-char verification code (admin-generated)
+  notes      String?                             // Admin notes
+  requestedAt DateTime    @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?                            // Admin user ID who approved/rejected
+
+  dealer Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([dealerId])
+  @@index([userId])
+  @@index([status])
+}
+
+enum ClaimStatus {
+  PENDING    // Waiting for admin review
+  CODE_SENT  // Admin generated code and sent to business
+  APPROVED   // Claim approved, ownership transferred
+  REJECTED   // Claim rejected
 }
 
 // ─── Menu ───

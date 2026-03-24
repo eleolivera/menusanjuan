@@ -2,31 +2,36 @@ import { prisma } from "./prisma";
 import { DEMO_RESTAURANTS } from "@/data/restaurants";
 import type { Restaurant } from "@/data/restaurants";
 
-export async function getRestaurantBySlug(slug: string): Promise<Restaurant | null> {
-  // Check demo data first
-  const demo = DEMO_RESTAURANTS.find((r) => r.slug === slug);
-  if (demo) return demo;
+export type RestaurantWithDealerId = Restaurant & { dealerId: string | null };
 
-  // Check DB
+export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithDealerId | null> {
+  // Check DB first (all restaurants should be here now)
   const dealer = await prisma.dealer.findUnique({
     where: { slug },
   });
 
-  if (!dealer || !dealer.isActive) return null;
+  if (dealer && dealer.isActive) {
+    return {
+      id: dealer.id,
+      dealerId: dealer.id,
+      name: dealer.name,
+      slug: dealer.slug,
+      description: dealer.description || "",
+      phone: dealer.phone,
+      address: dealer.address || "",
+      cuisineType: dealer.cuisineType,
+      logoUrl: dealer.logoUrl,
+      coverUrl: dealer.coverUrl || "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=400&fit=crop",
+      rating: 0,
+      itemCount: 0,
+      priceRange: "$$",
+      isOpen: true,
+    };
+  }
 
-  return {
-    id: dealer.id,
-    name: dealer.name,
-    slug: dealer.slug,
-    description: dealer.description || "",
-    phone: dealer.phone,
-    address: dealer.address || "",
-    cuisineType: dealer.cuisineType,
-    logoUrl: dealer.logoUrl,
-    coverUrl: dealer.coverUrl || "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=400&fit=crop",
-    rating: 0,
-    itemCount: 0,
-    priceRange: "$$",
-    isOpen: true,
-  };
+  // Fallback to demo data (for any not yet in DB)
+  const demo = DEMO_RESTAURANTS.find((r) => r.slug === slug);
+  if (demo) return { ...demo, dealerId: null };
+
+  return null;
 }

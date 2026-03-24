@@ -4,6 +4,7 @@ import { DEMO_RESTAURANTS } from "@/data/restaurants";
 import { getRestaurantBySlug } from "@/lib/get-restaurant";
 import { getMenuBySlug } from "@/lib/get-restaurant-menu";
 import { StoreMenu } from "@/components/StoreMenu";
+import { ClaimBanner } from "@/components/ClaimBanner";
 
 export async function generateStaticParams() {
   return DEMO_RESTAURANTS.map((r) => ({ store: r.slug }));
@@ -155,6 +156,15 @@ export default async function StorePage({
           </div>
         </div>
       </div>
+
+      {/* Claim Banner */}
+      {restaurant.dealerId && (
+        <ClaimBanner
+          dealerId={restaurant.dealerId}
+          restaurantName={restaurant.name}
+          slug={restaurant.slug}
+        />
+      )}
 
       {/* Menu */}
       <StoreMenu restaurant={restaurant} categories={categories} />
