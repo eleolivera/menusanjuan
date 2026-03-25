@@ -1,0 +1,91 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getAdminSession } from "@/lib/admin-auth";
+
+// GET — single restaurant with full details
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await getAdminSession())) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const { id } = await params;
+
+  const dealer = await prisma.dealer.findUnique({
+    where: { id },
+    include: {
+      account: { include: { user: { select: { id: true, email: true, name: true, phone: true } } } },
+      categories: { include: { items: { orderBy: { sortOrder: "asc" } } }, orderBy: { sortOrder: "asc" } },
+      claimRequests: {
+        include: { user: { select: { email: true, name: true } } },
+        orderBy: { requestedAt: "desc" },
+      },
+      _count: { select: { orders: true } },
+    },
+  });
+
+  if (!dealer) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+  return NextResponse.json({
+    ...dealer,
+    ownerEmail: dealer.account.user.email,
+    ownerName: dealer.account.user.name,
+    ownerId: dealer.account.user.id,
+    isPlaceholder: dealer.account.user.email.endsWith("@menusanjuan.com"),
+    orderCount: dealer._count.orders,
+  });
+}
+
+// PATCH — update restaurant fields
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await getAdminSession())) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const { id } = await params;
+  const body = await request.json();
+
+  const {
+    name, slug, phone, address, city, latitude, longitude,
+    cuisineType, description, logoUrl, coverUrl,
+    isActive, openHours, mercadoPagoAlias, mercadoPagoCvu, bankInfo,
+    sourceProfileId, sourceSite,
+  } = body;
+
+  const updated = await prisma.dealer.update({
+    where: { id },
+    data: {
+      ...(name !== undefined && { name }),
+      ...(slug !== undefined && { slug }),
+      ...(phone !== undefined && { phone }),
+      ...(address !== undefined && { address }),
+      ...(city !== undefined && { city }),
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude }),
+      ...(cuisineType !== undefined && { cuisineType }),
+      ...(description !== undefined && { description }),
+      ...(logoUrl !== undefined && { logoUrl }),
+      ...(coverUrl !== undefined && { coverUrl }),
+      ...(isActive !== undefined && { isActive }),
+      ...(openHours !== undefined && { openHours }),
+      ...(mercadoPagoAlias !== undefined && { mercadoPagoAlias }),
+      ...(mercadoPagoCvu !== undefined && { mercadoPagoCvu }),
+      ...(bankInfo !== undefined && { bankInfo }),
+      ...(sourceProfileId !== undefined && { sourceProfileId }),
+      ...(sourceSite !== undefined && { sourceSite }),
+    },
+  });
+
+  return NextResponse.json(updated);
+}
+
+// DELETE — delete restaurant
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await getAdminSession())) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const { id } = await params;
+
+  await prisma.dealer.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}

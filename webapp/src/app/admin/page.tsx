@@ -134,6 +134,22 @@ export default function AdminPage() {
       </header>
 
       <div className="max-w-6xl mx-auto p-6">
+        {/* Quick stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+          {[
+            { label: "Restaurantes", value: restaurants.length, color: "text-white" },
+            { label: "Sin reclamar", value: unclaimed, color: "text-amber-400" },
+            { label: "Con dueño", value: restaurants.length - unclaimed, color: "text-emerald-400" },
+            { label: "Reclamos pendientes", value: pendingClaims, color: "text-blue-400" },
+            { label: "Usuarios", value: users.length || "—", color: "text-slate-400" },
+          ].map((s, i) => (
+            <div key={i} className="rounded-xl border border-white/5 bg-slate-900/50 px-4 py-3">
+              <div className={`text-xl font-extrabold ${s.color}`}>{s.value}</div>
+              <div className="text-[10px] text-slate-500">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
         <div className="flex gap-2 mb-6">
           {[
             { key: "restaurants" as const, label: `🍽️ Restaurantes (${restaurants.length})` },
@@ -166,8 +182,8 @@ export default function AdminPage() {
               </tr></thead>
               <tbody>
                 {restaurants.map(r => (
-                  <tr key={r.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
-                    <td className="px-4 py-3"><div className="text-sm font-semibold text-white">{r.name}</div><div className="text-[11px] text-slate-500">/{r.slug}</div></td>
+                  <tr key={r.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 cursor-pointer" onClick={() => window.location.href = `/admin/restaurants/${r.id}`}>
+                    <td className="px-4 py-3"><div className="text-sm font-semibold text-white hover:text-primary">{r.name}</div><div className="text-[11px] text-slate-500">/{r.slug}</div></td>
                     <td className="px-4 py-3"><div className="text-xs text-white">{r.ownerEmail}</div>{r.isPlaceholder && <span className="text-[10px] text-amber-400">Sin reclamar</span>}</td>
                     <td className="px-4 py-3 text-center">{r.isVerified ? <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">Verificado</span> : r.isPlaceholder ? <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400">Disponible</span> : <span className="rounded-md bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-400">Registrado</span>}</td>
                     <td className="px-4 py-3 text-center text-xs text-slate-400">{r.categoryCount}</td>
