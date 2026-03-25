@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ImageUpload } from "@/components/ImageUpload";
 import { LocationPicker } from "@/components/LocationPicker";
 
 const CUISINE_OPTIONS = [
@@ -56,6 +55,20 @@ export default function ProfilePage() {
   const [mercadoPagoAlias, setMercadoPagoAlias] = useState("");
   const [mercadoPagoCvu, setMercadoPagoCvu] = useState("");
   const [bankInfo, setBankInfo] = useState("");
+
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImageUpload(file: File, type: string, setter: (url: string) => void) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", type);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (res.ok) setter(data.url);
+    } catch {}
+  }
 
   useEffect(() => {
     fetch("/api/restaurante/profile")
@@ -151,19 +164,58 @@ export default function ProfilePage() {
       </header>
 
       <div className="max-w-3xl mx-auto p-6 space-y-8">
-        {/* Live Preview */}
+        {/* Cover + Logo (Facebook-style, click to edit) */}
         <div className="rounded-2xl border border-white/5 overflow-hidden">
-          <div className="relative h-32 bg-gradient-to-br from-slate-900 via-orange-950 to-red-950">
-            {coverUrl && <img src={coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-            <div className="absolute bottom-3 left-4 flex items-end gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white text-xl font-bold shadow-lg border-2 border-white/20 overflow-hidden">
-                {logoUrl ? <img src={logoUrl} alt="" className="h-full w-full object-cover" /> : name?.charAt(0) || "R"}
+          {/* Cover — click to change */}
+          <div className="relative h-40 group cursor-pointer" onClick={() => coverInputRef.current?.click()}>
+            {coverUrl ? (
+              <img src={coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 flex items-center justify-center">
+                <div className="text-center">
+                  <svg className="h-8 w-8 text-slate-500 mx-auto mb-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                  </svg>
+                  <span className="text-xs text-slate-500">Agregar foto de portada</span>
+                </div>
               </div>
-              <div>
-                <div className="text-base font-bold text-white">{name || "Tu Restaurante"}</div>
+            )}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 rounded-lg bg-black/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                </svg>
+                Cambiar portada
+              </div>
+            </div>
+            <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "cover", setCoverUrl); e.target.value = ""; }} />
+          </div>
+
+          {/* Logo — overlapping the cover, click to change */}
+          <div className="relative px-4 pb-4 -mt-10">
+            <div className="flex items-end gap-4">
+              <div className="relative group cursor-pointer" onClick={() => logoInputRef.current?.click()}>
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-amber-500 text-white text-2xl font-bold shadow-lg border-4 border-slate-950 overflow-hidden">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    name?.charAt(0) || "R"
+                  )}
+                </div>
+                <div className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                  <svg className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                  </svg>
+                </div>
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "logo", setLogoUrl); e.target.value = ""; }} />
+              </div>
+              <div className="pb-1">
+                <div className="text-lg font-bold text-white">{name || "Tu Restaurante"}</div>
                 <div className="flex items-center gap-2">
                   {cuisineType && <span className="rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{cuisineType}</span>}
+                  {address && <span className="text-xs text-slate-500">{address}</span>}
                 </div>
               </div>
             </div>
@@ -218,28 +270,7 @@ export default function ProfilePage() {
           }}
         />
 
-        {/* Images */}
-        <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
-          <h2 className="text-sm font-bold text-white mb-4">Imágenes</h2>
-          <div className="flex gap-6">
-            <ImageUpload
-              value={logoUrl}
-              onChange={setLogoUrl}
-              type="logo"
-              label="Logo"
-              shape="logo"
-            />
-            <div className="flex-1">
-              <ImageUpload
-                value={coverUrl}
-                onChange={setCoverUrl}
-                type="cover"
-                label="Foto de portada"
-                shape="cover"
-              />
-            </div>
-          </div>
-        </section>
+        {/* Images section removed — cover + logo are editable in the preview above */}
 
         {/* Hours of Operation */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
