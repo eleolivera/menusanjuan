@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         logoUrl: logoUrl || null,
         coverUrl: coverUrl || null,
+        isActive: false, // Starts inactive — admin reviews and activates
       },
     });
 
