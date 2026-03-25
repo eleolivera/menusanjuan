@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import { KanbanBoard } from "@/components/restaurante/KanbanBoard";
@@ -63,17 +63,25 @@ export default function RestauranteDashboard() {
   }, [router]);
 
   // Fetch orders for selected date
+  const initialLoadDone = useRef(false);
   const fetchOrders = useCallback(() => {
     if (!slug) return;
-    setLoading(true);
+    // Only show loading spinner on first load or date change, not on polls
+    if (!initialLoadDone.current) setLoading(true);
     const dateParam = isToday ? "" : `&date=${selectedDate}`;
     fetch(`/api/orders?restaurante=${slug}${dateParam}`)
       .then((r) => r.json())
       .then((data) => {
         setOrders(data);
         setLoading(false);
+        initialLoadDone.current = true;
       });
   }, [slug, selectedDate, isToday]);
+
+  // Reset loading state when date changes
+  useEffect(() => {
+    initialLoadDone.current = false;
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchOrders();
