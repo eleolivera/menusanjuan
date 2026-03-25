@@ -93,7 +93,7 @@ export default function AnalyticsPage() {
               </svg>
             </button>
             <div>
-              <h1 className="text-xl font-bold text-white">Analíticas</h1>
+              <h1 className="text-xl font-bold text-white">Dashboard</h1>
               <p className="text-sm text-slate-400">Reportes y métricas de ventas</p>
             </div>
           </div>

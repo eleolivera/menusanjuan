@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/restaurante/analytics", label: "Analíticas", emoji: "📊" },
+  { href: "/restaurante/analytics", label: "Dashboard", emoji: "📊" },
   { href: "/restaurante", label: "Pedidos", emoji: "📋", exact: true },
   { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
   { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "⚙️" },
