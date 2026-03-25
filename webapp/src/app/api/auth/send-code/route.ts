@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   });
 
   // In dev, return the code for testing
-  const isDev = !process.env.RESEND_API_KEY;
+  const isDev = !process.env.MAILERSEND_API_KEY;
   return NextResponse.json({
     success: true,
     ...(isDev && { code }),

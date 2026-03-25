@@ -1,5 +1,7 @@
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = "MenuSanJuan <noreply@menusanjuan.com>";
+// MenuSanJuan uses MailerSend (Resend's free slot is used by AutoSanJuan)
+const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
+const FROM_EMAIL = "noreply@menusanjuan.com";
+const FROM_NAME = "MenuSanJuan";
 
 type SendEmailParams = {
   to: string;
@@ -8,24 +10,29 @@ type SendEmailParams = {
 };
 
 export async function sendEmail({ to, subject, html }: SendEmailParams): Promise<boolean> {
-  if (!RESEND_API_KEY) {
+  if (!MAILERSEND_API_KEY) {
     console.log(`[EMAIL DEV] To: ${to} | Subject: ${subject}`);
-    console.log(`[EMAIL DEV] Would send email but RESEND_API_KEY not set`);
+    console.log(`[EMAIL DEV] MAILERSEND_API_KEY not set — email not sent`);
     return true; // Pretend success in dev
   }
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.mailersend.com/v1/email", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${MAILERSEND_API_KEY}`,
       },
-      body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+      body: JSON.stringify({
+        from: { email: FROM_EMAIL, name: FROM_NAME },
+        to: [{ email: to }],
+        subject,
+        html,
+      }),
     });
 
     if (!res.ok) {
-      console.error("Email send failed:", await res.text());
+      console.error("MailerSend error:", await res.text());
       return false;
     }
     return true;
