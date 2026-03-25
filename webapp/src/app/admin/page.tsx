@@ -33,6 +33,7 @@ type Restaurant = {
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -43,11 +44,14 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Check if already logged in
+  // Check if already logged in + check for ?login param
   useEffect(() => {
     fetch("/api/admin/restaurants").then((r) => {
       if (r.ok) setAuthed(true);
     });
+    if (typeof window !== "undefined") {
+      setShowLogin(window.location.search.includes("login"));
+    }
   }, []);
 
   async function handleLogin() {
@@ -107,14 +111,6 @@ export default function AdminPage() {
   }
 
   if (!authed) {
-    // Check URL for secret ?login param — otherwise show nothing
-    const [showLogin, setShowLogin] = useState(false);
-    useEffect(() => {
-      if (typeof window !== "undefined") {
-        setShowLogin(window.location.search.includes("login"));
-      }
-    }, []);
-
     if (!showLogin) {
       // Show a blank 404-looking page — admin URL is not discoverable
       return (
