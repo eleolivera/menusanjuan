@@ -126,7 +126,7 @@ export function Header() {
                       {session.restaurants.map((r) => (
                         <Link
                           key={r.slug}
-                          href="/restaurante"
+                          href="/restaurante/analytics"
                           onClick={async () => {
                             await fetch("/api/restaurante/session", {
                               method: "PATCH",

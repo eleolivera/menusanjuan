@@ -1,6 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const NAV_ITEMS = [
+  { href: "/restaurante/analytics", label: "Analíticas", emoji: "📊" },
+  { href: "/restaurante", label: "Pedidos", emoji: "📋", exact: true },
+  { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
+  { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "⚙️" },
+];
 
 export function RestauranteSidebar({
   restaurantName,
@@ -11,6 +19,13 @@ export function RestauranteSidebar({
   slug: string;
   onLogout: () => void;
 }) {
+  const pathname = usePathname();
+
+  function isActive(item: typeof NAV_ITEMS[0]) {
+    if (item.exact) return pathname === item.href;
+    return pathname.startsWith(item.href);
+  }
+
   return (
     <aside className="hidden lg:flex w-64 flex-col border-r border-white/5 bg-slate-900">
       {/* Brand */}
@@ -28,36 +43,25 @@ export function RestauranteSidebar({
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        <Link
-          href="/restaurante"
-          className="flex items-center rounded-lg bg-primary/15 px-3 py-2.5 text-sm font-medium text-primary-light"
-        >
-          <span className="mr-2">📋</span> Pedidos
-        </Link>
-        <Link
-          href="/restaurante/menu"
-          className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"
-        >
-          <span className="mr-2">📋</span> Menú
-        </Link>
-        <Link
-          href="/restaurante/analytics"
-          className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"
-        >
-          <span className="mr-2">📊</span> Analíticas
-        </Link>
-        <Link
-          href="/restaurante/profile"
-          className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"
-        >
-          <span className="mr-2">⚙️</span> Mi Restaurante
-        </Link>
+        {NAV_ITEMS.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              isActive(item)
+                ? "bg-primary/15 text-primary-light"
+                : "text-slate-400 hover:bg-white/5 hover:text-slate-300"
+            }`}
+          >
+            <span className="mr-2">{item.emoji}</span> {item.label}
+          </Link>
+        ))}
         <Link
           href={`/${slug}`}
           target="_blank"
           className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors"
         >
-          <span className="mr-2">🍽️</span> Ver Menú Público
+          <span className="mr-2">👁️</span> Ver Página
         </Link>
       </nav>
 
