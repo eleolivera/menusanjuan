@@ -256,6 +256,20 @@ export default function AdminRestaurantDetail() {
               </div>
             </div>
 
+            {/* Pending owner */}
+            {(data as any).pendingOwnerEmail && (
+              <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400">⏳</span>
+                  <div>
+                    <div className="text-xs font-semibold text-amber-300">Dueño pendiente</div>
+                    <div className="text-sm text-white">{(data as any).pendingOwnerEmail}</div>
+                    <div className="text-[11px] text-amber-400/70">Se asignará automáticamente cuando esta persona se registre</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <h3 className="text-sm font-bold text-white mb-2">Asignar Dueño por Email</h3>
               <div className="flex gap-2">

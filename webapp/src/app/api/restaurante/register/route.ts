@@ -114,12 +114,38 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return { user, dealer };
+      // Check for pending restaurant assignments
+      const pendingRestaurants = await tx.dealer.findMany({
+        where: { pendingOwnerEmail: email },
+        include: { account: true },
+      });
+
+      for (const pending of pendingRestaurants) {
+        // Re-link the restaurant's account to this new user
+        await tx.account.update({
+          where: { id: pending.account.id },
+          data: { userId: user.id },
+        });
+        await tx.dealer.update({
+          where: { id: pending.id },
+          data: { pendingOwnerEmail: null, isVerified: true, claimedAt: new Date() },
+        });
+        // Clean up old placeholder user
+        const oldAccounts = await tx.account.count({ where: { userId: pending.account.userId } });
+        if (oldAccounts === 0) {
+          const oldUser = await tx.user.findUnique({ where: { id: pending.account.userId } });
+          if (oldUser?.email.endsWith("@menusanjuan.com")) {
+            await tx.user.delete({ where: { id: pending.account.userId } });
+          }
+        }
+      }
+
+      return { user, dealer, pendingLinked: pendingRestaurants.length };
     });
 
     await createSession(result.user.id, result.dealer.slug);
 
-    return NextResponse.json({ success: true, slug: result.dealer.slug }, { status: 201 });
+    return NextResponse.json({ success: true, slug: result.dealer.slug, pendingLinked: result.pendingLinked }, { status: 201 });
   } catch (err) {
     console.error("Registration error:", err);
     return NextResponse.json({ error: "Error al registrar. Intentá de nuevo." }, { status: 500 });

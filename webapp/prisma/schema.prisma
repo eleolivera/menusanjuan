@@ -78,6 +78,7 @@ model Dealer {
   isActive    Boolean  @default(true)
   isVerified  Boolean  @default(false)       // Owner identity verified
   claimedAt   DateTime?                      // When a real owner claimed this
+  pendingOwnerEmail String?                  // Email of future owner — auto-links on registration
   sourceProfileId String?                    // ID from scraped source
   sourceSite  String?                        // "google-maps", "instagram", "manual", etc.
   openHours   String?                        // JSON string of hours

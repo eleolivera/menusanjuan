@@ -55,14 +55,18 @@ export async function POST(
 
     return NextResponse.json({ success: true, linked: true, email });
   } else {
-    // User doesn't exist — save email for auto-link on registration
-    // Update the placeholder user's email so when someone registers with this email,
-    // they'll get a "this email is taken" error and need to claim instead
-    // For now, just return that we need to create the user first
+    // User doesn't exist yet — save email for auto-link when they register
+    await prisma.dealer.update({
+      where: { id: dealerId },
+      data: { pendingOwnerEmail: email },
+    });
+
     return NextResponse.json({
-      success: false,
-      message: `No existe un usuario con ${email}. El dueño debe registrarse primero, luego podés asignarlo.`,
-    }, { status: 404 });
+      success: true,
+      linked: false,
+      pending: true,
+      message: `Guardado. Cuando ${email} se registre, el restaurante se le asignará automáticamente.`,
+    });
   }
 }
 
