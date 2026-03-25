@@ -33,6 +33,7 @@ type Restaurant = {
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("");
   const [showLogin, setShowLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,8 +47,13 @@ export default function AdminPage() {
 
   // Check if already logged in + check for ?login param
   useEffect(() => {
-    fetch("/api/admin/restaurants").then((r) => {
-      if (r.ok) setAuthed(true);
+    fetch("/api/admin/session").then((r) => {
+      if (r.ok) {
+        r.json().then((data) => {
+          setAuthed(true);
+          setAdminEmail(data.email || "");
+        });
+      }
     });
     if (typeof window !== "undefined") {
       setShowLogin(window.location.search.includes("login"));
@@ -172,9 +178,24 @@ export default function AdminPage() {
             <h1 className="text-xl font-bold text-white">Admin — MenuSanJuan</h1>
             <p className="text-sm text-slate-500">Gestión de restaurantes y reclamos</p>
           </div>
-          <button onClick={fetchData} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">
-            Actualizar
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500">{adminEmail}</span>
+            <button onClick={fetchData} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">
+              Actualizar
+            </button>
+            <a href="/admin/guia" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">
+              Guía
+            </a>
+            <button
+              onClick={async () => {
+                await fetch("/api/admin/session", { method: "DELETE" });
+                setAuthed(false);
+                setAdminEmail("");
+              }}
+              className="rounded-lg border border-red-500/20 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors">
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
