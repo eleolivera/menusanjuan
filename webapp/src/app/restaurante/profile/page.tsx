@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ImageUpload } from "@/components/ImageUpload";
-import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { LocationPicker } from "@/components/LocationPicker";
 
 const CUISINE_OPTIONS = [
   "Comida Rápida", "Parrilla", "Pizzería", "Cafetería", "Pastas",
@@ -208,15 +208,15 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Address */}
+        {/* Address + Map */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
           <h2 className="text-sm font-bold text-white mb-4">Ubicación</h2>
-          <AddressAutocomplete
-            value={address}
-            onChange={setAddress}
-            onCoordinates={(lat, lng) => { setLatitude(lat); setLongitude(lng); }}
-            label="Dirección"
-            placeholder="Dirección del restaurante"
+          <LocationPicker
+            onLocationConfirm={(addr, lat, lng) => {
+              setAddress(addr);
+              setLatitude(lat);
+              setLongitude(lng);
+            }}
           />
         </section>
 
