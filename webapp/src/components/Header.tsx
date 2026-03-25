@@ -144,6 +144,11 @@ export function Header() {
                           {r.slug === active?.slug && <span className="ml-auto text-primary text-xs">✓</span>}
                         </button>
                       ))}
+                      <Link href="/restaurante/register" onClick={() => setShowMenu(false)}
+                        className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-all mt-1">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md border-2 border-dashed border-primary/30 text-primary text-sm">+</span>
+                        Agregar restaurante
+                      </Link>
                     </div>
                   )}
 
