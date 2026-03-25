@@ -42,9 +42,7 @@ export function Header() {
 
   async function handleLogout() {
     await fetch("/api/restaurante/session", { method: "DELETE" });
-    setSession(null);
-    setShowMenu(false);
-    setMobileOpen(false);
+    window.location.href = "/";
   }
 
   const hasRestas = session?.restaurants && session.restaurants.length > 0;

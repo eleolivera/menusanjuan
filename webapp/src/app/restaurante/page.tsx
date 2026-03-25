@@ -129,7 +129,7 @@ export default function RestauranteDashboard() {
 
   async function handleLogout() {
     await fetch("/api/restaurante/session", { method: "DELETE" });
-    router.push("/restaurante/login");
+    window.location.href = "/";
   }
 
   const newOrders = orders.filter((o) => o.status === "GENERATED").length;
