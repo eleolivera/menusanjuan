@@ -28,6 +28,8 @@ export async function createSession(userId: string, activeSlug?: string) {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
   });
+  // Clear admin session when logging in as a regular user
+  cookieStore.delete("menusj_admin");
   return token;
 }
 

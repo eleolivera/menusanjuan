@@ -14,6 +14,8 @@ export async function createAdminSession(userId: string) {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
   });
+  // Clear user session when logging in as admin
+  cookieStore.delete("menusj_session");
   return token;
 }
 
