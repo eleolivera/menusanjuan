@@ -5,8 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 
 const NAV_ITEMS = [
-  { href: "/restaurante/analytics", label: "Dashboard", emoji: "📊" },
-  { href: "/restaurante", label: "Pedidos", emoji: "📋", exact: true },
+  { href: "/restaurante", label: "Dashboard", emoji: "📊", exact: true },
+  { href: "/restaurante/pedidos", label: "Pedidos", emoji: "📋" },
   { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
   { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "⚙️" },
 ];
@@ -126,7 +126,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               }`}
             >
               <span className={collapsed ? "text-lg" : "text-base mr-2.5"}>👁️</span>
-              {!collapsed && <span className="text-sm font-medium">Ver Página</span>}
+              {!collapsed && (
+                <span className="text-sm font-medium flex items-center gap-1.5">
+                  Ver Página
+                  <svg className="h-3 w-3 text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </span>
+              )}
             </a>
           )}
         </nav>

@@ -29,7 +29,7 @@ export default function RestauranteLoginPage() {
         return;
       }
 
-      window.location.href = "/";
+      window.location.href = "/restaurante";
     } catch {
       setError("Error de conexión");
     } finally {

@@ -109,7 +109,7 @@ export function Header() {
                     <div className="py-1.5 border-b border-border/50">
                       <div className="px-4 py-1 text-[10px] font-bold text-text-muted uppercase tracking-wider">Mis Restaurantes</div>
                       {session.restaurants.map((r) => (
-                        <Link key={r.slug} href="/restaurante/analytics"
+                        <Link key={r.slug} href="/restaurante"
                           onClick={async () => {
                             await fetch("/api/restaurante/session", {
                               method: "PATCH",
