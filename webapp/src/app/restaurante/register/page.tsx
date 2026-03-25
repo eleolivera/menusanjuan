@@ -88,17 +88,55 @@ export default function RegisterPage() {
     return true;
   }
 
+  async function handleCreateAccount() {
+    if (!validateStep1()) return;
+    setLoading(true);
+    setError("");
+
+    // Create account first (no restaurant yet)
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Error al crear cuenta");
+        setLoading(false);
+        return;
+      }
+
+      // Check if restaurants were auto-linked
+      const sessionRes = await fetch("/api/restaurante/session");
+      if (sessionRes.ok) {
+        const session = await sessionRes.json();
+        if (session.restaurants && session.restaurants.length > 0) {
+          // Already has restaurants from pending assignment — go to dashboard
+          window.location.href = "/restaurante";
+          return;
+        }
+      }
+    } catch {
+      // Account creation endpoint doesn't exist yet — fall through to old flow
+    }
+
+    setLoading(false);
+
+    // No auto-linked restaurants — show step 1.5
+    if (unclaimed.length > 0) {
+      setStep(1.5);
+    } else {
+      setMode("new");
+      setStep(2);
+    }
+  }
+
   function handleNext() {
     setError("");
     if (step === 1) {
-      if (!validateStep1()) return;
-      // If there are unclaimed restaurants, show the choice
-      if (unclaimed.length > 0) {
-        setStep(1.5);
-      } else {
-        setMode("new");
-        setStep(2);
-      }
+      handleCreateAccount();
       return;
     }
     if (step === 2 && !validateStep2()) return;
