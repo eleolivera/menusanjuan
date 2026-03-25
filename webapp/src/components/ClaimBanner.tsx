@@ -12,68 +12,53 @@ export function ClaimBanner({
   restaurantName: string;
   slug: string;
 }) {
-  const [session, setSession] = useState<{ slug: string; userId?: string } | null>(null);
-  const [claimStatus, setClaimStatus] = useState<"none" | "pending" | "code_sent" | "approved" | "submitting">("none");
+  const [session, setSession] = useState<any>(null);
+  const [claimState, setClaimState] = useState<"none" | "pending" | "code_sent" | "approved" | "submitting">("none");
   const [claimId, setClaimId] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
 
-  // Check if user is logged in
   useEffect(() => {
     fetch("/api/restaurante/session")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.authenticated) {
           setSession(data);
-          // Check if they already have a claim
-          checkExistingClaim(data.slug);
+          // Check existing claims for this dealer by this user
+          fetch(`/api/claim?dealerId=${dealerId}`)
+            .then((r) => r.json())
+            .then((claims) => {
+              if (Array.isArray(claims) && claims.length > 0) {
+                const c = claims[0];
+                if (c.status === "PENDING") { setClaimState("pending"); setClaimId(c.id); }
+                else if (c.status === "CODE_SENT") { setClaimState("code_sent"); setClaimId(c.id); }
+                else if (c.status === "APPROVED") { setClaimState("approved"); }
+              }
+            });
         }
-      })
-      .catch(() => {});
-  }, []);
-
-  async function checkExistingClaim(userSlug: string) {
-    // Get user ID from session — we need to add this
-    const res = await fetch(`/api/claim?dealerId=${dealerId}`);
-    const claims = await res.json();
-    if (Array.isArray(claims) && claims.length > 0) {
-      const latest = claims[0];
-      if (latest.status === "PENDING") { setClaimStatus("pending"); setClaimId(latest.id); }
-      else if (latest.status === "CODE_SENT") { setClaimStatus("code_sent"); setClaimId(latest.id); }
-      else if (latest.status === "APPROVED") { setClaimStatus("approved"); }
-    }
-  }
+      });
+  }, [dealerId]);
 
   async function handleSubmitClaim() {
-    if (!session) return;
-    setClaimStatus("submitting");
+    setClaimState("submitting");
     setError("");
-
-    // We need the user ID — get it from a dedicated endpoint
-    const sessionRes = await fetch("/api/restaurante/session");
-    const sessionData = await sessionRes.json();
 
     const res = await fetch("/api/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "submit",
-        dealerId,
-        userId: sessionData.userId,
-      }),
+      body: JSON.stringify({ action: "submit", dealerId }),
     });
-
     const data = await res.json();
+
     if (!res.ok) {
       setError(data.error);
-      setClaimStatus("none");
-      if (data.existing) setClaimStatus("pending");
+      if (data.claimId) { setClaimId(data.claimId); setClaimState(data.status?.toLowerCase() || "pending"); }
+      else setClaimState("none");
       return;
     }
 
     setClaimId(data.claimId);
-    setClaimStatus("pending");
+    setClaimState("pending");
   }
 
   async function handleVerifyCode() {
@@ -85,26 +70,23 @@ export function ClaimBanner({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "verify", claimId, code: code.trim() }),
     });
-
     const data = await res.json();
-    if (!res.ok) { setError(data.error); return; }
 
-    setSuccess(true);
-    setClaimStatus("approved");
+    if (!res.ok) { setError(data.error); return; }
+    setClaimState("approved");
+    // Reload to update header + page
+    setTimeout(() => window.location.reload(), 1000);
   }
 
-  // Don't show if the logged-in user already owns this restaurant
-  if (session?.slug === slug) return null;
-
-  // Already approved
-  if (claimStatus === "approved" || success) {
+  // Don't show if logged-in user already owns this restaurant
+  if (session?.activeRestaurant?.slug === slug) return null;
+  // Don't show if already approved
+  if (claimState === "approved") {
     return (
       <div className="mx-auto max-w-7xl px-4 py-3">
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-50 px-4 py-3 flex items-center gap-2">
-          <svg className="h-5 w-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-sm font-medium text-emerald-800">Restaurante verificado</span>
+          <span className="text-emerald-600">✅</span>
+          <span className="text-sm font-medium text-emerald-800">Restaurante verificado — ¡Ahora es tuyo!</span>
         </div>
       </div>
     );
@@ -115,16 +97,16 @@ export function ClaimBanner({
       <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
         {/* Not logged in */}
         {!session && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🏪</span>
-              <span className="text-sm text-text-secondary">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg shrink-0">🏪</span>
+              <span className="text-sm text-text-secondary truncate">
                 ¿<strong>{restaurantName}</strong> es tu restaurante?
               </span>
             </div>
             <Link
               href={`/restaurante/register?claim=${dealerId}`}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors"
+              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors"
             >
               Reclamalo
             </Link>
@@ -132,49 +114,45 @@ export function ClaimBanner({
         )}
 
         {/* Logged in, no claim yet */}
-        {session && claimStatus === "none" && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🏪</span>
-              <span className="text-sm text-text-secondary">
+        {session && claimState === "none" && (
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg shrink-0">🏪</span>
+              <span className="text-sm text-text-secondary truncate">
                 ¿<strong>{restaurantName}</strong> es tu restaurante?
               </span>
             </div>
-            <button
-              onClick={handleSubmitClaim}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors"
-            >
-              Reclamar este restaurante
+            <button onClick={handleSubmitClaim}
+              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors">
+              Reclamar
             </button>
           </div>
         )}
 
-        {claimStatus === "submitting" && (
+        {claimState === "submitting" && (
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <span className="text-sm text-text-secondary">Enviando reclamo...</span>
           </div>
         )}
 
-        {/* Claim pending */}
-        {claimStatus === "pending" && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">⏳</span>
-              <span className="text-sm text-text-secondary">
-                Tu reclamo está <strong>pendiente de revisión</strong>. Te vamos a contactar con un código de verificación.
-              </span>
-            </div>
+        {/* Pending */}
+        {claimState === "pending" && (
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⏳</span>
+            <span className="text-sm text-text-secondary">
+              Tu reclamo está <strong>pendiente</strong>. Te vamos a contactar con un código.
+            </span>
           </div>
         )}
 
         {/* Code sent — enter code */}
-        {claimStatus === "code_sent" && (
+        {claimState === "code_sent" && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">🔑</span>
               <span className="text-sm text-text-secondary">
-                Ingresá el código de verificación que te enviamos:
+                Ingresá el código de verificación:
               </span>
             </div>
             <div className="flex gap-2">
@@ -186,20 +164,15 @@ export function ClaimBanner({
                 maxLength={6}
                 className="w-28 rounded-lg border border-border bg-white px-3 py-2 text-center text-sm font-mono font-bold tracking-widest text-text uppercase focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
-              <button
-                onClick={handleVerifyCode}
-                disabled={code.length < 6}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
-              >
+              <button onClick={handleVerifyCode} disabled={code.length < 6}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50">
                 Verificar
               </button>
             </div>
           </div>
         )}
 
-        {error && (
-          <p className="mt-2 text-xs text-danger">{error}</p>
-        )}
+        {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       </div>
     </div>
   );

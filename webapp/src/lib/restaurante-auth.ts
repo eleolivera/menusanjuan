@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 import crypto from "crypto";
 
-const COOKIE_NAME = "menusj_restaurante";
+const COOKIE_NAME = "menusj_session";
 const COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 
 export function hashPassword(password: string): string {
@@ -17,8 +17,9 @@ export function verifyPassword(password: string, stored: string): boolean {
   return attempt === hash;
 }
 
-export async function createRestauranteSession(slug: string) {
-  const token = Buffer.from(JSON.stringify({ slug, ts: Date.now() })).toString("base64");
+// Session now stores userId + active restaurant slug
+export async function createSession(userId: string, activeSlug?: string) {
+  const token = Buffer.from(JSON.stringify({ userId, activeSlug: activeSlug || null, ts: Date.now() })).toString("base64");
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
@@ -30,35 +31,124 @@ export async function createRestauranteSession(slug: string) {
   return token;
 }
 
-export async function getRestauranteSession(): Promise<{ slug: string } | null> {
+// Also keep old name for backward compat during transition
+export const createRestauranteSession = async (slug: string) => {
+  // Find user by slug
+  const dealer = await prisma.dealer.findUnique({
+    where: { slug },
+    include: { account: true },
+  });
+  if (dealer) {
+    await createSession(dealer.account.userId, slug);
+  }
+};
+
+export type SessionData = {
+  userId: string;
+  activeSlug: string | null;
+};
+
+export async function getSession(): Promise<SessionData | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
 
   try {
     const data = JSON.parse(Buffer.from(token, "base64").toString("utf-8"));
-    if (data.slug) return { slug: data.slug };
+    // Support old format (just slug) and new format (userId + activeSlug)
+    if (data.userId) return { userId: data.userId, activeSlug: data.activeSlug || null };
+    if (data.slug) {
+      // Old format — look up userId from slug
+      const dealer = await prisma.dealer.findUnique({
+        where: { slug: data.slug },
+        include: { account: true },
+      });
+      if (dealer) return { userId: dealer.account.userId, activeSlug: data.slug };
+    }
     return null;
   } catch {
     return null;
   }
 }
 
-// Get the full dealer record from the session
-export async function getRestauranteFromSession() {
-  const session = await getRestauranteSession();
+// Backward compat
+export async function getRestauranteSession() {
+  const session = await getSession();
+  if (!session) return null;
+  return { slug: session.activeSlug || "" };
+}
+
+// Get full user with all their restaurants + pending claims
+export async function getFullSession() {
+  const session = await getSession();
   if (!session) return null;
 
-  const dealer = await prisma.dealer.findUnique({
-    where: { slug: session.slug },
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
     include: {
-      account: {
-        include: { user: true },
+      accounts: {
+        where: { type: "dealer" },
+        include: {
+          dealer: {
+            select: {
+              id: true, name: true, slug: true, cuisineType: true,
+              logoUrl: true, coverUrl: true, phone: true, address: true,
+              description: true, isActive: true, isVerified: true,
+            },
+          },
+        },
+      },
+      claimRequests: {
+        where: { status: { in: ["PENDING", "CODE_SENT"] } },
+        include: {
+          dealer: { select: { id: true, name: true, slug: true } },
+        },
+        orderBy: { requestedAt: "desc" },
       },
     },
   });
 
+  if (!user) return null;
+
+  const restaurants = user.accounts
+    .map((a) => a.dealer)
+    .filter(Boolean);
+
+  const activeRestaurant = session.activeSlug
+    ? restaurants.find((r) => r!.slug === session.activeSlug) || restaurants[0]
+    : restaurants[0];
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      phone: user.phone,
+      role: user.role,
+    },
+    restaurants,
+    activeRestaurant: activeRestaurant || null,
+    pendingClaims: user.claimRequests,
+  };
+}
+
+// Get the active dealer (backward compat for existing code)
+export async function getRestauranteFromSession() {
+  const full = await getFullSession();
+  if (!full?.activeRestaurant) return null;
+
+  const dealer = await prisma.dealer.findUnique({
+    where: { slug: full.activeRestaurant.slug },
+    include: { account: { include: { user: true } } },
+  });
+
   return dealer;
+}
+
+export async function switchActiveRestaurant(slug: string) {
+  const session = await getSession();
+  if (!session) return;
+  await createSession(session.userId, slug);
 }
 
 export async function destroyRestauranteSession() {
@@ -66,7 +156,7 @@ export async function destroyRestauranteSession() {
   cookieStore.delete(COOKIE_NAME);
 }
 
-// Login with email + password
+// Login with email + password — returns userId
 export async function loginWithEmail(email: string, password: string): Promise<string | null> {
   const user = await prisma.user.findUnique({
     where: { email },
@@ -79,12 +169,10 @@ export async function loginWithEmail(email: string, password: string): Promise<s
   });
 
   if (!user) return null;
-
   if (!verifyPassword(password, user.password)) return null;
 
-  const dealer = user.accounts[0]?.dealer;
-  if (!dealer) return null;
+  const firstDealer = user.accounts[0]?.dealer;
+  await createSession(user.id, firstDealer?.slug || undefined);
 
-  await createRestauranteSession(dealer.slug);
-  return dealer.slug;
+  return firstDealer?.slug || user.id;
 }
