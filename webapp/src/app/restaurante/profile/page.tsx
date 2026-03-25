@@ -209,16 +209,14 @@ export default function ProfilePage() {
         </section>
 
         {/* Address + Map */}
-        <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
-          <h2 className="text-sm font-bold text-white mb-4">Ubicación</h2>
-          <LocationPicker
-            onLocationConfirm={(addr, lat, lng) => {
-              setAddress(addr);
-              setLatitude(lat);
-              setLongitude(lng);
-            }}
-          />
-        </section>
+        <LocationSection
+          address={address}
+          onConfirm={(addr, lat, lng) => {
+            setAddress(addr);
+            setLatitude(lat);
+            setLongitude(lng);
+          }}
+        />
 
         {/* Images */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
@@ -439,6 +437,51 @@ function AccountSection({ email, onEmailChange }: { email: string; onEmailChange
           </p>
         )}
       </div>
+    </section>
+  );
+}
+
+function LocationSection({ address, onConfirm }: { address: string; onConfirm: (addr: string, lat: number, lng: number) => void }) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-bold text-white">Ubicación</h2>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            className="text-xs font-medium text-primary hover:underline transition-colors"
+          >
+            Editar
+          </button>
+        )}
+      </div>
+
+      {!editing ? (
+        <div className="flex items-start gap-2">
+          <svg className="h-4 w-4 mt-0.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+          </svg>
+          <span className="text-sm text-slate-300">{address || "Sin dirección — hacé click en Editar para agregar"}</span>
+        </div>
+      ) : (
+        <>
+          <LocationPicker
+            onLocationConfirm={(addr, lat, lng) => {
+              onConfirm(addr, lat, lng);
+              setEditing(false);
+            }}
+          />
+          <button
+            onClick={() => setEditing(false)}
+            className="mt-3 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Cancelar
+          </button>
+        </>
+      )}
     </section>
   );
 }
