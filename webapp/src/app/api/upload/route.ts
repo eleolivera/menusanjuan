@@ -1,14 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadToR2, resolveUrlToR2 } from "@/lib/r2";
-import { getRestauranteSession } from "@/lib/restaurante-auth";
+import { getSession } from "@/lib/restaurante-auth";
+
+// Extract extension from a URL (handles query params, CDN URLs like Instagram/Facebook)
+function getExtFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    const match = pathname.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i);
+    return match ? match[1].toLowerCase() : "jpg";
+  } catch {
+    return "jpg";
+  }
+}
 
 // POST — upload image (file or URL)
 export async function POST(request: NextRequest) {
-  const session = await getRestauranteSession();
+  const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  // Use activeSlug for the folder, or a generic user folder
+  const folder = session.activeSlug || `user-${session.userId.slice(0, 8)}`;
   const contentType = request.headers.get("content-type") || "";
 
   // JSON body = URL resolve
@@ -20,8 +33,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Falta imageUrl" }, { status: 400 });
     }
 
-    const ext = imageUrl.match(/\.(jpg|jpeg|png|webp|gif)/i)?.[1] || "jpg";
-    const key = `${session.slug}/${type || "image"}-${Date.now()}.${ext}`;
+    const ext = getExtFromUrl(imageUrl);
+    const key = `${folder}/${type || "image"}-${Date.now()}.${ext}`;
 
     try {
       const url = await resolveUrlToR2(imageUrl, key);
@@ -51,8 +64,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Máximo 5MB" }, { status: 400 });
   }
 
-  const ext = file.name.split(".").pop() || "jpg";
-  const key = `${session.slug}/${type}-${Date.now()}.${ext}`;
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const key = `${folder}/${type}-${Date.now()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   try {

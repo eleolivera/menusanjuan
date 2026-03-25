@@ -143,7 +143,7 @@ export function ImageUpload({
         ) : (
           <div className="flex gap-2 w-full">
             <input
-              type="url"
+              type="text"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="https://..."
