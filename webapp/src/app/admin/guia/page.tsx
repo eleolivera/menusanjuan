@@ -51,7 +51,7 @@ export default function AdminGuide() {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 mb-10">
           <h2 className="text-sm font-bold text-slate-900 mb-3">Links Rápidos</h2>
           <div className="grid grid-cols-2 gap-2">
-            <a href="https://menusanjuan.com/admin" target="_blank" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 hover:border-primary hover:text-primary transition-all">
+            <a href="https://menusanjuan.com/admin?login" target="_blank" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 hover:border-primary hover:text-primary transition-all">
               🔐 Panel Admin
             </a>
             <a href="https://menusanjuan.com/restaurante/register" target="_blank" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 hover:border-primary hover:text-primary transition-all">
@@ -145,7 +145,7 @@ export default function AdminGuide() {
               <li>Decile al dueño que vaya a <strong>menusanjuan.com/{'{'}slug{'}'}</strong></li>
               <li>Van a ver <strong>"¿Es tu restaurante?"</strong> — que haga click en Reclamar</li>
               <li>Si no tiene cuenta, se registra con su email</li>
-              <li>Vos vas a <a href="https://menusanjuan.com/admin" target="_blank" className="underline">menusanjuan.com/admin</a> → Reclamos</li>
+              <li>Vos vas a <a href="https://menusanjuan.com/admin?login" target="_blank" className="underline">menusanjuan.com/admin</a> → Reclamos</li>
               <li>Click <strong>Generar Código</strong> → copiá el código de 6 caracteres</li>
               <li>Enviá el código al dueño por WhatsApp</li>
               <li>El dueño ingresa el código en la página del restaurante</li>
