@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import { KanbanBoard } from "@/components/restaurante/KanbanBoard";
-import { RestauranteSidebar } from "@/components/restaurante/RestauranteSidebar";
 import { OrderTotals } from "@/components/restaurante/OrderTotals";
 
 // Get today's date in AR timezone as YYYY-MM-DD
@@ -136,21 +135,14 @@ export default function RestauranteDashboard() {
 
   if (!slug) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen">
-      <RestauranteSidebar
-        restaurantName={restaurantName || slug}
-        slug={slug}
-        onLogout={handleLogout}
-      />
-
-      <div className="flex-1 overflow-y-auto">
+    <div className="h-full overflow-y-auto">
         {/* Top Bar */}
         <header className="sticky top-0 z-40 border-b border-white/5 glass-dark px-6 py-4">
           <div className="flex items-center justify-between">
@@ -290,6 +282,5 @@ export default function RestauranteDashboard() {
           )}
         </div>
       </div>
-    </div>
   );
 }

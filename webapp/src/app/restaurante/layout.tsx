@@ -1,16 +1,13 @@
-import { redirect } from "next/navigation";
-import { getRestauranteSession } from "@/lib/restaurante-auth";
+import { DashboardShell } from "@/components/restaurante/DashboardShell";
 
-export default async function RestauranteLayout({
+export default function RestauranteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Login page doesn't need auth check
-  // We handle auth in page components instead to avoid redirect loops
   return (
     <div className="min-h-screen bg-slate-950">
-      {children}
+      <DashboardShell>{children}</DashboardShell>
     </div>
   );
 }
