@@ -70,6 +70,7 @@ export default function AdminPage() {
     });
     if (res.ok) {
       setAuthed(true);
+      setAdminEmail(email);
     } else {
       const data = await res.json();
       setLoginError(data.error || "Error");
