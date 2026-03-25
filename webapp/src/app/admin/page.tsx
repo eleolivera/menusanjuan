@@ -110,17 +110,13 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
-          <div className="text-center mb-6">
-            <div className="text-3xl mb-2">🔐</div>
-            <h1 className="text-xl font-bold text-white">Admin Panel</h1>
-            <p className="text-sm text-slate-500">MenuSanJuan</p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5 space-y-3">
+          <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-3">
+            <p className="text-xs text-slate-600 text-center mb-2">Acceso restringido</p>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email admin"
+              placeholder="Email"
               className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none"
             />
             <input
@@ -135,8 +131,8 @@ export default function AdminPage() {
               <p className="text-xs text-red-400">{loginError}</p>
             )}
             <button onClick={handleLogin} disabled={loginLoading}
-              className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50">
-              {loginLoading ? "Ingresando..." : "Entrar"}
+              className="w-full rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/20 transition-all disabled:opacity-50">
+              {loginLoading ? "..." : "Entrar"}
             </button>
           </div>
         </div>

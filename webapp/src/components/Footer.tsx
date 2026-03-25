@@ -83,11 +83,14 @@ export function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="mt-12 border-t border-border/50 pt-6 text-center">
+        <div className="mt-12 border-t border-border/50 pt-6 flex items-center justify-between">
           <p className="text-xs text-text-muted">
             &copy; {new Date().getFullYear()} MenuSanJuan. Todos los derechos
             reservados.
           </p>
+          <Link href="/admin" className="text-[10px] text-text-muted/30 hover:text-text-muted transition-colors">
+            admin
+          </Link>
         </div>
       </div>
     </footer>
