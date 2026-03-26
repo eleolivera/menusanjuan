@@ -7,7 +7,7 @@ export type Restaurant = {
   address: string;
   cuisineType: string;
   logoUrl: string | null;
-  coverUrl: string;
+  coverUrl: string | null;
   rating: number;
   itemCount: number;
   priceRange: string;

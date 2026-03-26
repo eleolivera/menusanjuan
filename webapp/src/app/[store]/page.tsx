@@ -5,6 +5,27 @@ import { getMenuBySlug } from "@/lib/get-restaurant-menu";
 import { StoreMenu } from "@/components/StoreMenu";
 import { ClaimBanner } from "@/components/ClaimBanner";
 
+// Generate a unique gradient based on restaurant name so covers look different
+const GRADIENTS = [
+  "bg-gradient-to-br from-orange-900 via-red-900 to-rose-950",
+  "bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-950",
+  "bg-gradient-to-br from-violet-900 via-purple-900 to-fuchsia-950",
+  "bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-950",
+  "bg-gradient-to-br from-amber-900 via-orange-900 to-red-950",
+  "bg-gradient-to-br from-rose-900 via-pink-900 to-purple-950",
+  "bg-gradient-to-br from-teal-900 via-emerald-900 to-green-950",
+  "bg-gradient-to-br from-sky-900 via-blue-900 to-indigo-950",
+  "bg-gradient-to-br from-fuchsia-900 via-pink-900 to-rose-950",
+  "bg-gradient-to-br from-lime-900 via-green-900 to-emerald-950",
+  "bg-gradient-to-br from-cyan-900 via-sky-900 to-blue-950",
+  "bg-gradient-to-br from-red-900 via-orange-900 to-amber-950",
+];
+function coverGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  return GRADIENTS[Math.abs(hash) % GRADIENTS.length];
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -85,22 +106,28 @@ export default async function StorePage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       {/* Store Header / Cover */}
-      <div className="relative h-48 sm:h-56 overflow-hidden bg-gradient-to-br from-slate-900 via-orange-950 to-red-950">
-        <Image
-          src={restaurant.coverUrl}
-          alt={restaurant.name}
-          fill
-          className="object-cover opacity-40"
-          priority
-        />
+      <div className={`relative h-48 sm:h-56 overflow-hidden ${!restaurant.coverUrl ? coverGradient(restaurant.name) : "bg-slate-900"}`}>
+        {restaurant.coverUrl && (
+          <Image
+            src={restaurant.coverUrl}
+            alt={restaurant.name}
+            fill
+            className="object-cover opacity-40"
+            priority
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
 
         <div className="absolute bottom-0 left-0 right-0 px-4 pb-5">
           <div className="mx-auto max-w-7xl">
             <div className="flex items-end gap-4">
               {/* Logo */}
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-amber-500 text-white text-2xl font-bold shadow-lg border-2 border-white/20">
-                {restaurant.name.charAt(0)}
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-amber-500 text-white text-2xl font-bold shadow-lg border-2 border-white/20 overflow-hidden">
+                {restaurant.logoUrl ? (
+                  <Image src={restaurant.logoUrl} alt="" width={64} height={64} className="h-full w-full object-cover" />
+                ) : (
+                  restaurant.name.charAt(0)
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight truncate">

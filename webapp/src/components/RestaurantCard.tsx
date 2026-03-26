@@ -2,6 +2,26 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Restaurant } from "@/data/restaurants";
 
+const GRADIENTS = [
+  "from-orange-900 via-red-900 to-rose-950",
+  "from-emerald-900 via-teal-900 to-cyan-950",
+  "from-violet-900 via-purple-900 to-fuchsia-950",
+  "from-blue-900 via-indigo-900 to-slate-950",
+  "from-amber-900 via-orange-900 to-red-950",
+  "from-rose-900 via-pink-900 to-purple-950",
+  "from-teal-900 via-emerald-900 to-green-950",
+  "from-sky-900 via-blue-900 to-indigo-950",
+  "from-fuchsia-900 via-pink-900 to-rose-950",
+  "from-lime-900 via-green-900 to-emerald-950",
+  "from-cyan-900 via-sky-900 to-blue-950",
+  "from-red-900 via-orange-900 to-amber-950",
+];
+function coverGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  return `bg-gradient-to-br ${GRADIENTS[Math.abs(hash) % GRADIENTS.length]}`;
+}
+
 export function RestaurantCard({
   restaurant,
   index,
@@ -19,14 +39,26 @@ export function RestaurantCard({
       }}
     >
       {/* Cover Image */}
-      <div className="relative aspect-[2/1] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
-        <Image
-          src={restaurant.coverUrl}
-          alt={restaurant.name}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-        />
+      <div className={`relative aspect-[2/1] overflow-hidden ${restaurant.coverUrl ? "bg-slate-200" : coverGradient(restaurant.name)}`}>
+        {restaurant.coverUrl ? (
+          <Image
+            src={restaurant.coverUrl}
+            alt={restaurant.name}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+          />
+        ) : restaurant.logoUrl ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="h-20 w-20 rounded-2xl overflow-hidden bg-white/10 backdrop-blur-sm border border-white/20 shadow-lg">
+              <Image src={restaurant.logoUrl} alt="" width={80} height={80} className="h-full w-full object-cover" />
+            </div>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-5xl font-bold text-white/20">{restaurant.name.charAt(0)}</span>
+          </div>
+        )}
         {/* Status badge */}
         <div className="absolute top-3 left-3">
           <span
