@@ -1,12 +1,17 @@
 import type { MetadataRoute } from "next";
-import { DEMO_RESTAURANTS } from "@/data/restaurants";
+import { prisma } from "@/lib/prisma";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://menusanjuan.com";
 
-  const restaurantPages = DEMO_RESTAURANTS.map((r) => ({
-    url: `${baseUrl}/${r.slug}`,
-    lastModified: new Date(),
+  const dealers = await prisma.dealer.findMany({
+    where: { isActive: true },
+    select: { slug: true, updatedAt: true },
+  });
+
+  const restaurantPages = dealers.map((d) => ({
+    url: `${baseUrl}/${d.slug}`,
+    lastModified: d.updatedAt,
     changeFrequency: "daily" as const,
     priority: 0.8,
   }));

@@ -1,14 +1,9 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
-import { DEMO_RESTAURANTS } from "@/data/restaurants";
 import { getRestaurantBySlug } from "@/lib/get-restaurant";
 import { getMenuBySlug } from "@/lib/get-restaurant-menu";
 import { StoreMenu } from "@/components/StoreMenu";
 import { ClaimBanner } from "@/components/ClaimBanner";
-
-export async function generateStaticParams() {
-  return DEMO_RESTAURANTS.map((r) => ({ store: r.slug }));
-}
 
 export async function generateMetadata({
   params,

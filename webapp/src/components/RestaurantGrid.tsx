@@ -1,23 +1,23 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { DEMO_RESTAURANTS } from "@/data/restaurants";
 import type { Restaurant } from "@/data/restaurants";
 import { RestaurantCard } from "./RestaurantCard";
 import { CuisineFilter } from "./CuisineFilter";
 import { SearchBar } from "./SearchBar";
 
 export function RestaurantGrid() {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>(DEMO_RESTAURANTS);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loading, setLoading] = useState(true);
   const [cuisine, setCuisine] = useState("all");
   const [search, setSearch] = useState("");
 
-  // Fetch real restaurants from API (merges DB + demo)
+  // Fetch restaurants from DB only
   useEffect(() => {
     fetch("/api/restaurants")
       .then((r) => r.json())
-      .then((data) => setRestaurants(data))
-      .catch(() => {}); // fallback to demo data on error
+      .then((data) => { setRestaurants(data); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(() => {
