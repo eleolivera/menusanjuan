@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadToR2, resolveUrlToR2 } from "@/lib/r2";
 import { getSession } from "@/lib/restaurante-auth";
+import { getAdminSession } from "@/lib/admin-auth";
 
 // Extract extension from a URL (handles query params, CDN URLs like Instagram/Facebook)
 function getExtFromUrl(url: string): string {
@@ -15,13 +16,15 @@ function getExtFromUrl(url: string): string {
 
 // POST — upload image (file or URL)
 export async function POST(request: NextRequest) {
+  // Accept either user session or admin session
   const session = await getSession();
-  if (!session) {
+  const adminSession = await getAdminSession();
+  if (!session && !adminSession) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  // Use activeSlug for the folder, or a generic user folder
-  const folder = session.activeSlug || `user-${session.userId.slice(0, 8)}`;
+  // Use activeSlug for the folder, or admin folder
+  const folder = session?.activeSlug || (adminSession ? "admin-uploads" : `user-${session?.userId.slice(0, 8)}`);
   const contentType = request.headers.get("content-type") || "";
 
   // JSON body = URL resolve
