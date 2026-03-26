@@ -63,6 +63,26 @@ export function HowItWorks() {
             </div>
           ))}
         </div>
+
+        {/* Restaurant owner CTA */}
+        <div className="mt-14 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-orange-50 p-8 text-center">
+          <div className="text-3xl mb-3">🍽️</div>
+          <h3 className="text-xl font-extrabold text-text tracking-tight mb-2">
+            ¿Tenés un restaurante?
+          </h3>
+          <p className="text-sm text-text-secondary mb-5 max-w-md mx-auto">
+            Tu menú online, pedidos por WhatsApp, gestión de cocina y analíticas. Todo gratis, sin comisiones.
+          </p>
+          <a
+            href="/para-restaurantes"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+          >
+            Conocé más
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </a>
+        </div>
       </div>
     </section>
   );

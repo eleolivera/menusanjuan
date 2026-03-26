@@ -50,13 +50,18 @@ export function Footer() {
             </h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/restaurante/login" className="text-sm text-text-secondary hover:text-primary transition-colors">
-                  Iniciar Sesión
+                <Link href="/para-restaurantes" className="text-sm text-text-secondary hover:text-primary transition-colors">
+                  Cómo Funciona
                 </Link>
               </li>
               <li>
                 <Link href="/restaurante/register" className="text-sm text-text-secondary hover:text-primary transition-colors">
                   Registrar mi Restaurante
+                </Link>
+              </li>
+              <li>
+                <Link href="/restaurante/login" className="text-sm text-text-secondary hover:text-primary transition-colors">
+                  Iniciar Sesión
                 </Link>
               </li>
             </ul>
