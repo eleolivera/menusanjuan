@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { MenuItemData } from "@/data/menus";
 import { LocationPicker } from "./LocationPicker";
+import { PhoneInput } from "./PhoneInput";
+import { formatForWhatsApp } from "@/lib/phone";
 
 type CartItem = {
   item: MenuItemData;
@@ -99,7 +101,7 @@ _Pedido realizado desde MenuSanJuan_`;
       setOrderId(order.id);
 
       // 2. Open WhatsApp with the real order number
-      const cleanPhone = restaurantPhone.replace(/[^0-9]/g, "");
+      const cleanPhone = formatForWhatsApp(restaurantPhone) || restaurantPhone.replace(/[^0-9]/g, "");
       const message = buildWhatsAppMessage(order.orderNumber);
       window.open(`https://wa.me/${cleanPhone}?text=${message}`, "_blank");
 
@@ -225,18 +227,13 @@ _Pedido realizado desde MenuSanJuan_`;
                     className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                   />
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-text">
-                    Teléfono
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="264 555 1234"
-                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                  />
-                </div>
+                <PhoneInput
+                  value={phone}
+                  onChange={setPhone}
+                  label="Teléfono"
+                  placeholder="264 555 1234"
+                  required
+                />
                 <LocationPicker
                   onLocationConfirm={(addr, lat, lng) => {
                     setAddress(addr);
