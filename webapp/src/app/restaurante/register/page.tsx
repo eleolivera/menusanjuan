@@ -38,6 +38,8 @@ export default function RegisterPage() {
   const [claimSearch, setClaimSearch] = useState("");
 
   // Step 1: Account
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -75,6 +77,7 @@ export default function RegisterPage() {
   );
 
   function validateStep1(): boolean {
+    if (!firstName.trim() || !lastName.trim()) { setError("Ingresá tu nombre y apellido"); return false; }
     if (!email.includes("@")) { setError("Ingresá un email válido"); return false; }
     if (password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres"); return false; }
     if (password !== confirmPassword) { setError("Las contraseñas no coinciden"); return false; }
@@ -98,7 +101,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, name: `${firstName.trim()} ${lastName.trim()}` }),
       });
       const data = await res.json();
 
@@ -215,10 +218,10 @@ export default function RegisterPage() {
             M
           </div>
           <h1 className="text-2xl font-extrabold text-text tracking-tight">
-            Registrá tu Restaurante
+            Crear Cuenta
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Empezá a recibir pedidos por WhatsApp en minutos
+            Registrate para gestionar restaurantes y hacer pedidos
           </p>
         </div>
 
@@ -229,14 +232,28 @@ export default function RegisterPage() {
           {step === 1 && (
             <div className="space-y-4">
               <div className="text-center mb-2">
-                <div className="text-2xl mb-1">📧</div>
+                <div className="text-2xl mb-1">👤</div>
                 <h2 className="text-lg font-bold text-text">Creá tu cuenta</h2>
-                <p className="text-xs text-text-muted">Con esto vas a iniciar sesión en tu panel</p>
+                <p className="text-xs text-text-muted">Tus datos personales para iniciar sesión</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-text">Nombre</label>
+                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Juan"
+                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-text">Apellido</label>
+                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Pérez"
+                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+                </div>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-text">Email</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@restaurante.com"
+                  placeholder="tu@email.com"
                   className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
               </div>
               <div>

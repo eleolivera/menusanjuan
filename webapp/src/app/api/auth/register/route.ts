@@ -4,7 +4,7 @@ import { hashPassword, createSession } from "@/lib/restaurante-auth";
 
 // POST — create a user account (no restaurant). Auto-links pending restaurants.
 export async function POST(request: NextRequest) {
-  const { email, password } = await request.json();
+  const { email, password, name } = await request.json();
 
   if (!email?.includes("@") || !password || password.length < 6) {
     return NextResponse.json({ error: "Email y contraseña (mín. 6 caracteres) son obligatorios" }, { status: 400 });
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       data: {
         email,
         password: hashPassword(password),
-        name: email.split("@")[0],
+        name: name || email.split("@")[0],
       },
     });
 

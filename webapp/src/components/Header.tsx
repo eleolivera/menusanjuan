@@ -148,17 +148,26 @@ export function Header() {
 
                   {/* Pending claims */}
                   {hasClaims && (
-                    <div className="py-1.5 border-b border-border/50">
-                      <div className="px-4 py-1 text-[10px] font-bold text-amber-500 uppercase tracking-wider">Reclamos Pendientes</div>
+                    <div className="py-2 px-3 border-b border-border/50">
+                      <div className="px-1 py-1 text-[10px] font-bold text-amber-500 uppercase tracking-wider">Restaurantes en proceso</div>
                       {session.pendingClaims.map((c: any) => (
-                        <Link key={c.id} href={`/${c.dealer.slug}`} onClick={() => setShowMenu(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 transition-all">
-                          <span className="text-xs">⏳</span>
-                          <span className="truncate">{c.dealer.name}</span>
-                          <span className="ml-auto text-[10px] text-amber-400">
-                            {c.status === "CODE_SENT" ? "Ingresar código" : "Pendiente"}
-                          </span>
-                        </Link>
+                        <div key={c.id} className="rounded-lg bg-amber-50 border border-amber-200 p-3 mt-1.5">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">⏳</span>
+                            <span className="text-sm font-semibold text-amber-800 truncate">{c.dealer.name}</span>
+                          </div>
+                          {c.status === "CODE_SENT" ? (
+                            <div>
+                              <p className="text-[11px] text-amber-700 mb-2">Te enviamos un código. Ingresalo para completar el reclamo.</p>
+                              <Link href={`/${c.dealer.slug}`} onClick={() => setShowMenu(false)}
+                                className="block text-center rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 transition-colors">
+                                Ingresar código
+                              </Link>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-amber-600">Estamos revisando tu solicitud. Te vamos a contactar pronto.</p>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
