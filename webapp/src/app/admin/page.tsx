@@ -152,6 +152,7 @@ export default function AdminPage() {
             <button onClick={() => { setLoading(true); if (tab === "restaurants") fetch("/api/admin/restaurants").then(r => r.json()).then(d => { setRestaurants(d); setLoading(false); }); else if (tab === "claims") fetch("/api/admin/claims").then(r => r.json()).then(d => { setClaims(d); setLoading(false); }); else fetch("/api/admin/users").then(r => r.json()).then(d => { setUsers(d); setLoading(false); }); }}
               className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Actualizar</button>
             <a href="/admin/guia" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Guía</a>
+            <a href="/admin/playbook" className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary hover:bg-primary/20 transition-colors">Playbook</a>
             <button onClick={handleLogout} className="rounded-lg border border-red-500/20 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors">Salir</button>
           </div>
         </div>
