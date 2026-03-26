@@ -51,6 +51,13 @@ export default function AdminRestaurantDetail() {
   const [itemPrice, setItemPrice] = useState("");
   const [itemDesc, setItemDesc] = useState("");
 
+  // Edit item
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editName, setEditName] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editImage, setEditImage] = useState("");
+
   useEffect(() => { fetchData(); }, [id]);
 
   async function fetchData() {
@@ -131,6 +138,32 @@ export default function AdminRestaurantDetail() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "item", itemId, available: !available }),
     });
+    fetchData();
+  }
+
+  function startEditItem(item: any) {
+    setEditingItem(item);
+    setEditName(item.name);
+    setEditPrice(String(item.price));
+    setEditDesc(item.description || "");
+    setEditImage(item.imageUrl || "");
+  }
+
+  async function handleUpdateItem() {
+    if (!editingItem) return;
+    await fetch(`/api/admin/restaurants/${id}/menu`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "item",
+        itemId: editingItem.id,
+        name: editName,
+        price: Number(editPrice),
+        description: editDesc || null,
+        imageUrl: editImage || null,
+      }),
+    });
+    setEditingItem(null);
     fetchData();
   }
 
@@ -226,9 +259,11 @@ export default function AdminRestaurantDetail() {
                 {cat.items.map(item => (
                   <div key={item.id} className={`flex items-center gap-3 px-4 py-2 border-b border-white/5 last:border-0 ${!item.available ? "opacity-40" : ""}`}>
                     <span className="flex-1 text-sm text-white truncate">{item.name}</span>
-                    <span className="text-xs text-slate-400">${item.price.toLocaleString("es-AR")}</span>
-                    <button onClick={() => handleToggleItem(item.id, item.available)} className={`text-xs ${item.available ? "text-emerald-400" : "text-slate-600"}`}>{item.available ? "✓" : "✗"}</button>
-                    <button onClick={() => handleDeleteItem(item.id)} className="text-xs text-slate-600 hover:text-red-400">✕</button>
+                    {item.description && <span className="text-[10px] text-slate-600 truncate max-w-[150px]">{item.description}</span>}
+                    <span className="text-xs text-slate-400 shrink-0">${item.price.toLocaleString("es-AR")}</span>
+                    <button onClick={() => startEditItem(item)} className="text-xs text-slate-400 hover:text-primary transition-colors" title="Editar">✏️</button>
+                    <button onClick={() => handleToggleItem(item.id, item.available)} className={`text-xs ${item.available ? "text-emerald-400" : "text-slate-600"}`} title={item.available ? "Desactivar" : "Activar"}>{item.available ? "✓" : "✗"}</button>
+                    <button onClick={() => handleDeleteItem(item.id)} className="text-xs text-slate-600 hover:text-red-400" title="Eliminar">✕</button>
                   </div>
                 ))}
                 {cat.items.length === 0 && <div className="px-4 py-3 text-xs text-slate-600">Sin items</div>}
@@ -301,6 +336,44 @@ export default function AdminRestaurantDetail() {
           </div>
         )}
       </div>
+
+      {/* Edit Item Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingItem(null)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 p-6 shadow-2xl animate-scale-in">
+            <h3 className="text-lg font-bold text-white mb-4">Editar Item</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Nombre</label>
+                <input value={editName} onChange={e => setEditName(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Precio</label>
+                <input type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Descripción</label>
+                <input value={editDesc} onChange={e => setEditDesc(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">URL de imagen/video</label>
+                <input value={editImage} onChange={e => setEditImage(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+              </div>
+            </div>
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => setEditingItem(null)}
+                className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 transition-colors">Cancelar</button>
+              <button onClick={handleUpdateItem}
+                className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary-dark transition-colors">Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
