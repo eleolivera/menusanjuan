@@ -70,6 +70,7 @@ export default function AdminRestaurantDetail() {
   const [editPrice, setEditPrice] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editImage, setEditImage] = useState("");
+  const [uploadingItemImage, setUploadingItemImage] = useState(false);
 
   useEffect(() => { fetchData(); }, [id]);
 
@@ -599,9 +600,39 @@ Probalo y decime qué te parece!`;
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">URL de imagen/video</label>
-                <input value={editImage} onChange={e => setEditImage(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+                <label className="block text-xs text-slate-400 mb-1">Imagen</label>
+                {/* Preview */}
+                {editImage && (
+                  <div className="relative mb-2 rounded-xl overflow-hidden border border-white/10 h-32">
+                    <img src={editImage} alt="" className="h-full w-full object-cover" />
+                    <button onClick={() => setEditImage("")} className="absolute top-1.5 right-1.5 rounded-full bg-black/60 p-1 text-white hover:bg-black/80 transition-colors">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                )}
+                {/* Upload button */}
+                <label className={`flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/5 px-4 py-3 text-sm cursor-pointer hover:bg-white/10 transition-colors ${uploadingItemImage ? "opacity-50 pointer-events-none" : ""}`}>
+                  {uploadingItemImage ? (
+                    <><div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" /> <span className="text-slate-400">Subiendo...</span></>
+                  ) : (
+                    <><svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                    <span className="text-slate-400">{editImage ? "Cambiar imagen" : "Subir imagen"}</span></>
+                  )}
+                  <input type="file" accept="image/*,video/mp4" className="hidden" onChange={async (e) => {
+                    const f = e.target.files?.[0]; if (!f) return;
+                    setUploadingItemImage(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append("file", f);
+                      formData.append("type", "menu-item");
+                      const res = await fetch("/api/upload", { method: "POST", body: formData });
+                      const d = await res.json();
+                      if (res.ok) setEditImage(d.url);
+                    } catch {}
+                    setUploadingItemImage(false);
+                    e.target.value = "";
+                  }} />
+                </label>
               </div>
             </div>
             <div className="mt-4 flex gap-3">
