@@ -604,7 +604,11 @@ Probalo y decime qué te parece!`;
                 {/* Preview */}
                 {editImage && (
                   <div className="relative mb-2 rounded-xl overflow-hidden border border-white/10 h-32">
-                    <img src={editImage} alt="" className="h-full w-full object-cover" />
+                    {editImage.toLowerCase().includes(".mp4") || editImage.toLowerCase().includes(".mov") || editImage.toLowerCase().includes(".webm") ? (
+                      <video src={editImage} className="h-full w-full object-cover" autoPlay loop muted playsInline />
+                    ) : (
+                      <img src={editImage} alt="" className="h-full w-full object-cover" />
+                    )}
                     <button onClick={() => setEditImage("")} className="absolute top-1.5 right-1.5 rounded-full bg-black/60 p-1 text-white hover:bg-black/80 transition-colors">
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>

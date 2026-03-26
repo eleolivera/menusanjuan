@@ -3,6 +3,11 @@
 import Image from "next/image";
 import type { MenuItemData } from "@/data/menus";
 
+function isVideo(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.includes(".mp4") || lower.includes(".mov") || lower.includes(".webm") || lower.includes("video/");
+}
+
 export function MenuItemCard({
   item,
   quantity,
@@ -25,37 +30,40 @@ export function MenuItemCard({
       } ${!item.available ? "opacity-50" : ""}`}
     >
       {/* Image or Video */}
-      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200">
-        {item.imageUrl && (item.imageUrl.endsWith(".mp4") || item.imageUrl.endsWith(".mov") || item.imageUrl.endsWith(".webm")) ? (
-          <video
-            src={item.imageUrl}
-            className="h-full w-full object-cover"
-            autoPlay
-            loop
-            muted
-            playsInline
-          />
-        ) : (
-          <Image
-            src={item.imageUrl}
-            alt={item.name}
-            fill
-            className="object-cover"
-            sizes="96px"
-          />
-        )}
-        {item.badge && (
-          <span className="absolute top-1 left-1 rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-            {item.badge}
-          </span>
-        )}
-      </div>
+      {item.imageUrl && (
+        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200">
+          {isVideo(item.imageUrl) ? (
+            <video
+              src={item.imageUrl}
+              className="h-full w-full object-cover"
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+          ) : (
+            <Image
+              src={item.imageUrl}
+              alt={item.name}
+              fill
+              className="object-cover"
+              sizes="96px"
+            />
+          )}
+          {item.badge && (
+            <span className="absolute top-1 left-1 rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+              {item.badge}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Info */}
       <div className="flex flex-1 flex-col justify-between min-w-0">
         <div>
           <div className="flex items-start justify-between gap-2">
             <h4 className="text-sm font-bold text-text leading-snug truncate">
+              {!item.imageUrl && item.badge && <span className="mr-1.5 inline-block rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-white align-middle">{item.badge}</span>}
               {item.name}
             </h4>
             {item.rating && (
