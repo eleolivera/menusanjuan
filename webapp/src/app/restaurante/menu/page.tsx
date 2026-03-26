@@ -276,10 +276,14 @@ export default function MenuManagementPage() {
               <div className="divide-y divide-white/5">
                 {cat.items.map((item) => (
                   <div key={item.id} className={`flex items-center gap-4 px-5 py-3 ${!item.available ? "opacity-50" : ""}`}>
-                    {/* Image */}
+                    {/* Image or Video */}
                     <div className="h-12 w-12 shrink-0 rounded-lg bg-white/5 overflow-hidden">
                       {item.imageUrl ? (
-                        <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                        item.imageUrl.endsWith(".mp4") || item.imageUrl.endsWith(".mov") || item.imageUrl.endsWith(".webm") ? (
+                          <video src={item.imageUrl} className="h-full w-full object-cover" autoPlay loop muted playsInline />
+                        ) : (
+                          <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                        )
                       ) : (
                         <div className="h-full w-full flex items-center justify-center text-slate-600 text-lg">🍽️</div>
                       )}

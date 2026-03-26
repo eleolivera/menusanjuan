@@ -6,7 +6,7 @@ import { getSession } from "@/lib/restaurante-auth";
 function getExtFromUrl(url: string): string {
   try {
     const pathname = new URL(url).pathname;
-    const match = pathname.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i);
+    const match = pathname.match(/\.(jpg|jpeg|png|webp|gif|svg|mp4|mov|webm)$/i);
     return match ? match[1].toLowerCase() : "jpg";
   } catch {
     return "jpg";
@@ -54,14 +54,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No se recibió archivo" }, { status: 400 });
   }
 
-  // Validate file type
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "Solo se permiten imágenes" }, { status: 400 });
+  // Validate file type (images + video)
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/") || file.name.toLowerCase().endsWith(".mp4");
+  if (!isImage && !isVideo) {
+    return NextResponse.json({ error: "Solo se permiten imágenes y videos (mp4)" }, { status: 400 });
   }
 
-  // Max 5MB
-  if (file.size > 5 * 1024 * 1024) {
-    return NextResponse.json({ error: "Máximo 5MB" }, { status: 400 });
+  // Max 5MB for images, 20MB for videos
+  const maxSize = isVideo ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+  if (file.size > maxSize) {
+    return NextResponse.json({ error: isVideo ? "Máximo 20MB para videos" : "Máximo 5MB para imágenes" }, { status: 400 });
   }
 
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";

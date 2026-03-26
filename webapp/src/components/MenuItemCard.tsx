@@ -24,15 +24,26 @@ export function MenuItemCard({
           : "border-border/60 hover:border-primary/20 hover:shadow-sm"
       } ${!item.available ? "opacity-50" : ""}`}
     >
-      {/* Image */}
+      {/* Image or Video */}
       <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200">
-        <Image
-          src={item.imageUrl}
-          alt={item.name}
-          fill
-          className="object-cover"
-          sizes="96px"
-        />
+        {item.imageUrl && (item.imageUrl.endsWith(".mp4") || item.imageUrl.endsWith(".mov") || item.imageUrl.endsWith(".webm")) ? (
+          <video
+            src={item.imageUrl}
+            className="h-full w-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
+        ) : (
+          <Image
+            src={item.imageUrl}
+            alt={item.name}
+            fill
+            className="object-cover"
+            sizes="96px"
+          />
+        )}
         {item.badge && (
           <span className="absolute top-1 left-1 rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
             {item.badge}

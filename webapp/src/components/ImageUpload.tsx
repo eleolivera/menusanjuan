@@ -67,8 +67,10 @@ export function ImageUpload({
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file?.type.startsWith("image/")) handleFileUpload(file);
+    if (file?.type.startsWith("image/") || file?.type.startsWith("video/")) handleFileUpload(file);
   }
+
+  const isVideo = value && (value.endsWith(".mp4") || value.endsWith(".mov") || value.endsWith(".webm"));
 
   const isLogo = shape === "logo";
 
@@ -86,7 +88,11 @@ export function ImageUpload({
         } ${uploading ? "opacity-50 pointer-events-none" : ""}`}
       >
         {value ? (
-          <img src={value} alt="" className="h-full w-full object-cover" />
+          isVideo ? (
+            <video src={value} className="h-full w-full object-cover" autoPlay loop muted playsInline />
+          ) : (
+            <img src={value} alt="" className="h-full w-full object-cover" />
+          )
         ) : (
           <div className="h-full w-full flex flex-col items-center justify-center bg-surface-alt">
             <svg className="h-6 w-6 text-text-muted mb-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -121,7 +127,7 @@ export function ImageUpload({
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/mp4,video/quicktime,video/webm"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
