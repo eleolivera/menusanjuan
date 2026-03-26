@@ -78,7 +78,7 @@ export async function PATCH(
   return NextResponse.json(updated);
 }
 
-// DELETE — delete restaurant
+// DELETE — delete restaurant + clean up orphaned placeholder user
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -86,6 +86,28 @@ export async function DELETE(
   if (!(await getAdminSession())) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
 
+  const dealer = await prisma.dealer.findUnique({
+    where: { id },
+    include: { account: { include: { user: true } } },
+  });
+  if (!dealer) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+  const ownerUserId = dealer.account.userId;
+  const isPlaceholder = dealer.account.user.email.endsWith("@menusanjuan.com");
+
+  // Delete the dealer (cascades to menu, claims, orders)
   await prisma.dealer.delete({ where: { id } });
+
+  // Delete the account
+  await prisma.account.delete({ where: { id: dealer.account.id } });
+
+  // If the owner was a placeholder with no other accounts, delete them too
+  if (isPlaceholder) {
+    const otherAccounts = await prisma.account.count({ where: { userId: ownerUserId } });
+    if (otherAccounts === 0) {
+      await prisma.user.delete({ where: { id: ownerUserId } });
+    }
+  }
+
   return NextResponse.json({ success: true });
 }
