@@ -20,6 +20,7 @@ type Restaurant = {
   ownerEmail: string;
   isPlaceholder: boolean;
   isVerified: boolean;
+  isActive: boolean;
   categoryCount: number;
   orderCount: number;
 };
@@ -81,6 +82,28 @@ export default function AdminPage() {
     const notes = prompt("Motivo (opcional):");
     await fetch("/api/admin/claims", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ claimId, action: "reject", notes }) });
     fetch("/api/admin/claims").then(r => r.json()).then(setClaims);
+  }
+
+  async function toggleRestaurant(id: string, isActive: boolean) {
+    await fetch(`/api/admin/restaurants/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: !isActive }) });
+    fetch("/api/admin/restaurants").then(r => r.json()).then(setRestaurants);
+  }
+
+  async function deleteRestaurant(id: string, name: string) {
+    if (!confirm(`¿Eliminar "${name}" permanentemente? Esta acción no se puede deshacer.`)) return;
+    await fetch(`/api/admin/restaurants/${id}`, { method: "DELETE" });
+    fetch("/api/admin/restaurants").then(r => r.json()).then(setRestaurants);
+  }
+
+  async function changeUserRole(userId: string, role: string) {
+    await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, role }) });
+    fetch("/api/admin/users").then(r => r.json()).then(setUsers);
+  }
+
+  async function deleteUser(userId: string, email: string) {
+    if (!confirm(`¿Eliminar usuario "${email}"? Se eliminan también sus restaurantes y datos.`)) return;
+    await fetch(`/api/admin/users?userId=${userId}`, { method: "DELETE" });
+    fetch("/api/admin/users").then(r => r.json()).then(setUsers);
   }
 
   // Still checking session
@@ -180,6 +203,7 @@ export default function AdminPage() {
                 <th className="px-4 py-2.5 text-center">Estado</th>
                 <th className="px-4 py-2.5 text-center">Menú</th>
                 <th className="px-4 py-2.5 text-center">Pedidos</th>
+                <th className="px-4 py-2.5 text-right">Acciones</th>
               </tr></thead>
               <tbody>
                 {restaurants.map(r => (
@@ -189,6 +213,18 @@ export default function AdminPage() {
                     <td className="px-4 py-3 text-center">{r.isVerified ? <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">Verificado</span> : r.isPlaceholder ? <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400">Disponible</span> : <span className="rounded-md bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-400">Registrado</span>}</td>
                     <td className="px-4 py-3 text-center text-xs text-slate-400">{r.categoryCount}</td>
                     <td className="px-4 py-3 text-center text-xs text-slate-400">{r.orderCount}</td>
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => toggleRestaurant(r.id, r.isActive)}
+                          className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${r.isActive ? "bg-emerald-500/15 text-emerald-400 hover:bg-red-500/15 hover:text-red-400" : "bg-slate-500/15 text-slate-400 hover:bg-emerald-500/15 hover:text-emerald-400"}`}>
+                          {r.isActive ? "Desactivar" : "Activar"}
+                        </button>
+                        <button onClick={() => deleteRestaurant(r.id, r.name)}
+                          className="rounded-md px-2 py-1 text-[10px] font-medium text-slate-600 hover:bg-red-500/15 hover:text-red-400 transition-colors">
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -235,15 +271,31 @@ export default function AdminPage() {
                 <th className="px-4 py-2.5 text-center">Verificado</th>
                 <th className="px-4 py-2.5 text-center">Negocios</th>
                 <th className="px-4 py-2.5 text-left">Registrado</th>
+                <th className="px-4 py-2.5 text-right">Acciones</th>
               </tr></thead>
               <tbody>
                 {users.map((u: any) => (
                   <tr key={u.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
                     <td className="px-4 py-3"><div className="text-sm font-semibold text-white">{u.name}</div><div className="text-[11px] text-slate-500">{u.email}</div></td>
-                    <td className="px-4 py-3 text-center"><span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${u.role === "ADMIN" ? "bg-purple-500/15 text-purple-400" : u.role === "BUSINESS" ? "bg-blue-500/15 text-blue-400" : "bg-slate-500/15 text-slate-400"}`}>{u.role}</span></td>
+                    <td className="px-4 py-3 text-center">
+                      <select value={u.role} onChange={(e) => changeUserRole(u.id, e.target.value)}
+                        className="rounded-md bg-white/5 border border-white/10 px-2 py-1 text-[10px] font-semibold text-white focus:border-primary focus:outline-none cursor-pointer">
+                        <option value="USER" className="bg-slate-900">USER</option>
+                        <option value="BUSINESS" className="bg-slate-900">BUSINESS</option>
+                        <option value="ADMIN" className="bg-slate-900">ADMIN</option>
+                      </select>
+                    </td>
                     <td className="px-4 py-3 text-center text-xs">{u.emailVerified ? <span className="text-emerald-400">✓</span> : <span className="text-slate-600">✗</span>}</td>
                     <td className="px-4 py-3 text-center text-xs text-slate-400">{u._count.accounts}</td>
                     <td className="px-4 py-3 text-[11px] text-slate-500">{new Date(u.createdAt).toLocaleDateString("es-AR")}</td>
+                    <td className="px-4 py-3 text-right">
+                      {u.role !== "ADMIN" && (
+                        <button onClick={() => deleteUser(u.id, u.email)}
+                          className="rounded-md px-2 py-1 text-[10px] font-medium text-slate-600 hover:bg-red-500/15 hover:text-red-400 transition-colors">
+                          Eliminar
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

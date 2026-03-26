@@ -99,7 +99,34 @@ export default function AdminGuide() {
           </ol>
         </Section>
 
-        <Section title="Gestionar el Menú (Admin)" emoji="🍽️" number={4}>
+        <Section title="Activar / Desactivar / Eliminar Restaurantes" emoji="🔘" number={4}>
+          <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700">
+            <li>Admin → pestaña <strong>Restaurantes</strong></li>
+            <li>Cada restaurante tiene botones de <strong>Activar/Desactivar</strong> y <strong>Eliminar</strong></li>
+            <li><strong>Desactivar</strong>: el restaurante no aparece en el marketplace pero no se borra</li>
+            <li><strong>Activar</strong>: el restaurante aparece en el marketplace</li>
+            <li><strong>Eliminar</strong>: borra el restaurante permanentemente (pide confirmación)</li>
+            <li>Los restaurantes nuevos (subidos por script o creados) empiezan <strong>inactivos</strong></li>
+          </ol>
+          <Tip>Siempre desactivá en vez de eliminar, a menos que estés segura de que no se necesita más.</Tip>
+        </Section>
+
+        <Section title="Gestionar Usuarios" emoji="👥" number={5}>
+          <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700">
+            <li>Admin → pestaña <strong>Usuarios</strong></li>
+            <li><strong>Cambiar rol</strong>: usá el dropdown para cambiar entre USER, BUSINESS, ADMIN</li>
+            <li><strong>Eliminar usuario</strong>: borra el usuario y todos sus datos (no se puede eliminar un admin)</li>
+            <li>Los roles significan:
+              <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                <li><strong>USER</strong> — usuario regular, puede hacer pedidos</li>
+                <li><strong>BUSINESS</strong> — dueño de restaurante, puede gestionar su negocio</li>
+                <li><strong>ADMIN</strong> — acceso total al panel de admin</li>
+              </ul>
+            </li>
+          </ol>
+        </Section>
+
+        <Section title="Gestionar el Menú (Admin)" emoji="🍽️" number={6}>
           <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700">
             <li>Admin → click en restaurante → pestaña <strong>Menú</strong></li>
             <li><strong>+ Categoría</strong>: poné emoji + nombre (ej: 🍔 Hamburguesas)</li>
@@ -110,7 +137,7 @@ export default function AdminGuide() {
           </ol>
         </Section>
 
-        <Section title="Mensajes para WhatsApp" emoji="📱" number={5}>
+        <Section title="Mensajes para WhatsApp" emoji="📱" number={7}>
           <div className="space-y-4">
             <MsgTemplate title="Invitar a un restaurante" msg={`Hola! 👋\n\nTe escribo de *MenuSanJuan*. Creamos una página gratuita para tu restaurante donde tus clientes pueden ver tu menú y hacer pedidos directo por WhatsApp.\n\nYa está todo armado, tu página es:\n👉 menusanjuan.com/{slug}\n\nPara manejar los pedidos y modificar el menú, registrate con tu email en:\n👉 menusanjuan.com/restaurante/register\n\nEs 100% gratis. Sin comisiones.\n\n¿Te interesa? 🍽️`} />
             <MsgTemplate title="Enviar código de verificación" msg={`Hola! Tu código de verificación para reclamar tu restaurante en MenuSanJuan es:\n\n🔑 *{CODIGO}*\n\nIngresalo en tu página: menusanjuan.com/{slug}\n\nCon esto ya podés gestionar todo desde tu celular. 🙌`} />
@@ -118,7 +145,7 @@ export default function AdminGuide() {
           </div>
         </Section>
 
-        <Section title="Operación Diaria del Restaurante" emoji="📋" number={6}>
+        <Section title="Operación Diaria del Restaurante" emoji="📋" number={8}>
           <div className="space-y-3">
             {[
               { emoji: "📊", title: "Dashboard", desc: "Primera pantalla al entrar. Ventas del día/semana, top productos, hora pico." },
@@ -136,7 +163,7 @@ export default function AdminGuide() {
           </div>
         </Section>
 
-        <Section title="Credenciales" emoji="🔐" number={7}>
+        <Section title="Credenciales" emoji="🔐" number={9}>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 font-mono text-sm">
             <div><span className="text-slate-500">Admin:</span> <span className="text-slate-900">admin@menusanjuan.com / admin-menusj-2024</span></div>
             <div><span className="text-slate-500">Admin URL:</span> <a href="/admin?login" className="text-primary underline">menusanjuan.com/admin?login</a></div>
@@ -163,6 +190,14 @@ function Section({ title, emoji, number, children }: { title: string; emoji: str
       )}
       {number === 0 && <h2 className="text-xl font-bold text-slate-900 mb-4">{emoji} {title}</h2>}
       {children}
+    </div>
+  );
+}
+
+function Tip({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-800">
+      💡 <strong>Tip:</strong> {children}
     </div>
   );
 }
