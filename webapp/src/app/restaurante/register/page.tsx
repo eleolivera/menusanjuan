@@ -61,13 +61,44 @@ export default function RegisterPage() {
   const [slug, setSlug] = useState("");
   const [resultName, setResultName] = useState("");
 
-  // Fetch unclaimed restaurants
+  // Check if user is already logged in — skip to step 1.5
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    fetch("/api/restaurante/unclaimed")
-      .then((r) => r.json())
-      .then((data) => setUnclaimed(data))
+    fetch("/api/restaurante/session")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.authenticated) {
+          setIsLoggedIn(true);
+          setEmail(data.user.email);
+          setFirstName(data.user.name?.split(" ")[0] || "");
+          setLastName(data.user.name?.split(" ").slice(1).join(" ") || "");
+          // Skip account creation — go to choose claim/new
+          fetch("/api/restaurante/unclaimed")
+            .then((r) => r.json())
+            .then((u) => {
+              setUnclaimed(u);
+              if (u.length > 0) {
+                setStep(1.5);
+              } else {
+                setMode("new");
+                setStep(2);
+              }
+            })
+            .catch(() => { setMode("new"); setStep(2); });
+        }
+      })
       .catch(() => {});
   }, []);
+
+  // Fetch unclaimed restaurants (for non-logged-in users)
+  useEffect(() => {
+    if (!isLoggedIn) {
+      fetch("/api/restaurante/unclaimed")
+        .then((r) => r.json())
+        .then((data) => setUnclaimed(data))
+        .catch(() => {});
+    }
+  }, [isLoggedIn]);
 
   const filteredUnclaimed = unclaimed.filter((r) =>
     claimSearch === "" ||
@@ -157,8 +188,7 @@ export default function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
-          password,
+          ...(isLoggedIn ? {} : { email, password }),
           dealerId: selectedClaim.id,
         }),
       });
@@ -186,7 +216,8 @@ export default function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email, password, restaurantName, phone, address,
+          ...(isLoggedIn ? {} : { email, password }),
+          restaurantName, phone, address,
           latitude, longitude, cuisineType, description,
           logoUrl: logoUrl || null, coverUrl: coverUrl || null,
         }),
@@ -546,7 +577,7 @@ export default function RegisterPage() {
           {/* Navigation Buttons (steps 1, 2, 3) */}
           {(step === 1 || (step >= 2 && step <= 3 && mode === "new")) && (
             <div className="mt-6 flex gap-3">
-              {step > 1 && (
+              {step > 1 && !(isLoggedIn && step === 2 && unclaimed.length === 0) && (
                 <button type="button"
                   onClick={() => { setStep(step === 2 ? (unclaimed.length > 0 ? 1.5 : 1) : step - 1); setError(""); }}
                   className="flex-1 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-text hover:bg-surface-hover transition-colors">

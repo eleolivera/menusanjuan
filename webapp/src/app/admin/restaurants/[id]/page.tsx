@@ -11,6 +11,7 @@ type Restaurant = {
   ownerEmail: string; ownerName: string; isPlaceholder: boolean;
   sourceProfileId: string | null; sourceSite: string | null;
   openHours: string | null; mercadoPagoAlias: string | null; mercadoPagoCvu: string | null;
+  rating: number | null; deliveryFee: number | null;
   categories: { id: string; name: string; emoji: string | null; items: { id: string; name: string; description: string | null; price: number; imageUrl: string | null; badge: string | null; available: boolean }[] }[];
   claimRequests: { id: string; status: string; code: string | null; requestedAt: string; user: { email: string; name: string } }[];
   orderCount: number;
@@ -41,12 +42,19 @@ export default function AdminRestaurantDetail() {
   const [logoUrl, setLogoUrl] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [rating, setRating] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
 
   // Owner assignment
   const [assignEmail, setAssignEmail] = useState("");
   const [assignMsg, setAssignMsg] = useState("");
+
+  // Owner activation
+  const [activating, setActivating] = useState(false);
+  const [activatedCreds, setActivatedCreds] = useState<{ email: string; password: string; slug: string; name: string } | null>(null);
+  const [whatsAppMsg, setWhatsAppMsg] = useState("");
 
   // Menu
   const [newCatName, setNewCatName] = useState("");
@@ -74,6 +82,8 @@ export default function AdminRestaurantDetail() {
     setCuisineType(d.cuisineType); setDescription(d.description || "");
     setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
     setIsActive(d.isActive);
+    setRating(d.rating != null ? String(d.rating) : "");
+    setDeliveryFee(d.deliveryFee != null ? String(d.deliveryFee) : "");
     setLoading(false);
   }
 
@@ -82,7 +92,7 @@ export default function AdminRestaurantDetail() {
     await fetch(`/api/admin/restaurants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, cuisineType, description, logoUrl, coverUrl, isActive }),
+      body: JSON.stringify({ name, phone, address, cuisineType, description, logoUrl, coverUrl, isActive, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -123,6 +133,50 @@ export default function AdminRestaurantDetail() {
     const d = await res.json();
     setAssignMsg(d.success ? `Asignado a ${assignEmail}` : d.message || d.error);
     if (d.success) { setAssignEmail(""); fetchData(); }
+  }
+
+  async function handleToggleOwner(enable: boolean) {
+    setActivating(true);
+    if (enable) {
+      const res = await fetch(`/api/admin/restaurants/${id}/activate-owner`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setActivatedCreds(d);
+        setWhatsAppMsg(buildWhatsAppMessage(d));
+        fetchData();
+      } else {
+        setAssignMsg(d.error || "Error al activar");
+      }
+    } else {
+      await fetch(`/api/admin/restaurants/${id}/activate-owner`, { method: "DELETE" });
+      setActivatedCreds(null);
+      setWhatsAppMsg("");
+      fetchData();
+    }
+    setActivating(false);
+  }
+
+  function buildWhatsAppMessage(creds: { email: string; password: string; slug: string; name: string }) {
+    return `Hola! 👋 Soy de MenuSanJuan.com
+
+Noté que *${creds.name}* no tiene su propia página de pedidos online todavía.
+
+Te creamos una gratis — ya tiene tu menú cargado con precios e imágenes. Tus clientes pueden ver el menú y hacer pedidos por WhatsApp.
+
+Es 100% gratis, sin comisiones.
+
+🍽️ Tu página: menusanjuan.com/${creds.slug}
+
+Para editar tu menú, horarios, y ver pedidos:
+🔗 menusanjuan.com/restaurante/login
+📧 ${creds.email}
+🔑 ${creds.password}
+
+Probalo y decime qué te parece!`;
   }
 
   async function handleRemoveOwner() {
@@ -283,6 +337,19 @@ export default function AdminRestaurantDetail() {
             </div>
             <div><label className="block text-xs text-slate-400 mb-1">Dirección</label><input value={address} onChange={e => setAddress(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" /></div>
             <div><label className="block text-xs text-slate-400 mb-1">Descripción</label><textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none resize-none" /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Rating (1-5 estrellas)</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min="1" max="5" step="0.1" value={rating} onChange={e => setRating(e.target.value)} placeholder="Ej: 4.5" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+                  {rating && <div className="flex items-center gap-0.5 shrink-0">{[1,2,3,4,5].map(s => <span key={s} className={`text-sm ${s <= Math.round(Number(rating)) ? "text-amber-400" : "text-slate-700"}`}>★</span>)}</div>}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Envío ($)</label>
+                <input type="number" min="0" step="100" value={deliveryFee} onChange={e => setDeliveryFee(e.target.value)} placeholder="Gratis si vacío" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+              </div>
+            </div>
             <div><label className="block text-xs text-slate-400 mb-1">Tipo de cocina</label>
               <div className="flex flex-wrap gap-1.5">{CUISINE_OPTIONS.map(c => (
                 <button key={c} onClick={() => setCuisineType(c)} className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${cuisineType === c ? "bg-primary/15 text-primary border border-primary/30" : "border border-white/10 text-slate-400 hover:border-white/20"}`}>{c}</button>
@@ -344,21 +411,119 @@ export default function AdminRestaurantDetail() {
 
         {/* Owner tab */}
         {tab === "owner" && (
-          <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-4">
-            <div>
-              <h3 className="text-sm font-bold text-white mb-2">Dueño Actual</h3>
+          <div className="space-y-4">
+            {/* Current owner info */}
+            <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white">Dueño Actual</h3>
+                {data.isPlaceholder ? (
+                  <span className="rounded-md bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400">Placeholder</span>
+                ) : (
+                  <span className="rounded-md bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">Dueño real</span>
+                )}
+              </div>
               <div className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
                 <div>
                   <div className="text-sm text-white">{data.ownerName}</div>
                   <div className="text-xs text-slate-500">{data.ownerEmail}</div>
                 </div>
-                {data.isPlaceholder ? (
-                  <span className="text-xs text-amber-400">Cuenta placeholder</span>
-                ) : (
+                {!data.isPlaceholder && (
                   <button onClick={handleRemoveOwner} className="rounded-lg border border-red-500/20 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors">Quitar dueño</button>
                 )}
               </div>
             </div>
+
+            {/* Placeholder toggle + onboarding — only for placeholder accounts */}
+            {data.isPlaceholder && (
+              <div className={`rounded-2xl border p-6 space-y-4 transition-colors ${data.isVerified ? "border-emerald-500/20 bg-emerald-500/5" : "border-white/5 bg-slate-900/50"}`}>
+                {/* Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Cuenta Habilitada</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {data.isVerified
+                        ? "El dueño puede iniciar sesión. No aparece como \"sin reclamar\"."
+                        : "Habilitá la cuenta para generar credenciales y enviar por WhatsApp."}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleToggleOwner(!data.isVerified)}
+                    disabled={activating}
+                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${data.isVerified ? "bg-emerald-500" : "bg-slate-700"} ${activating ? "opacity-50" : ""}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-1 ${data.isVerified ? "translate-x-6 ml-0.5" : "translate-x-1"}`} />
+                  </button>
+                </div>
+
+                {/* Credentials + WhatsApp — shown when enabled (verified) */}
+                {data.isVerified && activatedCreds && (
+                  <>
+                    {/* Credentials card */}
+                    <div className="rounded-xl bg-slate-900 border border-white/10 p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Email</span>
+                        <span className="text-sm font-mono text-white">{activatedCreds.email}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Contraseña</span>
+                        <span className="text-sm font-mono text-primary font-bold">{activatedCreds.password}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Página</span>
+                        <a href={`/${activatedCreds.slug}`} target="_blank" className="text-sm text-primary hover:underline">menusanjuan.com/{activatedCreds.slug}</a>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Login</span>
+                        <span className="text-sm text-slate-300">menusanjuan.com/restaurante/login</span>
+                      </div>
+                    </div>
+
+                    {/* Editable WhatsApp message */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-2">Mensaje de WhatsApp (editá antes de enviar)</label>
+                      <textarea
+                        value={whatsAppMsg}
+                        onChange={e => setWhatsAppMsg(e.target.value)}
+                        rows={12}
+                        className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-slate-300 focus:border-emerald-400 focus:outline-none resize-y leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-3">
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(whatsAppMsg)}`}
+                        target="_blank"
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-6 py-3 text-sm font-semibold text-white hover:bg-[#20BD5A] transition-colors"
+                      >
+                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        Enviar por WhatsApp
+                      </a>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(whatsAppMsg)}
+                        className="rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-400 hover:bg-white/5 transition-colors"
+                        title="Copiar mensaje"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Already verified but no creds in memory — prompt to regenerate */}
+                {data.isVerified && !activatedCreds && (
+                  <div className="rounded-xl bg-slate-900 border border-white/10 p-4">
+                    <p className="text-xs text-slate-400 mb-3">Esta cuenta ya está habilitada. Para generar nuevas credenciales y ver el mensaje de WhatsApp, desactivá y volvé a activar.</p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <span>Email:</span>
+                      <span className="font-mono text-white">{data.ownerEmail}</span>
+                    </div>
+                  </div>
+                )}
+
+                {assignMsg && <p className="text-xs text-amber-400">{assignMsg}</p>}
+              </div>
+            )}
 
             {/* Pending owner */}
             {(data as any).pendingOwnerEmail && (
@@ -374,14 +539,19 @@ export default function AdminRestaurantDetail() {
               </div>
             )}
 
-            <div>
-              <h3 className="text-sm font-bold text-white mb-2">Asignar Dueño por Email</h3>
-              <div className="flex gap-2">
-                <input value={assignEmail} onChange={e => setAssignEmail(e.target.value)} placeholder="email@ejemplo.com" className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
-                <button onClick={handleAssign} disabled={!assignEmail.includes("@")} className="rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50">Asignar</button>
+            {/* Assign by email — for non-placeholder accounts */}
+            {!data.isPlaceholder && (
+              <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white mb-2">Asignar Dueño por Email</h3>
+                  <div className="flex gap-2">
+                    <input value={assignEmail} onChange={e => setAssignEmail(e.target.value)} placeholder="email@ejemplo.com" className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+                    <button onClick={handleAssign} disabled={!assignEmail.includes("@")} className="rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50">Asignar</button>
+                  </div>
+                  {assignMsg && <p className={`mt-2 text-xs ${assignMsg.startsWith("Asignado") ? "text-emerald-400" : "text-amber-400"}`}>{assignMsg}</p>}
+                </div>
               </div>
-              {assignMsg && <p className={`mt-2 text-xs ${assignMsg.startsWith("Asignado") ? "text-emerald-400" : "text-amber-400"}`}>{assignMsg}</p>}
-            </div>
+            )}
           </div>
         )}
 

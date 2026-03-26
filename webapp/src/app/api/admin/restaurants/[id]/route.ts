@@ -48,7 +48,7 @@ export async function PATCH(
     name, slug, phone, address, city, latitude, longitude,
     cuisineType, description, logoUrl, coverUrl,
     isActive, openHours, mercadoPagoAlias, mercadoPagoCvu, bankInfo,
-    sourceProfileId, sourceSite,
+    sourceProfileId, sourceSite, rating, deliveryFee,
   } = body;
 
   const updated = await prisma.dealer.update({
@@ -72,6 +72,8 @@ export async function PATCH(
       ...(bankInfo !== undefined && { bankInfo }),
       ...(sourceProfileId !== undefined && { sourceProfileId }),
       ...(sourceSite !== undefined && { sourceSite }),
+      ...(rating !== undefined && { rating: rating === null ? null : Number(rating) }),
+      ...(deliveryFee !== undefined && { deliveryFee: deliveryFee === null ? null : Number(deliveryFee) }),
     },
   });
 
