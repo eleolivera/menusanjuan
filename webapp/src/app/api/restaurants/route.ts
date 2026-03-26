@@ -8,7 +8,7 @@ export async function GET() {
     include: {
       categories: { select: { _count: { select: { items: true } } } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ rating: "desc" }, { name: "asc" }],
   });
 
   const restaurants: Restaurant[] = dbDealers.map((d) => ({
@@ -20,8 +20,8 @@ export async function GET() {
     address: d.address || "",
     cuisineType: d.cuisineType,
     logoUrl: d.logoUrl,
-    coverUrl: d.coverUrl || "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=400&fit=crop",
-    rating: 0,
+    coverUrl: d.coverUrl,
+    rating: d.rating ?? 0,
     itemCount: d.categories.reduce((s, c) => s + c._count.items, 0),
     priceRange: "$$",
     isOpen: true,
