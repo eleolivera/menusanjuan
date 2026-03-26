@@ -46,8 +46,13 @@ export function PhoneInput({
         setCountry(match.code);
         const stripped = value.replace(match.prefix, "").replace(match.prefix.replace("+", ""), "");
         setLocalNumber(stripped);
+        // Validate on init
+        const isValid = isValidPhone(value, match.code as any);
+        setValid(stripped.length > 5 ? isValid : null);
       } else {
         setLocalNumber(value);
+        const isValid = isValidPhone(value, "AR");
+        setValid(value.length > 5 ? isValid : null);
       }
     }
   }, []);
