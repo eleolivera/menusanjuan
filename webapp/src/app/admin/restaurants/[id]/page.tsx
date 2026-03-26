@@ -37,7 +37,11 @@ export default function AdminRestaurantDetail() {
   const [address, setAddress] = useState("");
   const [cuisineType, setCuisineType] = useState("");
   const [description, setDescription] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   // Owner assignment
   const [assignEmail, setAssignEmail] = useState("");
@@ -67,6 +71,7 @@ export default function AdminRestaurantDetail() {
     setData(d);
     setName(d.name); setPhone(d.phone); setAddress(d.address || "");
     setCuisineType(d.cuisineType); setDescription(d.description || "");
+    setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
     setIsActive(d.isActive);
     setLoading(false);
   }
@@ -76,11 +81,35 @@ export default function AdminRestaurantDetail() {
     await fetch(`/api/admin/restaurants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, cuisineType, description, isActive }),
+      body: JSON.stringify({ name, phone, address, cuisineType, description, logoUrl, coverUrl, isActive }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
     fetchData();
+  }
+
+  async function handleImageUpload(file: File, type: "logo" | "cover") {
+    const setter = type === "logo" ? setLogoUrl : setCoverUrl;
+    const setUploading = type === "logo" ? setUploadingLogo : setUploadingCover;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", type);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const d = await res.json();
+      if (res.ok) {
+        setter(d.url);
+        // Auto-save to DB
+        await fetch(`/api/admin/restaurants/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [type === "logo" ? "logoUrl" : "coverUrl"]: d.url }),
+        });
+        fetchData();
+      }
+    } catch {}
+    setUploading(false);
   }
 
   async function handleAssign() {
@@ -208,7 +237,45 @@ export default function AdminRestaurantDetail() {
 
         {/* Info tab */}
         {tab === "info" && (
-          <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-4">
+          <div className="space-y-4">
+            {/* Cover + Logo */}
+            <div className="rounded-2xl border border-white/5 overflow-hidden">
+              {/* Cover */}
+              <label className="relative block h-36 cursor-pointer group">
+                {coverUrl ? (
+                  <img src={coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 flex items-center justify-center">
+                    <span className="text-xs text-slate-500">Click para agregar portada</span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white bg-black/60 rounded-lg px-3 py-1.5">
+                    {uploadingCover ? "Subiendo..." : "Cambiar portada"}
+                  </span>
+                </div>
+                <input type="file" accept="image/*,video/mp4" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "cover"); e.target.value = ""; }} />
+              </label>
+
+              {/* Logo */}
+              <div className="relative px-4 pb-4 -mt-10">
+                <label className="relative inline-block cursor-pointer group">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-amber-500 text-white text-2xl font-bold shadow-lg border-4 border-slate-950 overflow-hidden">
+                    {logoUrl ? <img src={logoUrl} alt="" className="h-full w-full object-cover" /> : name?.charAt(0) || "R"}
+                  </div>
+                  <div className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-white">
+                      {uploadingLogo ? "..." : "Logo"}
+                    </span>
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "logo"); e.target.value = ""; }} />
+                </label>
+                <span className="ml-3 text-lg font-bold text-white align-bottom">{name}</span>
+              </div>
+            </div>
+
+            {/* Fields */}
+            <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div><label className="block text-xs text-slate-400 mb-1">Nombre</label><input value={name} onChange={e => setName(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" /></div>
               <div><label className="block text-xs text-slate-400 mb-1">Teléfono</label><input value={phone} onChange={e => setPhone(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" /></div>
@@ -224,6 +291,7 @@ export default function AdminRestaurantDetail() {
               <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary" /><span className="text-xs text-slate-400">Activo</span></label>
             </div>
             <button onClick={handleSave} disabled={saving} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50">{saving ? "Guardando..." : "Guardar"}</button>
+            </div>
           </div>
         )}
 
