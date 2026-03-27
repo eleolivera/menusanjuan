@@ -37,8 +37,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           setSlug(data.slug);
           setRestaurantName(data.name || data.slug);
           setAuthed(true);
+        } else if (data.authenticated && !data.slug) {
+          // Logged in but no restaurant — send to register to pick/create one
+          router.push("/restaurante/register");
         } else {
           setAuthed(false);
+          router.push("/restaurante/login");
         }
       })
       .catch(() => {

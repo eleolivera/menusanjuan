@@ -72,7 +72,7 @@ export function Header() {
 
           {/* "Soy Restaurante" — visible when user has no restaurants */}
           {!hasRestas && (
-            <Link href="/para-restaurantes"
+            <Link href={session ? "/restaurante/register" : "/para-restaurantes"}
               className="hidden sm:inline-flex rounded-xl bg-gradient-to-r from-primary to-amber-500 px-3 py-2 text-xs font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all">
               Soy Restaurante
             </Link>
@@ -214,7 +214,7 @@ export function Header() {
             <Link href="/#restaurantes" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</Link>
             <Link href="/#como-funciona" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</Link>
             {!hasRestas && (
-              <Link href="/para-restaurantes" onClick={() => setMobileOpen(false)}
+              <Link href={session ? "/restaurante/register" : "/para-restaurantes"} onClick={() => setMobileOpen(false)}
                 className="mt-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-md shadow-primary/25 transition-all">
                 Soy Restaurante
               </Link>
