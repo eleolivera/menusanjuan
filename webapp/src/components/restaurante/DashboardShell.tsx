@@ -1,18 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 
-const NAV_ITEMS = [
+const DEFAULT_NAV = [
   { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "🏪" },
-  { href: "/restaurante", label: "Dashboard", emoji: "📊", exact: true },
+  { href: "/restaurante/dashboard", label: "Dashboard", emoji: "📊" },
   { href: "/restaurante/pedidos", label: "Pedidos", emoji: "📋" },
   { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
 ];
 
-// Pages that should NOT show the sidebar (login, register, reset)
+const USAGE_KEY = "msj_nav_usage";
+const USAGE_THRESHOLD = 15; // Total clicks before sorting kicks in
+
+// Pages that should NOT show the sidebar
 const AUTH_PATHS = ["/restaurante/login", "/restaurante/register", "/restaurante/reset-password"];
+
+function getUsage(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(USAGE_KEY) || "{}"); } catch { return {}; }
+}
+
+function trackUsage(href: string) {
+  const usage = getUsage();
+  usage[href] = (usage[href] || 0) + 1;
+  localStorage.setItem(USAGE_KEY, JSON.stringify(usage));
+}
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -21,9 +34,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [slug, setSlug] = useState("");
   const [restaurantName, setRestaurantName] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [navVersion, setNavVersion] = useState(0);
 
-  // Don't show sidebar on auth pages
   const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
+
+  // Sort nav by usage after threshold
+  const navItems = useMemo(() => {
+    if (typeof window === "undefined") return DEFAULT_NAV;
+    const usage = getUsage();
+    const totalClicks = Object.values(usage).reduce((s, v) => s + v, 0);
+    if (totalClicks < USAGE_THRESHOLD) return DEFAULT_NAV;
+    return [...DEFAULT_NAV].sort((a, b) => (usage[b.href] || 0) - (usage[a.href] || 0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navVersion]);
+
+  // Track page visits
+  useEffect(() => {
+    if (isAuthPage || !authed) return;
+    const match = DEFAULT_NAV.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"));
+    if (match) {
+      trackUsage(match.href);
+      setNavVersion((v) => v + 1);
+    }
+  }, [pathname, isAuthPage, authed]);
 
   useEffect(() => {
     if (isAuthPage) { setAuthed(false); return; }
@@ -38,7 +71,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           setRestaurantName(data.name || data.slug);
           setAuthed(true);
         } else if (data.authenticated && !data.slug) {
-          // Logged in but no restaurant — send to register to pick/create one
           router.push("/restaurante/register");
         } else {
           setAuthed(false);
@@ -51,10 +83,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       });
   }, [pathname, isAuthPage, router]);
 
-  // Auth pages — no sidebar, just render children
   if (isAuthPage) return <>{children}</>;
 
-  // Still checking auth
   if (authed === null) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -63,12 +93,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Not authed — the useEffect will redirect
   if (!authed) return null;
 
-  function isActive(item: typeof NAV_ITEMS[0]) {
-    if (item.exact) return pathname === item.href;
-    return pathname.startsWith(item.href);
+  function isActive(item: typeof DEFAULT_NAV[0]) {
+    return pathname === item.href || pathname.startsWith(item.href + "/");
   }
 
   return (
@@ -97,7 +125,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = isActive(item);
             return (
               <Link
