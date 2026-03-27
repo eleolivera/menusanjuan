@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import type { Restaurant } from "@/data/restaurants";
 
-export type RestaurantWithDealerId = Restaurant & { dealerId: string | null };
+export type RestaurantWithDealerId = Restaurant & { dealerId: string | null; isVerified: boolean };
 
 export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithDealerId | null> {
   const dealer = await prisma.dealer.findUnique({
@@ -25,5 +25,6 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
     itemCount: 0,
     priceRange: "$$",
     isOpen: true,
+    isVerified: dealer.isVerified,
   };
 }
