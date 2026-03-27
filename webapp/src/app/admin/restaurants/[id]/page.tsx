@@ -63,6 +63,8 @@ export default function AdminRestaurantDetail() {
   const [itemName, setItemName] = useState("");
   const [itemPrice, setItemPrice] = useState("");
   const [itemDesc, setItemDesc] = useState("");
+  const [itemImageUrl, setItemImageUrl] = useState("");
+  const [uploadingNewItemImage, setUploadingNewItemImage] = useState(false);
 
   // Edit item
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -201,9 +203,9 @@ Probalo y decime qué te parece!`;
     await fetch(`/api/admin/restaurants/${id}/menu`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "item", categoryId, name: itemName, price: itemPrice, description: itemDesc }),
+      body: JSON.stringify({ type: "item", categoryId, name: itemName, price: itemPrice, description: itemDesc, imageUrl: itemImageUrl || undefined }),
     });
-    setItemName(""); setItemPrice(""); setItemDesc(""); setAddingItemTo(null); fetchData();
+    setItemName(""); setItemPrice(""); setItemDesc(""); setItemImageUrl(""); setAddingItemTo(null); fetchData();
   }
 
   async function handleDeleteCategory(catId: string) {
@@ -385,11 +387,43 @@ Probalo y decime qué te parece!`;
                 </div>
 
                 {addingItemTo === cat.id && (
-                  <div className="border-b border-white/5 bg-primary/5 p-3 flex gap-2">
-                    <input value={itemName} onChange={e => setItemName(e.target.value)} placeholder="Nombre *" className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
-                    <input value={itemPrice} onChange={e => setItemPrice(e.target.value)} placeholder="Precio *" type="number" className="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
-                    <button onClick={() => handleAddItem(cat.id)} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white">Agregar</button>
-                    <button onClick={() => setAddingItemTo(null)} className="text-xs text-slate-500">✕</button>
+                  <div className="border-b border-white/5 bg-primary/5 p-3 space-y-2">
+                    <div className="flex gap-2">
+                      <input value={itemName} onChange={e => setItemName(e.target.value)} placeholder="Nombre *" className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
+                      <input value={itemPrice} onChange={e => setItemPrice(e.target.value)} placeholder="Precio *" type="number" className="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <input value={itemDesc} onChange={e => setItemDesc(e.target.value)} placeholder="Descripción (opcional)" className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
+                      {itemImageUrl ? (
+                        <div className="flex items-center gap-1.5">
+                          <img src={itemImageUrl} alt="" className="h-7 w-7 rounded object-cover" />
+                          <button onClick={() => setItemImageUrl("")} className="text-xs text-slate-500 hover:text-red-400">✕</button>
+                        </div>
+                      ) : (
+                        <label className={`shrink-0 flex items-center gap-1 rounded-lg border border-dashed border-white/20 bg-white/5 px-2.5 py-1.5 text-xs text-slate-400 cursor-pointer hover:bg-white/10 transition-colors ${uploadingNewItemImage ? "opacity-50 pointer-events-none" : ""}`}>
+                          {uploadingNewItemImage ? <div className="h-3 w-3 animate-spin rounded-full border border-primary border-t-transparent" /> : <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>}
+                          Imagen
+                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            const f = e.target.files?.[0]; if (!f) return;
+                            setUploadingNewItemImage(true);
+                            try {
+                              const formData = new FormData();
+                              formData.append("file", f);
+                              formData.append("type", "menu-item");
+                              const res = await fetch("/api/upload", { method: "POST", body: formData });
+                              const d = await res.json();
+                              if (res.ok) setItemImageUrl(d.url);
+                            } catch {}
+                            setUploadingNewItemImage(false);
+                            e.target.value = "";
+                          }} />
+                        </label>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleAddItem(cat.id)} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white">Agregar</button>
+                      <button onClick={() => { setAddingItemTo(null); setItemImageUrl(""); }} className="text-xs text-slate-500">Cancelar</button>
+                    </div>
                   </div>
                 )}
 
