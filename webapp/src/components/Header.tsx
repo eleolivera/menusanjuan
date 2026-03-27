@@ -66,8 +66,8 @@ export function Header() {
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1 mr-2">
             <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Inicio</Link>
-            <a href="/#restaurantes" className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</a>
-            <a href="/#como-funciona" className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</a>
+            <Link href="/#restaurantes" scroll={false} onClick={() => { if (window.location.pathname === "/") { document.getElementById("restaurantes")?.scrollIntoView({ behavior: "smooth" }); } }} className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</Link>
+            <Link href="/#como-funciona" scroll={false} onClick={() => { if (window.location.pathname === "/") { document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" }); } }} className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</Link>
           </nav>
 
           {/* "Soy Restaurante" — visible when user has no restaurants */}
@@ -211,8 +211,8 @@ export function Header() {
         <div className="md:hidden border-t border-border/30 glass animate-slide-in-right">
           <nav className="flex flex-col px-4 py-3 gap-0.5">
             <Link href="/" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Inicio</Link>
-            <a href="/#restaurantes" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</a>
-            <a href="/#como-funciona" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</a>
+            <Link href="/#restaurantes" onClick={() => { setMobileOpen(false); if (window.location.pathname === "/") { setTimeout(() => document.getElementById("restaurantes")?.scrollIntoView({ behavior: "smooth" }), 100); } }} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</Link>
+            <Link href="/#como-funciona" onClick={() => { setMobileOpen(false); if (window.location.pathname === "/") { setTimeout(() => document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" }), 100); } }} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</Link>
             {!hasRestas && (
               <Link href={session ? "/restaurante/register" : "/para-restaurantes"} onClick={() => setMobileOpen(false)}
                 className="mt-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-md shadow-primary/25 transition-all">
