@@ -5,10 +5,10 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 
 const NAV_ITEMS = [
+  { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "🏪" },
   { href: "/restaurante", label: "Dashboard", emoji: "📊", exact: true },
   { href: "/restaurante/pedidos", label: "Pedidos", emoji: "📋" },
   { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
-  { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "⚙️" },
 ];
 
 // Pages that should NOT show the sidebar (login, register, reset)

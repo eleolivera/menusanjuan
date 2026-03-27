@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LocationPicker } from "@/components/LocationPicker";
+import { PhoneInput } from "@/components/PhoneInput";
 
 const CUISINE_OPTIONS = [
   "Comida Rápida", "Parrilla", "Pizzería", "Cafetería", "Pastas",
@@ -237,9 +238,7 @@ export default function ProfilePage() {
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-500 transition-colors" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">WhatsApp</label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="2645551234"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+              <PhoneInput value={phone} onChange={setPhone} label="WhatsApp del Restaurante" placeholder="264 555 1234" required darkMode />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-400">Tipo de cocina</label>
