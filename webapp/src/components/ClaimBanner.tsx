@@ -78,8 +78,9 @@ export function ClaimBanner({
     setTimeout(() => window.location.reload(), 1000);
   }
 
-  // Don't show if logged-in user already owns this restaurant
+  // Don't show if logged-in user owns this restaurant (any of their restaurants)
   if (session?.activeRestaurant?.slug === slug) return null;
+  if (session?.restaurants?.some((r: any) => r.slug === slug)) return null;
   // Don't show if already approved
   if (claimState === "approved") {
     return (
