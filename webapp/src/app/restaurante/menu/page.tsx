@@ -49,6 +49,23 @@ export default function MenuManagementPage() {
   const [editImage, setEditImage] = useState("");
   const [editBadge, setEditBadge] = useState("");
 
+  // Image upload state
+  const [uploadingAdd, setUploadingAdd] = useState(false);
+  const [uploadingEdit, setUploadingEdit] = useState(false);
+
+  async function handleUpload(file: File, setter: (url: string) => void, setUploading: (v: boolean) => void) {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "menu-item");
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const d = await res.json();
+      if (res.ok) setter(d.url);
+    } catch {}
+    setUploading(false);
+  }
+
   useEffect(() => {
     fetch("/api/restaurante/session")
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
@@ -253,8 +270,21 @@ export default function MenuManagementPage() {
                     placeholder="Precio *" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
                   <input type="text" value={itemDesc} onChange={(e) => setItemDesc(e.target.value)}
                     placeholder="Descripción (opcional)" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                  <input type="url" value={itemImage} onChange={(e) => setItemImage(e.target.value)}
-                    placeholder="URL imagen (opcional)" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                  <div className="flex items-center gap-2">
+                    {itemImage ? (
+                      <div className="flex items-center gap-2 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5">
+                        <img src={itemImage} alt="" className="h-7 w-7 rounded object-cover" />
+                        <span className="text-xs text-slate-400 truncate flex-1">Imagen cargada</span>
+                        <button onClick={() => setItemImage("")} className="text-slate-500 hover:text-red-400 text-xs">✕</button>
+                      </div>
+                    ) : (
+                      <label className={`flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-white/5 px-3 py-2 text-sm cursor-pointer hover:bg-white/10 transition-colors ${uploadingAdd ? "opacity-50 pointer-events-none" : ""}`}>
+                        {uploadingAdd ? <div className="h-3.5 w-3.5 animate-spin rounded-full border border-primary border-t-transparent" /> : <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>}
+                        <span className="text-slate-400 text-xs">{uploadingAdd ? "Subiendo..." : "Subir imagen"}</span>
+                        <input type="file" accept="image/*,video/mp4" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f, setItemImage, setUploadingAdd); e.target.value = ""; }} />
+                      </label>
+                    )}
+                  </div>
                   <input type="text" value={itemBadge} onChange={(e) => setItemBadge(e.target.value)}
                     placeholder="Badge: Popular, Nuevo... (opcional)" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
                 </div>
@@ -357,8 +387,30 @@ export default function MenuManagementPage() {
                 placeholder="Precio" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
               <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
                 placeholder="Descripción" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-              <input type="url" value={editImage} onChange={(e) => setEditImage(e.target.value)}
-                placeholder="URL imagen" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Imagen</label>
+                {editImage && (
+                  <div className="relative mb-2 rounded-xl overflow-hidden border border-white/10 h-32">
+                    {editImage.toLowerCase().includes(".mp4") || editImage.toLowerCase().includes(".mov") ? (
+                      <video src={editImage} className="h-full w-full object-cover" autoPlay loop muted playsInline />
+                    ) : (
+                      <img src={editImage} alt="" className="h-full w-full object-cover" />
+                    )}
+                    <button onClick={() => setEditImage("")} className="absolute top-1.5 right-1.5 rounded-full bg-black/60 p-1 text-white hover:bg-black/80 transition-colors">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                )}
+                <label className={`flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/5 px-4 py-3 text-sm cursor-pointer hover:bg-white/10 transition-colors ${uploadingEdit ? "opacity-50 pointer-events-none" : ""}`}>
+                  {uploadingEdit ? (
+                    <><div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" /> <span className="text-slate-400">Subiendo...</span></>
+                  ) : (
+                    <><svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                    <span className="text-slate-400">{editImage ? "Cambiar imagen" : "Subir imagen"}</span></>
+                  )}
+                  <input type="file" accept="image/*,video/mp4" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f, setEditImage, setUploadingEdit); e.target.value = ""; }} />
+                </label>
+              </div>
               <input type="text" value={editBadge} onChange={(e) => setEditBadge(e.target.value)}
                 placeholder="Badge (Popular, Nuevo...)" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
             </div>
