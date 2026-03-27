@@ -51,7 +51,20 @@ export function RestaurantGrid() {
           <CuisineFilter selected={cuisine} onChange={setCuisine} />
         </div>
 
-        {filtered.length > 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="rounded-2xl border border-border/60 bg-surface overflow-hidden animate-pulse">
+                <div className="aspect-[2/1] bg-surface-hover" />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 w-2/3 rounded bg-surface-hover" />
+                  <div className="h-3 w-full rounded bg-surface-hover" />
+                  <div className="h-3 w-1/2 rounded bg-surface-hover" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((restaurant, i) => (
               <RestaurantCard
