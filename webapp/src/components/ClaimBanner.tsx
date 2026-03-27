@@ -13,6 +13,7 @@ export function ClaimBanner({
   slug: string;
 }) {
   const [session, setSession] = useState<any>(null);
+  const [ready, setReady] = useState(false); // Don't render until session check completes
   const [claimState, setClaimState] = useState<"none" | "pending" | "code_sent" | "approved" | "submitting">("none");
   const [claimId, setClaimId] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -21,22 +22,24 @@ export function ClaimBanner({
   useEffect(() => {
     fetch("/api/restaurante/session")
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
+      .then(async (data) => {
         if (data?.authenticated) {
           setSession(data);
           // Check existing claims for this dealer by this user
-          fetch(`/api/claim?dealerId=${dealerId}`)
-            .then((r) => r.json())
-            .then((claims) => {
-              if (Array.isArray(claims) && claims.length > 0) {
-                const c = claims[0];
-                if (c.status === "PENDING") { setClaimState("pending"); setClaimId(c.id); }
-                else if (c.status === "CODE_SENT") { setClaimState("code_sent"); setClaimId(c.id); }
-                else if (c.status === "APPROVED") { setClaimState("approved"); }
-              }
-            });
+          try {
+            const claimsRes = await fetch(`/api/claim?dealerId=${dealerId}`);
+            const claims = await claimsRes.json();
+            if (Array.isArray(claims) && claims.length > 0) {
+              const c = claims[0];
+              if (c.status === "PENDING") { setClaimState("pending"); setClaimId(c.id); }
+              else if (c.status === "CODE_SENT") { setClaimState("code_sent"); setClaimId(c.id); }
+              else if (c.status === "APPROVED") { setClaimState("approved"); }
+            }
+          } catch {}
         }
-      });
+        setReady(true);
+      })
+      .catch(() => setReady(true));
   }, [dealerId]);
 
   async function handleSubmitClaim() {
@@ -78,6 +81,8 @@ export function ClaimBanner({
     setTimeout(() => window.location.reload(), 1000);
   }
 
+  // Don't render until session check completes (prevents flash)
+  if (!ready) return null;
   // Don't show if logged-in user owns this restaurant (any of their restaurants)
   if (session?.activeRestaurant?.slug === slug) return null;
   if (session?.restaurants?.some((r: any) => r.slug === slug)) return null;
