@@ -141,8 +141,8 @@ export function HowItWorks() {
           ))}
         </div>
 
-        {/* Restaurant owner CTA — only show in customer mode */}
-        {mode === "customer" && (
+        {/* Restaurant owner CTA */}
+        {(
           <div className="mt-14 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-orange-50 p-8 text-center">
             <div className="text-3xl mb-3">🍽️</div>
             <h3 className="text-xl font-extrabold text-text tracking-tight mb-2">
