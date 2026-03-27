@@ -17,7 +17,7 @@ const AUTH_PATHS = ["/restaurante/login", "/restaurante/register", "/restaurante
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const [slug, setSlug] = useState("");
   const [restaurantName, setRestaurantName] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
