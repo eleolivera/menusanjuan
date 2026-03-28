@@ -392,10 +392,21 @@ server.tool(
         const p = products[pi];
         const price = p.price?.finalPrice || 0;
         const imgUuid = p.images?.urls?.[0];
-        const imageUrl = imgUuid ? `https://pedidosya.dhmedia.io/image/pedidosya/products/${imgUuid}${imgUuid.includes('.') ? '' : '.jpg'}?quality=90&width=400` : null;
         const badge = p.tags?.isMostOrdered ? "Popular" : null;
-
         const itemId = cuid();
+
+        // Download image to R2 instead of using PedidosYa CDN URL
+        let imageUrl: string | null = null;
+        if (imgUuid) {
+          const peyaUrl = `https://pedidosya.dhmedia.io/image/pedidosya/products/${imgUuid}${imgUuid.includes('.') ? '' : '.jpg'}?quality=90&width=400`;
+          try {
+            const key = `${restaurant_slug}/items/${itemId}.jpg`;
+            imageUrl = await downloadAndUpload(peyaUrl, key);
+          } catch {
+            imageUrl = peyaUrl; // Fallback to CDN URL if download fails
+          }
+        }
+
         await query('INSERT INTO "MenuItem" (id, "categoryId", name, description, price, "imageUrl", badge, available, "sortOrder") VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8)',
           [itemId, catId, p.name, p.description || null, price, imageUrl, badge, pi]);
         totalItems++;
