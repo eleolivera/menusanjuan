@@ -150,6 +150,160 @@ Average feature time: **10-30 minutes** from idea to production.
 
 ---
 
+## Database
+
+### Connection
+
+PostgreSQL on **Supabase** (project `hzokeqvgmbhfrnrkxxtd`, us-west-2). Uses Prisma 7 with `@prisma/adapter-pg` (driver adapter, not Prisma's built-in connection).
+
+```
+DATABASE_URL="postgresql://postgres.PROJECT_ID:PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
+```
+
+- **Pool mode:** Transaction (port 5432 via pooler)
+- **Max connections per worker:** 3 (set in `webapp/src/lib/prisma.ts`)
+- **Dashboard:** `supabase.com/dashboard/project/hzokeqvgmbhfrnrkxxtd`
+
+### Schema
+
+```
+User ──┬── Account ──── Dealer ──┬── MenuCategory ── MenuItem
+       │                         ├── Order
+       │                         └── ClaimRequest
+       └── Session
+```
+
+| Model | Key Fields | Purpose |
+|-------|-----------|---------|
+| **User** | email, password (salt:hash), name, phone, role (USER/BUSINESS/ADMIN) | Account holder |
+| **Account** | userId, type ("dealer") | Links User to Dealer (1 user can have multiple) |
+| **Dealer** | name, slug (unique URL), phone, address, lat/lng, cuisineType, logoUrl, coverUrl, isActive, isVerified, rating, deliveryFee, sourceProfileId, sourceSite, openHours (JSON) | Restaurant |
+| **MenuCategory** | dealerId, name, emoji, sortOrder | Menu section (e.g., "Hamburguesas") |
+| **MenuItem** | categoryId, name, description, price (ARS), imageUrl, badge, available, sortOrder | Individual menu item |
+| **Order** | orderNumber (ORD-MMDD-SEQ), restauranteSlug, dealerId, status, customerName/Phone/Address, items (JSON), total | Customer order |
+| **ClaimRequest** | dealerId, userId, status (PENDING→CODE_SENT→APPROVED/REJECTED), code | Ownership claim |
+| **Session** | userId, token, expiresAt | Auth session |
+
+**Important fields on Dealer:**
+- `sourceProfileId` + `sourceSite`: tracks where the restaurant was imported from (e.g., `"pedidosya"`)
+- `isActive`: admin toggle — inactive restaurants don't appear on the site
+- `isVerified`: owner account is activated — claim banner disappears
+- `pendingOwnerEmail`: if set, auto-links when that email registers
+- `openHours`: JSON string with per-day hours `{ "lun": { "open": "08:00", "close": "23:00", "closed": false } }`
+
+### Useful DB commands
+
+```bash
+# Push schema changes to DB
+cd webapp && npx prisma db push
+
+# Regenerate Prisma client after schema changes
+npx prisma generate
+
+# Open Prisma Studio (visual DB browser)
+npx prisma studio
+
+# Run raw SQL via script
+npx tsx -e "
+import pg from 'pg';
+async function main() {
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  const res = await client.query('SELECT count(*) FROM \"Dealer\" WHERE \"isActive\" = true');
+  console.log(res.rows[0]);
+  await client.end();
+}
+main();
+"
+```
+
+### Kill stuck connections (Supabase SQL Editor)
+
+```sql
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE state = 'idle' AND pid != pg_backend_pid();
+```
+
+---
+
+## Image uploads (Cloudflare R2)
+
+### Setup
+
+- **Bucket:** `menusanjuan-images`
+- **Public URL:** `https://images.menusanjuan.com/{key}`
+- **R2 endpoint:** `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+
+### How it works
+
+The upload API (`POST /api/upload`) accepts both **file uploads** and **URL downloads**:
+
+**File upload (FormData):**
+```bash
+curl -X POST https://menusanjuan.com/api/upload \
+  -H "Cookie: menusj_session=..." \
+  -F "file=@photo.jpg" \
+  -F "type=menu-item"
+# Returns: { "url": "https://images.menusanjuan.com/slug/menu-item-1234.jpg", "key": "slug/menu-item-1234.jpg" }
+```
+
+**URL download (JSON):**
+```bash
+curl -X POST https://menusanjuan.com/api/upload \
+  -H "Cookie: menusj_session=..." \
+  -H "Content-Type: application/json" \
+  -d '{"imageUrl": "https://example.com/photo.jpg", "type": "logo"}'
+# Downloads the image, uploads to R2, returns our URL
+```
+
+- Accepts both **user session** and **admin session**
+- Images max **5MB**, videos max **20MB**
+- Supports: jpg, png, webp, gif, svg, mp4, mov, webm
+- Files stored as: `{slug}/{type}-{timestamp}.{ext}`
+
+### R2 environment variables
+
+```
+R2_ACCOUNT_ID=             # Cloudflare account ID (from dashboard)
+R2_ACCESS_KEY=             # R2 API token access key
+R2_SECRET_KEY=             # R2 API token secret key
+R2_BUCKET=menusanjuan-images
+```
+
+### Image migration scripts
+
+```bash
+# Migrate PedidosYa CDN images to R2 (logos + 900 item images)
+npx tsx src/scripts/migrate-images-to-r2.ts
+
+# Fetch Google Places photos as restaurant covers
+npx tsx src/scripts/fetch-google-covers.ts
+```
+
+---
+
+## Scraping PedidosYa (with Cowork)
+
+Full instructions in **[PEDIDOSYA_SCRAPER_INSTRUCTIONS.md](./PEDIDOSYA_SCRAPER_INSTRUCTIONS.md)** — covers APIs, cookie management, field mappings, what worked and what didn't.
+
+### Quick summary for Cowork
+
+1. **Log in** to pedidosya.com.ar in Chrome (real account)
+2. **Navigate** to San Juan restaurants
+3. **Capture vendor list** — DevTools → Network → filter `vendors` → Copy response → save as `vendors-full.json`
+4. **For each restaurant** — click into it → Network → filter `menus` → Copy response → save as `menu-{id}.json`
+5. **Run import**: `cd webapp && npx tsx src/scripts/import-pedidosya.ts`
+6. **Migrate images**: `npx tsx src/scripts/migrate-images-to-r2.ts`
+7. **Fetch covers**: `npx tsx src/scripts/fetch-google-covers.ts`
+8. **Activate**: Admin panel → toggle restaurants active
+
+**Key learnings:**
+- PedidosYa blocks all automation (Playwright, Puppeteer, headless browsers)
+- Cookie-based curl works but cookies expire every ~30 min
+- Closed restaurants return empty menus — scrape Friday/Saturday 9pm+
+- PedidosYa image URLs expire — always migrate to R2 after import
+
+---
+
 ## Getting started
 
 ### Prerequisites
@@ -170,19 +324,28 @@ npx prisma generate
 npm run dev
 ```
 
-### Environment variables
+### All environment variables
 
 ```
-DATABASE_URL=              # Supabase PostgreSQL connection string
+# Database (Supabase PostgreSQL)
+DATABASE_URL=              # postgresql://postgres.xxx:password@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+
+# Cloudflare R2 (image storage)
 R2_ACCOUNT_ID=             # Cloudflare account ID
 R2_ACCESS_KEY=             # R2 API token access key
 R2_SECRET_KEY=             # R2 API token secret key
-R2_BUCKET=                 # R2 bucket name (menusanjuan-images)
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=  # Google Maps + Places API key
-MAILERSEND_API_KEY=        # MailerSend for transactional emails
+R2_BUCKET=menusanjuan-images
+
+# Google Maps
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=  # Maps + Places API key
+
+# Email
+MAILERSEND_API_KEY=        # MailerSend transactional emails
+
+# Auth
 ADMIN_EMAIL=               # Admin login email
 ADMIN_PASSWORD=            # Admin login password
-CLAIM_SECRET=              # Secret for deterministic claim codes
+CLAIM_SECRET=              # Secret for deterministic claim verification codes
 ```
 
 ### Scripts
@@ -199,18 +362,6 @@ npx tsx src/scripts/fetch-google-covers.ts
 
 # Seed demo data
 npx tsx src/scripts/seed-restaurants.ts
-```
-
-### Scraping PedidosYa
-
-```bash
-# 1. Get fresh cookies from pedidosya.com.ar (DevTools → Network → Copy as cURL)
-# 2. Paste cookie string into scraper/cookies.txt
-# 3. Run the scraper
-npx tsx scraper/pedidosya-scraper.ts
-
-# 4. Import scraped data
-cd webapp && npx tsx src/scripts/import-pedidosya.ts
 ```
 
 ---
