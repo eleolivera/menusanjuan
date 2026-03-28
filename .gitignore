@@ -3,3 +3,6 @@ node_modules/
 .env
 .env.local
 webapp/src/generated/
+scraper/cookies.txt
+mcp/.env
+mcp/SECRETS.md
