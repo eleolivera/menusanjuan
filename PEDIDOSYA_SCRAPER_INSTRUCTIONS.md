@@ -1,67 +1,98 @@
-# PedidosYa → MenuSanJuan — Instrucciones de Importación
+# PedidosYa → MenuSanJuan — Knowledge Transfer
 
-## Qué es esto
+## Purpose
 
-Instrucciones para extraer datos de restaurantes de PedidosYa (San Juan) e importarlos a la base de datos de MenuSanJuan. Los restaurantes se crean inactivos — el admin los revisa y activa después.
+Extract restaurant data (names, menus, prices, images, locations) from PedidosYa for San Juan, Argentina and import it into MenuSanJuan's database. Restaurants are created as inactive with placeholder accounts — admin reviews and activates them.
+
+**Current status:** 227 vendors scraped, 52 menus downloaded, 29 imported with full menus + images migrated to R2.
 
 ---
 
-## Paso 1: Obtener la lista de restaurantes
+## How PedidosYa works (what we learned)
 
-### Desde el browser:
-1. Abrí **pedidosya.com.ar** → navegá a restaurantes de San Juan
-2. Abrí DevTools (Cmd+Option+I) → pestaña **Network** → filtrar por **Fetch/XHR**
-3. Buscá la request a `/v1/food-home/v1/vendors`
-4. Click derecho en la respuesta → **Copy response**
-5. Guardá como `/Users/eleolivera/Downloads/pedidosya-data/vendors.json`
+### Bot protection
+PedidosYa uses **PerimeterX** (bot detection) + **Cloudflare** (WAF/challenge). This means:
 
-### Si tenés control del browser (extensión):
-Navegá a la página de restaurantes de San Juan en PedidosYa y capturá la respuesta de la API `/v1/food-home/v1/vendors`. Puede haber paginación — scrolleá para cargar más y capturá todas las respuestas.
+- **Playwright/Puppeteer don't work** — PerimeterX fingerprints the browser and blocks automation. We tried stealth plugins, persistent contexts, real Chrome profiles — all detected.
+- **Direct API calls don't work** — Cloudflare issues a JavaScript challenge that curl can't solve.
+- **Cookie-based curl DOES work** — if you copy cookies from a real browser session. The key cookies are `cf_clearance` (Cloudflare challenge pass), `_px3` (PerimeterX token), and `__Secure-peya.sid` / `__Secure-peya.who` (PedidosYa session).
 
-### Estructura del vendors JSON:
+### Cookie lifetime
+- `cf_clearance`: ~30 minutes
+- `_px3`: ~30 minutes
+- `__Secure-peya.who`: ~2 hours (JWT with `exp` field)
+- **Practical limit:** ~30 minutes per cookie session before 403
+
+### Best time to scrape
+- **Friday/Saturday 9pm-12am** — most restaurants are open, so menus return full data
+- Closed restaurants may return empty sections or 404
+
+---
+
+## The two APIs
+
+### 1. Vendor list (who's on PedidosYa in San Juan)
+
+**Endpoint:** `POST https://www.pedidosya.com.ar/v4/shoplist/vendors`
+
+**Important:** This is a POST, not GET. The older v1 endpoint (`/v1/food-home/v1/vendors`) also works but returns less data.
+
+**Request body:**
 ```json
 {
-  "data": [
-    {
-      "id": 550595,
-      "name": "Agape Comidas",
-      "address": {
-        "street": "Sargento Cabral oeste 1364",
-        "latitude": -31.51658,
-        "longitude": -68.58411
-      },
-      "logo_url": "https://pedidosya.dhmedia.io/image/pedidosya/restaurants/xxx.jpg",
-      "header_url": "https://pedidosya.dhmedia.io/image/pedidosya/profile-headers/xxx.jpg",
-      "link": "agape-comidas-xxx",
-      "menu_id": 823801
-    }
-  ]
+  "filters": {},
+  "businessTypes": ["RESTAURANT"],
+  "countryId": 3,
+  "point": {
+    "latitude": -31.5364202,
+    "longitude": -68.5159897
+  },
+  "sort": "RELEVANCE",
+  "offer": false,
+  "size": 30,
+  "page": 0
 }
 ```
 
----
+- Increment `page` for pagination (0, 1, 2... until empty response)
+- `point` is San Juan coordinates — changing this changes which restaurants appear
+- `size: 30` is the max per page
 
-## Paso 2: Obtener el menú de cada restaurante
-
-Para cada restaurante del vendors list, necesitamos su menú.
-
-### URL del menú:
+**Response structure (v4):**
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": 550595,
+        "name": "Agape Comidas",
+        "link": "agape-comidas-xxx",
+        "logo": "logo-uuid.jpg",
+        "location": { "latitude": -31.51658, "longitude": -68.58411 },
+        "mainFoodCategories": [{ "name": "Hamburguesas" }]
+      }
+    ]
+  }
+}
 ```
-https://www.pedidosya.com.ar/v2/niles/partners/{id}/menus?occasion=DELIVERY
-```
 
-Donde `{id}` es el campo `id` del vendor (ej: `550595`).
+Key fields per vendor:
+| Field | Description |
+|-------|-------------|
+| `id` | PedidosYa vendor ID — used to fetch menu |
+| `name` | Restaurant display name (may have location suffix like "- Rivadavia") |
+| `link` | URL slug on PedidosYa |
+| `logo` | UUID for logo image: `https://pedidosya.dhmedia.io/image/pedidosya/restaurants/{logo}` |
+| `location.latitude/longitude` | GPS coordinates |
+| `mainFoodCategories[0].name` | Primary cuisine type |
 
-### Desde el browser:
-1. Para cada restaurante, abrí su página en PedidosYa
-2. En Network tab, buscá la request a `/v2/niles/partners/{id}/menus`
-3. Copiá la respuesta
-4. Guardá como `/Users/eleolivera/Downloads/pedidosya-data/menu-{id}.json`
+**We saved this as:** `vendors-full.json` — a flat array of all vendor objects (227 total).
 
-### Si tenés control del browser:
-Para cada vendor ID del paso 1, navegá a `pedidosya.com.ar/restaurantes/san-juan/{link}-menu` y capturá la respuesta del endpoint `/v2/niles/partners/{id}/menus?occasion=DELIVERY`.
+### 2. Menu for each restaurant
 
-### Estructura del menu JSON:
+**Endpoint:** `GET https://www.pedidosya.com.ar/v2/niles/partners/{vendorId}/menus?occasion=DELIVERY`
+
+**Response structure:**
 ```json
 {
   "sections": [
@@ -70,16 +101,10 @@ Para cada vendor ID del paso 1, navegá a `pedidosya.com.ar/restaurantes/san-jua
       "products": [
         {
           "name": "Milanesa napolitana",
-          "description": "Con salsa de tomate y queso con 1 guarnición.",
-          "price": {
-            "finalPrice": 17500.00
-          },
-          "images": {
-            "urls": ["b5fdc630-xxxx.jpeg"]
-          },
-          "tags": {
-            "isMostOrdered": true
-          },
+          "description": "Con salsa de tomate y queso.",
+          "price": { "finalPrice": 17500.00 },
+          "images": { "urls": ["b5fdc630-xxxx.jpeg"] },
+          "tags": { "isMostOrdered": true },
           "enabled": true
         }
       ]
@@ -88,227 +113,334 @@ Para cada vendor ID del paso 1, navegá a `pedidosya.com.ar/restaurantes/san-jua
 }
 ```
 
+Key fields per product:
+| Field | Use |
+|-------|-----|
+| `name` | Item name |
+| `description` | Optional description |
+| `price.finalPrice` | Price in ARS |
+| `images.urls[0]` | Image UUID → `https://pedidosya.dhmedia.io/image/pedidosya/products/{uuid}.jpg?quality=90&width=400` |
+| `tags.isMostOrdered` | If `true`, we set `badge: "Popular"` |
+| `enabled` | If `false`, skip this item |
+
+**We saved each as:** `menu-{vendorId}.json`
+
 ---
 
-## Paso 3: Importar a MenuSanJuan
+## How to get the data (for Cowork / manual)
 
-Una vez que tengas los JSONs guardados, usá este script para importar cada restaurante.
+### Method: Browser + DevTools (recommended)
 
-### Proyecto: `/Users/eleolivera/Desktop/manu-san-juan/webapp`
-### Env: `/Users/eleolivera/Desktop/manu-san-juan/webapp/.env`
-### DB: PostgreSQL (Supabase) via Prisma
+This is the safest approach — no bot detection because you're using a real browser.
 
-### Script de importación:
+#### Step 1: Get the vendor list
 
-Para cada restaurante, creá y ejecutá un script como este:
+1. Open Chrome, go to `pedidosya.com.ar`
+2. Log in with a real account
+3. Navigate to **Restaurantes** in San Juan
+4. Open DevTools (`Cmd+Option+I`) → **Network** tab → filter by `Fetch/XHR`
+5. Look for the request to `/v4/shoplist/vendors` or `/v1/food-home/v1/vendors`
+6. **Scroll down** to load more restaurants — each scroll triggers a new page request
+7. For each response: right-click → **Copy response**
+8. Save all vendor data into a single file: `vendors-full.json` (flat array of all vendor objects)
 
-```typescript
-// webapp/src/scripts/import-pedidosya-{slug}.ts
-import { config } from "dotenv";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
-const __dirname2 = typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname2, "../../.env") });
+**Alternative (single page):** If using the v1 endpoint, it paginates with `offset` param. Copy each page's `data` array and merge them.
 
-import pg from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../generated/prisma/client.js";
-import crypto from "crypto";
+#### Step 2: Get each restaurant's menu
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter });
+For each vendor ID from step 1:
 
-function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.createHash("sha256").update(password + salt).digest("hex");
-  return `${salt}:${hash}`;
-}
+1. Navigate to the restaurant's page on PedidosYa: `pedidosya.com.ar/restaurantes/san-juan/{link}-menu`
+2. In DevTools Network tab, filter by `menus`
+3. Find the request to `/v2/niles/partners/{id}/menus?occasion=DELIVERY`
+4. Right-click the response → **Copy response**
+5. Save as `menu-{id}.json`
 
-function makeSlug(name: string): string {
-  return name.toLowerCase().normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-").trim();
-}
+**This is the slow part.** Each restaurant requires navigating to its page. With 200+ restaurants, this takes time. Tips:
+- Do it in batches of 20-30
+- Best done Friday/Saturday evening when restaurants are open
+- Closed restaurants may return empty `sections: []`
+- You can skip those and retry when they're open
 
-// ======== DATOS DE PEDIDOSYA — COMPLETAR ========
+#### Step 3: Get cookies for the automated scraper (optional)
 
-const VENDOR = {
-  // Del vendors.json:
-  id: 0,                    // PedidosYa ID
-  name: "",                 // Nombre del restaurante
-  street: "",               // Dirección
-  latitude: 0,
-  longitude: 0,
-  logoUrl: "",              // logo_url del vendor
-  coverUrl: "",             // header_url del vendor
-  phone: "0000000000",      // PedidosYa no da teléfono — placeholder
-};
+If you want to use the automated scraper instead of copying each menu manually:
 
-// Del menu-{id}.json — mapear sections → categories con items:
-const MENU: { category: string; emoji: string; items: { name: string; price: number; description?: string; badge?: string }[] }[] = [
-  // {
-  //   category: "Milanesas",
-  //   emoji: "🍗",
-  //   items: [
-  //     { name: "Milanesa napolitana", price: 17500, description: "Con salsa...", badge: "Popular" },
-  //   ],
-  // },
-];
+1. On any restaurant page in PedidosYa, open DevTools → Network
+2. Find any `/v2/niles/partners/` request that returned **200**
+3. Right-click → **Copy as cURL**
+4. Extract the `cookie:` header value
+5. Paste into `scraper/cookies.txt` (single line, no newlines)
+6. Run: `cd /path/to/manu-san-juan && npx tsx scraper/pedidosya-scraper.ts`
+7. When cookies expire (~30 min), get fresh ones and run again — it resumes automatically
 
-// ======== FIN DATOS ========
+---
 
-async function main() {
-  const slug = makeSlug(VENDOR.name);
-  const existing = await prisma.dealer.findUnique({ where: { slug } });
-  if (existing) {
-    console.log(`⚠️  ${VENDOR.name} ya existe (/${slug}). Abortando.`);
-    await prisma.$disconnect();
-    return;
-  }
+## Cookie format
 
-  console.log(`🍽️  Importando: ${VENDOR.name} (PedidosYa #${VENDOR.id})`);
+The `scraper/cookies.txt` file should be a **single line** with all cookies separated by `;`. Example:
 
-  const placeholderEmail = `${slug}@menusanjuan.com`;
-  const user = await prisma.user.create({
-    data: { email: placeholderEmail, password: hashPassword("menusj2024"), name: VENDOR.name, phone: VENDOR.phone },
-  });
-  const account = await prisma.account.create({
-    data: { userId: user.id, type: "dealer" },
-  });
-  const dealer = await prisma.dealer.create({
-    data: {
-      accountId: account.id,
-      name: VENDOR.name,
-      slug,
-      phone: VENDOR.phone,
-      address: VENDOR.street || null,
-      latitude: VENDOR.latitude || null,
-      longitude: VENDOR.longitude || null,
-      logoUrl: VENDOR.logoUrl || null,
-      coverUrl: VENDOR.coverUrl || null,
-      cuisineType: "General",
-      isActive: false,
-      sourceProfileId: String(VENDOR.id),
-      sourceSite: "pedidosya",
-    },
-  });
-
-  let totalItems = 0;
-  for (let ci = 0; ci < MENU.length; ci++) {
-    const cat = MENU[ci];
-    const category = await prisma.menuCategory.create({
-      data: { dealerId: dealer.id, name: cat.category, emoji: cat.emoji || null, sortOrder: ci },
-    });
-    for (let ii = 0; ii < cat.items.length; ii++) {
-      const item = cat.items[ii];
-      await prisma.menuItem.create({
-        data: {
-          categoryId: category.id,
-          name: item.name,
-          description: item.description || null,
-          price: item.price,
-          badge: item.badge || null,
-          available: true,
-          sortOrder: ii,
-        },
-      });
-      totalItems++;
-    }
-    console.log(`   📋 ${cat.emoji || "📋"} ${cat.category}: ${cat.items.length} items`);
-  }
-
-  console.log(`\n✅ ${VENDOR.name}: ${MENU.length} categorías, ${totalItems} items`);
-  console.log(`   PedidosYa ID: ${VENDOR.id}`);
-  console.log(`   Admin: https://menusanjuan.com/admin?login → "${VENDOR.name}"`);
-  await prisma.$disconnect();
-}
-
-main().catch((err) => { console.error(err); process.exit(1); });
+```
+_pxhd=xxx; dhhPerseusSessionId=xxx; __Secure-peya.sid=xxx; __Secure-peya.who=xxx; cf_clearance=xxx; _px3=xxx; dhhPerseusHitId=xxx
 ```
 
-Ejecutar: `cd /Users/eleolivera/Desktop/manu-san-juan/webapp && npx tsx src/scripts/import-pedidosya-{slug}.ts`
+**Critical cookies:**
+| Cookie | Purpose | Expires |
+|--------|---------|---------|
+| `cf_clearance` | Cloudflare challenge pass | ~30 min |
+| `_px3` | PerimeterX bot check token | ~30 min |
+| `__Secure-peya.sid` | PedidosYa session ID | ~2 hours |
+| `__Secure-peya.who` | JWT with user identity | ~2 hours |
+| `_pxhd` | PerimeterX device fingerprint | Long-lived |
+| `dhhPerseusHitId` | Analytics tracking | Per-session |
+
+If you get `403`, the cookies expired. Get fresh ones.
 
 ---
 
-## Mapeo de campos PedidosYa → MenuSanJuan
+## Required headers
 
-### Vendor → Restaurant:
-| PedidosYa | MenuSanJuan | Notas |
-|-----------|-------------|-------|
-| `name` | `name` | Directo |
-| `address.street` | `address` | Directo |
-| `address.latitude` | `latitude` | Directo |
-| `address.longitude` | `longitude` | Directo |
-| `logo_url` | `logoUrl` | URL completa de PedidosYa CDN |
-| `header_url` | `coverUrl` | URL completa de PedidosYa CDN |
-| `id` | `sourceProfileId` | Guardar como string |
-| — | `sourceSite` | Siempre `"pedidosya"` |
-| — | `phone` | PedidosYa no da teléfono, usar `"0000000000"` |
-| — | `cuisineType` | Deducir del menú o poner `"General"` |
-| — | `isActive` | Siempre `false` |
+When making curl requests, these headers are required to avoid detection:
 
-### Menu Section → Category:
-| PedidosYa | MenuSanJuan | Notas |
-|-----------|-------------|-------|
-| `sections[].name` | `category` | Directo |
-| — | `emoji` | Elegir emoji apropiado basado en el nombre |
+```
+user-agent: Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36
+accept: application/json, text/plain, */*
+referer: https://www.pedidosya.com.ar/restaurantes/san-juan/{restaurant-link}-menu
+sec-ch-ua-mobile: ?1
+sec-ch-ua: "Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"
+sec-ch-ua-platform: "Android"
+sec-fetch-dest: empty
+sec-fetch-mode: cors
+sec-fetch-site: same-origin
+```
 
-### Product → Item:
-| PedidosYa | MenuSanJuan | Notas |
-|-----------|-------------|-------|
-| `products[].name` | `name` | Directo |
-| `products[].description` | `description` | Directo (puede ser null) |
-| `products[].price.finalPrice` | `price` | Número sin decimales |
-| `products[].images.urls[0]` | — | Imagen en CDN de PedidosYa (no importar, expira) |
-| `products[].tags.isMostOrdered` | `badge` | Si true → `"Popular"` |
-| `products[].enabled` | — | Ignorar items con `enabled: false` |
-
-### Emojis sugeridos por nombre de categoría:
-| Nombre contiene | Emoji |
-|-----------------|-------|
-| Hamburguesa | 🍔 |
-| Pizza | 🍕 |
-| Milanesa | 🍗 |
-| Empanada | 🥟 |
-| Pasta, Tallarin, Ñoqui, Raviole, Lasaña | 🍝 |
-| Bebida, Gaseosa, Agua, Cerveza | 🥤 |
-| Postre, Torta, Helado | 🍰 |
-| Ensalada, Vegetariano | 🥗 |
-| Papa, Guarnición | 🍟 |
-| Café, Desayuno | ☕ |
-| Sushi, Roll | 🍣 |
-| Combo, Promo | ⭐ |
-| Parrilla, Carne, Asado | 🥩 |
-| Pollo | 🍗 |
-| Sandwich, Lomito | 🥖 |
-| Wrap, Piadina | 🌯 |
-| Default | 🍽️ |
+The `referer` should match the restaurant page you're fetching the menu for. The mobile user-agent matches what DevTools device emulation sends.
 
 ---
 
-## Proceso completo para importar en lote
+## Field mapping: PedidosYa → MenuSanJuan
 
-1. **Guardar vendors JSON** → tiene la lista de todos los restaurantes
-2. **Para cada restaurante**, guardar su menu JSON (necesita browser porque PedidosYa bloquea requests directos)
-3. **Para cada par (vendor + menu)**, crear un script que:
-   - Extrae los datos del vendor JSON
-   - Parsea las sections/products del menu JSON
-   - Mapea los campos según la tabla de arriba
-   - Asigna emojis a las categorías
-   - Marca items con `isMostOrdered: true` como `badge: "Popular"`
-   - Ignora items con `enabled: false`
-   - Ejecuta contra la DB
-4. **Ejecutar** el script: `npx tsx src/scripts/import-pedidosya-{slug}.ts`
-5. **Admin revisa** en menusanjuan.com/admin?login → ajusta → activa
+### Vendor → Dealer (Restaurant)
+
+| PedidosYa | MenuSanJuan field | Notes |
+|-----------|-------------------|-------|
+| `id` | `sourceProfileId` | Store as string |
+| — | `sourceSite` | Always `"pedidosya"` |
+| `name` | `name` | Strip location suffixes (e.g., "- San Juan", "- Rivadavia") |
+| `location.latitude` | `latitude` | Direct |
+| `location.longitude` | `longitude` | Direct |
+| `logo` | `logoUrl` | Build URL: `https://pedidosya.dhmedia.io/image/pedidosya/restaurants/{logo}` |
+| — | `coverUrl` | Not available from PedidosYa. Use Google Places photo instead. |
+| — | `phone` | Not available. Use placeholder `"0000000000"` |
+| — | `address` | Not available from v4 API (v1 has it). Set null. |
+| `mainFoodCategories[0].name` | `cuisineType` | Map to our types (see cuisine mapping below) |
+| — | `isActive` | Always `false` — admin activates after review |
+| — | `isVerified` | Always `false` — admin verifies when onboarding owner |
+
+### Menu Section → MenuCategory
+
+| PedidosYa | MenuSanJuan field | Notes |
+|-----------|-------------------|-------|
+| `sections[].name` | `name` | Direct |
+| — | `emoji` | Auto-assign based on category name (see emoji table below) |
+| array index | `sortOrder` | Preserve order from PedidosYa |
+
+### Product → MenuItem
+
+| PedidosYa | MenuSanJuan field | Notes |
+|-----------|-------------------|-------|
+| `products[].name` | `name` | Direct |
+| `products[].description` | `description` | Can be null |
+| `products[].price.finalPrice` | `price` | Number (ARS) |
+| `products[].images.urls[0]` | `imageUrl` | Build URL: `https://pedidosya.dhmedia.io/image/pedidosya/products/{uuid}.jpg?quality=90&width=400`. **Must migrate to R2 ASAP — PedidosYa URLs expire.** |
+| `products[].tags.isMostOrdered` | `badge` | If `true` → `"Popular"` |
+| `products[].enabled` | — | Skip items with `enabled: false` |
+| array index | `sortOrder` | Preserve order |
 
 ---
 
-## Tips
+## Cuisine type mapping
 
-- PedidosYa image URLs (`pedidosya.dhmedia.io`) pueden expirar. Guardalas como `logoUrl`/`coverUrl` por ahora, pero idealmente descargarlas a R2 después.
-- El teléfono no viene de PedidosYa — el admin lo agrega manualmente después, o el dueño lo pone cuando reclama el restaurante.
-- Algunos restaurantes tienen nombres con sufijos de ubicación (ej: "Burger King - Rivadavia"). Limpiá eso en el nombre si querés.
-- Si un restaurante ya existe en la DB (mismo slug), el script aborta para no duplicar.
+```
+PedidosYa category → MenuSanJuan cuisineType
+─────────────────────────────────────────────
+sushi, japon         → Sushi
+pizza                → Pizzería
+hambur, burger       → Comida Rápida
+empanada             → Empanadas
+helad, ice           → Heladería
+café, cafe, coffee   → Cafetería
+pasta, italian       → Pastas
+parrilla, asado      → Parrilla
+poke, salad, veg     → Vegetariano
+postre, pastel       → Postres
+árabe, arab          → Comida Árabe
+mexic                → Comida Mexicana
+china, chino, wok    → Comida China
+(default)            → Comida Rápida
+```
+
+## Emoji mapping for categories
+
+```
+Category name contains → Emoji
+───────────────────────────────
+hambur, burger          → 🍔
+pizza                   → 🍕
+empanada                → 🥟
+pasta, tallarin, ñoqui  → 🍝
+sushi, roll             → 🍣
+helad                   → 🍦
+bebid, gaseosa, agua    → 🥤
+postre, torta, cake     → 🍰
+café, desayuno          → ☕
+ensalad                 → 🥗
+papa, guarnicion        → 🍟
+pollo, milanes          → 🍗
+carne, parrilla, asado  → 🥩
+sandwich, lomito        → 🥖
+combo, promo            → ⭐
+churro                  → 🥐
+wrap, burrito, piadina  → 🌯
+poke, bowl              → 🥗
+factura, medialuna      → 🥐
+(default)               → 🍽️
+```
+
+---
+
+## Image pipeline
+
+PedidosYa image URLs **expire**. The pipeline is:
+
+1. **During import**: store PedidosYa CDN URLs as `logoUrl` and `imageUrl`
+2. **After import**: run `migrate-images-to-r2.ts` to download each image and upload to our R2 bucket
+3. **For covers**: run `fetch-google-covers.ts` to get real photos from Google Places
+4. **Result**: all images on `images.menusanjuan.com` — permanent, no expiry
+
+### Image URLs
+
+```
+Logos:   https://pedidosya.dhmedia.io/image/pedidosya/restaurants/{uuid}
+Items:   https://pedidosya.dhmedia.io/image/pedidosya/products/{uuid}.jpg?quality=90&width=400
+Headers: https://pedidosya.dhmedia.io/image/pedidosya/profile-headers/{uuid}
+```
+
+Some UUIDs don't have extensions — append `.jpg` if missing.
+
+---
+
+## Import scripts
+
+All scripts run from: `cd /path/to/manu-san-juan/webapp`
+
+### 1. Bulk import: `import-pedidosya.ts`
+
+Reads `vendors-full.json` + `menu-{id}.json` files, creates restaurants in DB.
+
+```bash
+npx tsx src/scripts/import-pedidosya.ts
+```
+
+For each vendor with a matching menu file:
+- Creates a placeholder user (`slug@menusanjuan.com` / auto-generated password)
+- Creates Account + Dealer (restaurant)
+- Creates MenuCategory + MenuItem for each section/product
+- Sets `isActive: false`, `sourceSite: "pedidosya"`, `sourceProfileId: vendorId`
+- Skips if slug or sourceProfileId already exists
+
+### 2. Migrate images: `migrate-images-to-r2.ts`
+
+Downloads all PedidosYa CDN images and uploads to our R2 bucket.
+
+```bash
+npx tsx src/scripts/migrate-images-to-r2.ts
+```
+
+- Finds all dealers + items with `pedidosya.dhmedia.io` URLs
+- Downloads each image, uploads to R2, updates DB with new URL
+- Logos: `{slug}/logo.jpg`, Items: `{slug}/items/{itemId}.jpg`
+- ~900 images takes ~15 minutes
+
+### 3. Google Places covers: `fetch-google-covers.ts`
+
+Fetches real restaurant photos from Google Places API for restaurants without covers.
+
+```bash
+npx tsx src/scripts/fetch-google-covers.ts
+```
+
+- Searches Google Places by `"{name} restaurante San Juan Argentina"`
+- Downloads the first photo (800px wide)
+- Uploads to R2 as `{slug}/cover-google.jpg`
+- Updates dealer.coverUrl in DB
+
+### 4. Activate restaurants
+
+After import + image migration, activate all restaurants that have logos:
+
+```sql
+UPDATE "Dealer" SET "isActive" = true WHERE "sourceSite" = 'pedidosya' AND "logoUrl" LIKE '%images.menusanjuan.com%';
+```
+
+---
+
+## Post-import: Owner onboarding
+
+Once a restaurant is imported and activated:
+
+1. **Admin panel** → Restaurant → Owner tab
+2. Toggle **"Cuenta Habilitada"** ON — generates real login credentials
+3. Editable **WhatsApp message** appears with:
+   - Restaurant public page link
+   - Login URL + email + password
+   - Pitch about the free service
+4. Click **"Enviar por WhatsApp"** to send to the restaurant owner
+5. Owner logs in → can edit menu, prices, images, hours
+
+When the account is enabled, the "Reclamalo" claim banner disappears from the public page.
+
+---
+
+## File locations
+
+```
+/path/to/manu-san-juan/
+├── scraper/
+│   ├── pedidosya-scraper.ts      # Automated menu scraper (cookie-based)
+│   ├── scrape-batch.ts           # Batch scraper for specific vendor IDs
+│   └── cookies.txt               # PedidosYa session cookies (DO NOT COMMIT)
+├── webapp/src/scripts/
+│   ├── import-pedidosya.ts       # Bulk import vendors + menus → DB
+│   ├── migrate-images-to-r2.ts   # PedidosYa CDN → R2 migration
+│   └── fetch-google-covers.ts    # Google Places → cover photos
+└── /Downloads/pedidosya-data/    # Scraped data (local, not in repo)
+    ├── vendors-full.json         # 227 vendor records
+    ├── menu-{id}.json            # Menu data per vendor (52 files)
+    └── scrape-progress.json      # Failed/remaining vendor IDs
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| `403` on all requests | Cookies expired | Get fresh cookies from DevTools |
+| Empty `sections: []` | Restaurant is closed | Retry during business hours (Fri/Sat 9pm) |
+| `MaxClientsInSessionMode` | Too many DB connections | Wait 2 min, or kill idle connections in Supabase SQL Editor |
+| Images not loading | PedidosYa CDN expired | Run `migrate-images-to-r2.ts` |
+| Duplicate slug error | Restaurant already imported | Script skips automatically |
+| Scraper stops after ~30 restaurants | Cookies expired mid-scrape | Get fresh cookies, run again — it resumes |
+
+---
+
+## What we tried that didn't work
+
+1. **Playwright with stealth plugin** — PerimeterX detected within 2-3 requests
+2. **Playwright with real Chrome profile** — detected after login page
+3. **Persistent browser context** — detected
+4. **Direct API calls without cookies** — Cloudflare JavaScript challenge (403)
+5. **Old v1 vendor API with GET** — returned 0 results (need POST to v4)
+
+**What works:** Real browser session → copy cookies → curl with proper headers. Simple, reliable, no detection.
