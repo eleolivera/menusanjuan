@@ -42,6 +42,8 @@ export default function SalesPlaybook() {
               "Tickets con QR para imprimir",
               "Analíticas de ventas",
               "Ubicación exacta del cliente con mapa",
+              "Delivery con zonas de precio (cerca/lejos)",
+              "Opción de retiro en local",
               "Funciona desde el celular",
             ].map((f, i) => (
               <div key={i} className="flex items-start gap-2 rounded-lg bg-slate-50 p-2.5">
@@ -179,18 +181,14 @@ Una vez que tenga eso, te armo la página y te mando el link para que la revises
 
             <MsgTemplate title="Cuando la página está lista" msg={`Tu página ya está lista! 🎉
 
-👉 menusanjuan.com/{slug}
+🍽️ Tu página: menusanjuan.com/{slug}
 
-Desde ahí tus clientes pueden ver el menú y hacer pedidos directo a tu WhatsApp.
+Para editar tu menú, horarios, y ver pedidos:
+🔗 menusanjuan.com/restaurante/login
+📧 {email}
+🔑 {contraseña}
 
-Para gestionar pedidos, modificar precios, y ver tus ventas:
-1. Entrá a menusanjuan.com/restaurante/register
-2. Registrate con tu email
-3. ¡Listo! Desde tu panel podés controlar todo
-
-Tip: Compartí tu link en tus redes sociales y con tus clientes habituales 📲
-
-Cualquier duda me escribís! 💪`} />
+Probalo y decime qué te parece!`} />
 
             <MsgTemplate title="Si preguntan el costo" msg={`Es 100% gratis 🙌
 
@@ -218,10 +216,10 @@ Muchos restaurantes lo usan para pedidos directos + PedidosYa para delivery. As�
         <Section title="Proceso de Onboarding (Paso a Paso)" emoji="📋" number={8}>
           <div className="space-y-4">
             <Step n={1} title="Conseguir el menú" desc="Pedí una foto del menú por WhatsApp, o sacale foto en persona. Si tienen menú en redes, descargalo de ahí." />
-            <Step n={2} title="Subir el restaurante" desc="Usá Claude Code con las instrucciones de COWORK_UPLOAD_INSTRUCTIONS.md. Dale la foto del menú y que lo suba. El restaurante se crea INACTIVO." />
+            <Step n={2} title="Subir el restaurante" desc="En el admin, click '+ Nuevo' para crear el restaurante. Completá nombre y WhatsApp. Te lleva directo a editar los detalles." />
             <Step n={3} title="Revisar en admin" desc="Entrá a menusanjuan.com/admin?login → click en el restaurante → revisá nombre, menú, precios. Ajustá lo que haga falta." />
             <Step n={4} title="Activar" desc="En el admin, click 'Activar'. El restaurante aparece en el marketplace." />
-            <Step n={5} title="Asignar al dueño" desc="En el admin → Dueño → escribí el email del dueño. Si ya tiene cuenta, se vincula al instante. Si no, se vincula automáticamente cuando se registre." />
+            <Step n={5} title="Activar al dueño" desc="En el admin → Dueño → toggle 'Cuenta Habilitada' → se generan credenciales → usá el botón 'Enviar por WhatsApp' para mandarle todo al dueño" />
             <Step n={6} title="Enviar el link" desc="Mandá el mensaje 'Cuando la página está lista' (arriba) con el link de su página." />
             <Step n={7} title="Seguimiento" desc="A la semana, preguntá cómo les fue. Si necesitan cambios, ayudalos. Si están contentos, pediles que compartan el link en redes." />
           </div>

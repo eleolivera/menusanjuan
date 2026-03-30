@@ -45,7 +45,7 @@ export default function AdminGuide() {
         <Section title="Agregar un Restaurante (Admin)" emoji="➕" number={1}>
           <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700">
             <li>Ir a <a href="/admin?login" target="_blank" className="text-primary underline">Admin Panel</a></li>
-            <li>En la pestaña <strong>Restaurantes</strong>, hacé click en cualquier restaurante para editar, o usá la API para crear uno nuevo</li>
+            <li>Click el botón <strong>+ Nuevo</strong> arriba a la derecha de la tabla. Poné nombre y WhatsApp. Te lleva directo a la página del restaurante para completar todo.</li>
             <li>Completá: nombre, teléfono, dirección, tipo de cocina, descripción</li>
             <li>En la pestaña <strong>Menú</strong>: creá categorías y agregá items con precios</li>
             <li>El restaurante queda como <strong>sin reclamar</strong> (placeholder) hasta que un dueño lo tome</li>
@@ -134,6 +134,9 @@ export default function AdminGuide() {
             <li><strong>✓/✗</strong>: toggle disponibilidad de cada item</li>
             <li><strong>✕</strong>: eliminar item o categoría</li>
             <li>Los cambios se reflejan inmediatamente en la página pública</li>
+            <li>✏️ Click en el nombre de una categoría para editarlo (nombre y emoji)</li>
+            <li>📸 Upload de imágenes: click &quot;Subir imagen&quot; al agregar o editar items</li>
+            <li>🎥 Soporta imágenes y videos (mp4)</li>
           </ol>
         </Section>
 
@@ -148,11 +151,12 @@ export default function AdminGuide() {
         <Section title="Operación Diaria del Restaurante" emoji="📋" number={8}>
           <div className="space-y-3">
             {[
-              { emoji: "📊", title: "Dashboard", desc: "Primera pantalla al entrar. Ventas del día/semana, top productos, hora pico." },
+              { emoji: "📊", title: "Dashboard", desc: "Analíticas de ventas. Acceso desde el sidebar: /restaurante/dashboard" },
               { emoji: "📋", title: "Pedidos (Kanban)", desc: "Arrastrá pedidos entre columnas: Generado → Pagado → En Cocina → Entregado. Auto-refresca cada 10s." },
               { emoji: "🖨️", title: "Tickets", desc: "Expandí un pedido para ver el ticket. QR de WhatsApp + Google Maps. Botón Imprimir para térmica 80mm." },
               { emoji: "🍽️", title: "Menú", desc: "Agregar/quitar items, cambiar precios, marcar no disponible. Cambios al instante." },
-              { emoji: "⚙️", title: "Mi Restaurante", desc: "Portada y logo (click para cambiar), horarios, dirección con mapa, métodos de pago." },
+              { emoji: "⚙️", title: "Mi Restaurante", desc: "Primera página al entrar. Logo, portada, WhatsApp con validación, horarios, ubicación con mapa." },
+              { emoji: "🛵", title: "Delivery", desc: "Configurá zonas de delivery (cerca/lejos) con radio y precio, o tarifa fija. Los clientes eligen entre delivery y retiro en local." },
               { emoji: "📅", title: "Día de negocio", desc: "8:00 AM a 5:59 AM. Pedidos de madrugada cuentan como el día anterior. Números se reinician cada día." },
             ].map((item) => (
               <div key={item.title} className="flex gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
@@ -164,11 +168,23 @@ export default function AdminGuide() {
         </Section>
 
         <Section title="Credenciales" emoji="🔐" number={9}>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 font-mono text-sm">
-            <div><span className="text-slate-500">Admin:</span> <span className="text-slate-900">admin@menusanjuan.com / admin-menusj-2024</span></div>
-            <div><span className="text-slate-500">Admin URL:</span> <a href="/admin?login" className="text-primary underline">menusanjuan.com/admin?login</a></div>
-            <div><span className="text-slate-500">Placeholder restas:</span> <span className="text-slate-900">{"{slug}"}@menusanjuan.com / menusj2024</span></div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p>Las credenciales del admin se configuran por variables de entorno (ADMIN_EMAIL, ADMIN_PASSWORD). No se muestran acá por seguridad.</p>
           </div>
+        </Section>
+
+        <Section title="Delivery y Retiro" emoji="🛵" number={10}>
+          <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700">
+            <li>Admin → click en restaurante → Info → sección <strong>Delivery</strong></li>
+            <li>Toggle ON/OFF para habilitar delivery</li>
+            <li><strong>Zona cercana</strong>: radio en km + precio en $</li>
+            <li><strong>Zona lejana</strong>: radio en km + precio en $</li>
+            <li>Si no ponés zonas, usá la <strong>tarifa fija</strong> (mismo precio para todos)</li>
+            <li>Si no ponés nada, el cliente ve &quot;Consultá con el restaurante&quot;</li>
+            <li>El restaurante necesita coordenadas (ubicación en mapa) para que las zonas funcionen</li>
+            <li>Los clientes siempre pueden elegir <strong>Retiro en local</strong> (gratis)</li>
+          </ol>
+          <Tip>Hovereá el ícono ⓘ junto a &quot;Delivery&quot; en el admin para ver la explicación rápida.</Tip>
         </Section>
 
         <div className="mt-12 pt-8 border-t border-slate-200 text-center text-xs text-slate-400">
