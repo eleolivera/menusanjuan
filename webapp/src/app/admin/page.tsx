@@ -198,6 +198,7 @@ export default function AdminPage() {
         {loading ? (
           <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
         ) : tab === "restaurants" ? (
+          <>
           {/* Quick create restaurant */}
           {showNewResta && (
             <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 mb-4 animate-fade-in">
@@ -258,6 +259,7 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+        </>
         ) : tab === "claims" ? (
           <div className="space-y-4">
             {claims.length === 0 ? <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-12 text-center"><div className="text-3xl mb-3">📋</div><h3 className="text-lg font-bold text-white">Sin reclamos</h3></div> : claims.map(c => (
