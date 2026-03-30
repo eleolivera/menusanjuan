@@ -152,7 +152,8 @@ export default function AdminPage() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-white">Admin</h1>
-            <p className="text-xs text-slate-500">{adminEmail} <span className="ml-1 text-pink-400">te amo Majo ❤️</span></p>
+            <p className="text-xs text-slate-500">{adminEmail}</p>
+            <p className="text-lg font-extrabold bg-gradient-to-r from-pink-400 via-rose-400 to-red-400 bg-clip-text text-transparent animate-pulse">TE AMO MAJO ❤️</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => { setLoading(true); if (tab === "restaurants") fetch("/api/admin/restaurants").then(r => r.json()).then(d => { setRestaurants(d); setLoading(false); }); else if (tab === "claims") fetch("/api/admin/claims").then(r => r.json()).then(d => { setClaims(d); setLoading(false); }); else fetch("/api/admin/users").then(r => r.json()).then(d => { setUsers(d); setLoading(false); }); }}
