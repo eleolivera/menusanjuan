@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin-auth";
+import { getAdminSession, destroyAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 
 export async function GET() {
   const session = await getAdminSession();
@@ -9,20 +8,28 @@ export async function GET() {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { email: true, name: true },
-  });
-
-  return NextResponse.json({
-    authenticated: true,
-    email: user?.email,
-    name: user?.name,
-  });
+  // Try to get user email, but don't fail if DB is unavailable
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { email: true, name: true },
+    });
+    return NextResponse.json({
+      authenticated: true,
+      email: user?.email || "admin",
+      name: user?.name || "Admin",
+    });
+  } catch {
+    // DB unavailable — still return authenticated (cookie is valid)
+    return NextResponse.json({
+      authenticated: true,
+      email: "admin",
+      name: "Admin",
+    });
+  }
 }
 
 export async function DELETE() {
-  const cookieStore = await cookies();
-  cookieStore.delete("menusj_admin");
+  await destroyAdminSession();
   return NextResponse.json({ success: true });
 }

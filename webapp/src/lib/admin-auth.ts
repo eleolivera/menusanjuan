@@ -19,6 +19,7 @@ export async function createAdminSession(userId: string) {
   return token;
 }
 
+// Check admin session — does NOT hit DB (trusts the cookie)
 export async function getAdminSession(): Promise<{ userId: string } | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -26,15 +27,30 @@ export async function getAdminSession(): Promise<{ userId: string } | null> {
 
   try {
     const data = JSON.parse(Buffer.from(token, "base64").toString("utf-8"));
-    if (!data.userId) return null;
-
-    // Verify user still has ADMIN role
-    const user = await prisma.user.findUnique({ where: { id: data.userId } });
-    if (!user || user.role !== "ADMIN") return null;
-
-    return { userId: user.id };
+    if (!data.userId || data.role !== "ADMIN") return null;
+    return { userId: data.userId };
   } catch {
     return null;
+  }
+}
+
+// Full admin session check WITH DB verification (use sparingly — login, sensitive operations)
+export async function verifyAdminSession(): Promise<{ userId: string } | null> {
+  const session = await getAdminSession();
+  if (!session) return null;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: session.userId } });
+    if (!user || user.role !== "ADMIN") {
+      // Invalid — clear the cookie
+      const cookieStore = await cookies();
+      cookieStore.delete(COOKIE_NAME);
+      return null;
+    }
+    return { userId: user.id };
+  } catch {
+    // DB error — trust the cookie rather than locking the admin out
+    return session;
   }
 }
 
@@ -43,11 +59,16 @@ export async function loginAdmin(email: string, password: string): Promise<boole
   if (!user || user.role !== "ADMIN") return false;
 
   // Verify password
-  const [salt, hash] = user.password.split(":");
   const crypto = require("crypto");
+  const [salt, hash] = user.password.split(":");
   const attempt = crypto.createHash("sha256").update(password + salt).digest("hex");
   if (attempt !== hash) return false;
 
   await createAdminSession(user.id);
   return true;
+}
+
+export async function destroyAdminSession() {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAME);
 }
