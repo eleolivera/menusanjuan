@@ -27,7 +27,8 @@ const mapContainerStyle = {
 const mapOptions: google.maps.MapOptions = {
   disableDefaultUI: true,
   zoomControl: true,
-  gestureHandling: "greedy",
+  gestureHandling: "cooperative",
+  scrollwheel: false,
   restriction: {
     latLngBounds: SAN_JUAN_BOUNDS,
     strictBounds: true,
