@@ -39,6 +39,10 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [showNewResta, setShowNewResta] = useState(false);
+  const [newRestaName, setNewRestaName] = useState("");
+  const [newRestaPhone, setNewRestaPhone] = useState("");
+  const [creatingResta, setCreatingResta] = useState(false);
 
   // Check existing session
   useEffect(() => {
@@ -194,11 +198,31 @@ export default function AdminPage() {
         {loading ? (
           <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
         ) : tab === "restaurants" ? (
+          {/* Quick create restaurant */}
+          {showNewResta && (
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 mb-4 animate-fade-in">
+              <h3 className="text-sm font-bold text-white mb-3">Nuevo Restaurante</h3>
+              <div className="flex gap-3">
+                <input value={newRestaName} onChange={e => setNewRestaName(e.target.value)} placeholder="Nombre del restaurante *" className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                <input value={newRestaPhone} onChange={e => setNewRestaPhone(e.target.value)} placeholder="WhatsApp (opcional)" className="w-40 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                <button disabled={!newRestaName.trim() || creatingResta} onClick={async () => {
+                  setCreatingResta(true);
+                  const res = await fetch("/api/admin/restaurants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newRestaName.trim(), phone: newRestaPhone || "0000000000" }) });
+                  if (res.ok) { const d = await res.json(); setShowNewResta(false); setNewRestaName(""); setNewRestaPhone(""); window.location.href = `/admin/restaurants/${d.id}`; }
+                  setCreatingResta(false);
+                }} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50 shrink-0">
+                  {creatingResta ? "Creando..." : "Crear"}
+                </button>
+                <button onClick={() => setShowNewResta(false)} className="text-xs text-slate-500 hover:text-slate-300">Cancelar</button>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
             <div className="border-b border-white/5 px-5 py-3 flex items-center justify-between gap-3">
               <h2 className="text-sm font-bold text-white shrink-0">Restaurantes</h2>
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, slug, dueño..." className="flex-1 max-w-xs rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-              <span className="text-xs text-slate-500 shrink-0">{unclaimed} sin dueño · {restaurants.length - unclaimed} con dueño</span>
+              <button onClick={() => setShowNewResta(true)} className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors">+ Nuevo</button>
             </div>
             <table className="w-full">
               <thead><tr className="border-b border-white/5 text-xs text-slate-500">

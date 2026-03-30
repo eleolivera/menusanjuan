@@ -74,6 +74,9 @@ export default function AdminRestaurantDetail() {
 
   // Edit item
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatName, setEditCatName] = useState("");
+  const [editCatEmoji, setEditCatEmoji] = useState("");
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -217,6 +220,16 @@ Probalo y decime qué te parece!`;
       body: JSON.stringify({ type: "item", categoryId, name: itemName, price: itemPrice, description: itemDesc, imageUrl: itemImageUrl || undefined }),
     });
     setItemName(""); setItemPrice(""); setItemDesc(""); setItemImageUrl(""); setAddingItemTo(null); fetchData();
+  }
+
+  async function handleSaveCategory(catId: string) {
+    await fetch(`/api/admin/restaurants/${id}/menu`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "category", categoryId: catId, name: editCatName, emoji: editCatEmoji || null }),
+    });
+    setEditingCatId(null);
+    fetchData();
   }
 
   async function handleDeleteCategory(catId: string) {
@@ -434,8 +447,20 @@ Probalo y decime qué te parece!`;
             {data.categories.map(cat => (
               <div key={cat.id} className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
                 <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-                  <h3 className="text-sm font-bold text-white">{cat.emoji} {cat.name} <span className="font-normal text-slate-500">({cat.items.length})</span></h3>
-                  <div className="flex gap-2">
+                  {editingCatId === cat.id ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input value={editCatEmoji} onChange={e => setEditCatEmoji(e.target.value)} className="w-10 rounded-md border border-white/10 bg-white/5 px-1.5 py-1 text-center text-sm text-white focus:border-primary focus:outline-none" />
+                      <input value={editCatName} onChange={e => setEditCatName(e.target.value)} className="flex-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-sm text-white focus:border-primary focus:outline-none" />
+                      <button onClick={() => handleSaveCategory(cat.id)} className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-white">Guardar</button>
+                      <button onClick={() => setEditingCatId(null)} className="text-xs text-slate-500">Cancelar</button>
+                    </div>
+                  ) : (
+                    <h3 className="text-sm font-bold text-white cursor-pointer hover:text-primary transition-colors" onClick={() => { setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatEmoji(cat.emoji || ""); }}>
+                      {cat.emoji} {cat.name} <span className="font-normal text-slate-500">({cat.items.length})</span>
+                      <span className="ml-1.5 text-slate-600 text-[10px]">✏️</span>
+                    </h3>
+                  )}
+                  <div className="flex gap-2 shrink-0 ml-2">
                     <button onClick={() => { setAddingItemTo(cat.id); setItemName(""); setItemPrice(""); setItemDesc(""); }} className="rounded-lg bg-white/5 px-3 py-1 text-xs text-slate-300 hover:bg-white/10 transition-colors">+ Item</button>
                     <button onClick={() => handleDeleteCategory(cat.id)} className="rounded-lg p-1 text-slate-600 hover:text-red-400 transition-colors"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
                   </div>
