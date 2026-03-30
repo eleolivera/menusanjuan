@@ -49,6 +49,10 @@ export function OrderModal({
   const [deliveryResult, setDeliveryResult] = useState<DeliveryZoneResult | null>(null);
 
   const hasDelivery = deliveryConfig != null && deliveryConfig.deliveryEnabled !== false;
+  // No pricing configured = restaurant sets fee manually
+  const hasDeliveryPricing = deliveryConfig != null && (
+    deliveryConfig.deliveryClosePrice != null || deliveryConfig.deliveryFee != null
+  );
   const deliveryFee = deliveryMethod === "pickup" ? 0 : (deliveryResult?.fee ?? 0);
   const grandTotal = total + deliveryFee;
   const isOutOfRange = deliveryMethod === "delivery" && deliveryResult?.zone === null && deliveryResult !== null;
@@ -61,7 +65,7 @@ export function OrderModal({
     }
     if (deliveryConfig.deliveryClosePrice != null) return `$${deliveryConfig.deliveryClosePrice.toLocaleString("es-AR")}`;
     if (deliveryConfig.deliveryFee != null) return `$${deliveryConfig.deliveryFee.toLocaleString("es-AR")}`;
-    return "Gratis";
+    return "Consultá con el restaurante";
   }
 
   function handleLocationConfirm(addr: string, lat: number, lng: number) {
@@ -84,9 +88,14 @@ export function OrderModal({
       .join("\n");
 
     const methodLabel = deliveryMethod === "pickup" ? "Retiro en local" : "Delivery";
-    const deliveryLine = deliveryMethod === "delivery" && deliveryFee > 0
-      ? `\n🚛 *Envío:* $${deliveryFee.toLocaleString("es-AR")}${deliveryResult?.zone === "far" ? " (zona lejana)" : ""}`
-      : deliveryMethod === "pickup" ? "\n🏪 *Retiro en local* (sin costo de envío)" : "";
+    let deliveryLine = "";
+    if (deliveryMethod === "delivery" && deliveryFee > 0) {
+      deliveryLine = `\n🚛 *Envío:* $${deliveryFee.toLocaleString("es-AR")}${deliveryResult?.zone === "far" ? " (zona lejana)" : ""}`;
+    } else if (deliveryMethod === "delivery" && !hasDeliveryPricing) {
+      deliveryLine = "\n🚛 *Envío:* ⚠️ Por confirmar — informale al cliente el costo de envío";
+    } else if (deliveryMethod === "pickup") {
+      deliveryLine = "\n🏪 *Retiro en local* (sin costo de envío)";
+    }
 
     const msg = `🍽️ *Nuevo Pedido — ${restaurantName}*
 ━━━━━━━━━━━━━━━━━━
@@ -95,7 +104,7 @@ export function OrderModal({
 ${itemLines}
 
 💰 *Subtotal: $${total.toLocaleString("es-AR")}*${deliveryLine}
-💰 *Total: $${grandTotal.toLocaleString("es-AR")}*
+💰 *Total: $${grandTotal.toLocaleString("es-AR")}*${!hasDeliveryPricing && deliveryMethod === "delivery" ? " + envío" : ""}
 ━━━━━━━━━━━━━━━━━━
 👤 *Nombre:* ${name}
 📱 *Teléfono:* ${phone}
@@ -337,6 +346,19 @@ _Pedido realizado desde MenuSanJuan_`;
                   </div>
                 )}
 
+                {/* No pricing configured — consult restaurant */}
+                {deliveryMethod === "delivery" && !hasDeliveryPricing && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">💬</span>
+                      <div>
+                        <div className="text-sm font-semibold text-amber-800">Costo de envío a confirmar</div>
+                        <div className="text-xs text-amber-600">El restaurante te va a informar el precio del envío por WhatsApp.</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Pickup info */}
                 {deliveryMethod === "pickup" && (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -393,6 +415,12 @@ _Pedido realizado desde MenuSanJuan_`;
                   <div className="flex justify-between py-1 text-sm">
                     <span className="text-text-secondary">Envío ({deliveryResult?.zone === "close" ? "zona cercana" : "zona lejana"})</span>
                     <span className="font-semibold text-text">${deliveryFee.toLocaleString("es-AR")}</span>
+                  </div>
+                )}
+                {deliveryMethod === "delivery" && !hasDeliveryPricing && (
+                  <div className="flex justify-between py-1 text-sm">
+                    <span className="text-text-secondary">Envío</span>
+                    <span className="font-semibold text-amber-500">A confirmar</span>
                   </div>
                 )}
                 {deliveryMethod === "pickup" && (
