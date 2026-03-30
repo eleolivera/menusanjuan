@@ -57,6 +57,7 @@ scraper/                        # PedidosYa scraper
 - Images: always upload to R2 via `/api/upload`, never store external CDN URLs permanently
 - Phone numbers: use `PhoneInput` component with `libphonenumber-js` validation
 - Git commits: NEVER include `Co-Authored-By` trailers — they break the commit hook
+- Before committing: ALWAYS run `npx next build` and verify it passes. Never push broken builds.
 
 ## Design system
 → See skill: sanjuan-design
