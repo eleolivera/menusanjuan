@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import type { MenuCategoryData, MenuItemData } from "@/data/menus";
 import type { Restaurant } from "@/data/restaurants";
+import type { DeliveryConfig } from "@/lib/delivery";
 import { CategoryNav } from "./CategoryNav";
 import { MenuItemCard } from "./MenuItemCard";
 import { FloatingCart } from "./FloatingCart";
@@ -11,9 +12,11 @@ import { OrderModal } from "./OrderModal";
 export function StoreMenu({
   restaurant,
   categories,
+  deliveryConfig,
 }: {
   restaurant: Restaurant;
   categories: MenuCategoryData[];
+  deliveryConfig?: DeliveryConfig | null;
 }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [activeCategory, setActiveCategory] = useState(categories[0]?.id || "");
@@ -109,6 +112,7 @@ export function StoreMenu({
           restaurantName={restaurant.name}
           restaurantPhone={restaurant.phone}
           restauranteSlug={restaurant.slug}
+          deliveryConfig={deliveryConfig}
           onClose={() => setShowModal(false)}
           onRemove={removeItem}
           onAdd={addItem}

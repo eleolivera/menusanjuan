@@ -25,6 +25,8 @@ export type Order = {
   longitude: number | null;
   items: OrderItem[];
   total: number;
+  deliveryMethod: string;
+  deliveryFee: number;
   notes: string;
   whatsappSent: boolean;
   createdAt: string;
@@ -154,6 +156,8 @@ function mapOrder(dbOrder: any): Order {
     longitude: dbOrder.longitude,
     items: (dbOrder.items as OrderItem[]) || [],
     total: dbOrder.total,
+    deliveryMethod: dbOrder.deliveryMethod || "delivery",
+    deliveryFee: dbOrder.deliveryFee || 0,
     notes: dbOrder.notes || "",
     whatsappSent: dbOrder.whatsappSent,
     createdAt: dbOrder.createdAt.toISOString(),
@@ -173,6 +177,8 @@ export async function createOrder(data: {
   items: OrderItem[];
   total: number;
   notes?: string;
+  deliveryMethod?: string;
+  deliveryFee?: number;
 }): Promise<Order> {
   const orderNumber = await nextOrderNumber(data.restauranteSlug);
 
@@ -188,6 +194,8 @@ export async function createOrder(data: {
       items: data.items as any,
       total: data.total,
       notes: data.notes || null,
+      deliveryMethod: data.deliveryMethod ?? "delivery",
+      deliveryFee: data.deliveryFee ?? 0,
     },
   });
 

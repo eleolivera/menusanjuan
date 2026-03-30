@@ -1,7 +1,13 @@
 import { prisma } from "./prisma";
 import type { Restaurant } from "@/data/restaurants";
+import type { DeliveryConfig } from "./delivery";
 
-export type RestaurantWithDealerId = Restaurant & { dealerId: string | null; isVerified: boolean; ownerUserId: string | null };
+export type RestaurantWithDealerId = Restaurant & {
+  dealerId: string | null;
+  isVerified: boolean;
+  ownerUserId: string | null;
+  deliveryConfig: DeliveryConfig;
+};
 
 export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithDealerId | null> {
   const dealer = await prisma.dealer.findUnique({
@@ -33,5 +39,15 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
     isOpen: true,
     isVerified: dealer.isVerified,
     ownerUserId: dealer.account.userId,
+    deliveryConfig: {
+      deliveryEnabled: dealer.deliveryEnabled,
+      deliveryCloseRadius: dealer.deliveryCloseRadius,
+      deliveryClosePrice: dealer.deliveryClosePrice,
+      deliveryFarRadius: dealer.deliveryFarRadius,
+      deliveryFarPrice: dealer.deliveryFarPrice,
+      deliveryFee: dealer.deliveryFee,
+      latitude: dealer.latitude,
+      longitude: dealer.longitude,
+    },
   };
 }

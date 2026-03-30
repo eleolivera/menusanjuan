@@ -189,7 +189,7 @@ export default async function StorePage({
       )}
 
       {/* Menu */}
-      <StoreMenu restaurant={restaurant} categories={categories} />
+      <StoreMenu restaurant={restaurant} categories={categories} deliveryConfig={restaurant.deliveryConfig} />
     </div>
   );
 }

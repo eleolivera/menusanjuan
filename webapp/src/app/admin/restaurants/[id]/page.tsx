@@ -12,6 +12,7 @@ type Restaurant = {
   sourceProfileId: string | null; sourceSite: string | null;
   openHours: string | null; mercadoPagoAlias: string | null; mercadoPagoCvu: string | null;
   rating: number | null; deliveryFee: number | null;
+  deliveryEnabled: boolean; deliveryCloseRadius: number | null; deliveryClosePrice: number | null; deliveryFarRadius: number | null; deliveryFarPrice: number | null;
   categories: { id: string; name: string; emoji: string | null; items: { id: string; name: string; description: string | null; price: number; imageUrl: string | null; badge: string | null; available: boolean }[] }[];
   claimRequests: { id: string; status: string; code: string | null; requestedAt: string; user: { email: string; name: string } }[];
   orderCount: number;
@@ -44,6 +45,11 @@ export default function AdminRestaurantDetail() {
   const [isActive, setIsActive] = useState(true);
   const [rating, setRating] = useState("");
   const [deliveryFee, setDeliveryFee] = useState("");
+  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
+  const [deliveryCloseRadius, setDeliveryCloseRadius] = useState("");
+  const [deliveryClosePrice, setDeliveryClosePrice] = useState("");
+  const [deliveryFarRadius, setDeliveryFarRadius] = useState("");
+  const [deliveryFarPrice, setDeliveryFarPrice] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
 
@@ -87,6 +93,11 @@ export default function AdminRestaurantDetail() {
     setIsActive(d.isActive);
     setRating(d.rating != null ? String(d.rating) : "");
     setDeliveryFee(d.deliveryFee != null ? String(d.deliveryFee) : "");
+    setDeliveryEnabled(d.deliveryEnabled !== false);
+    setDeliveryCloseRadius(d.deliveryCloseRadius != null ? String(d.deliveryCloseRadius) : "");
+    setDeliveryClosePrice(d.deliveryClosePrice != null ? String(d.deliveryClosePrice) : "");
+    setDeliveryFarRadius(d.deliveryFarRadius != null ? String(d.deliveryFarRadius) : "");
+    setDeliveryFarPrice(d.deliveryFarPrice != null ? String(d.deliveryFarPrice) : "");
     setLoading(false);
   }
 
@@ -95,7 +106,7 @@ export default function AdminRestaurantDetail() {
     await fetch(`/api/admin/restaurants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, cuisineType, description, logoUrl, coverUrl, isActive, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null }),
+      body: JSON.stringify({ name, phone, address, cuisineType, description, logoUrl, coverUrl, isActive, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, deliveryCloseRadius: deliveryCloseRadius ? Number(deliveryCloseRadius) : null, deliveryClosePrice: deliveryClosePrice ? Number(deliveryClosePrice) : null, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null, deliveryFarPrice: deliveryFarPrice ? Number(deliveryFarPrice) : null }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -348,10 +359,43 @@ Probalo y decime qué te parece!`;
                   {rating && <div className="flex items-center gap-0.5 shrink-0">{[1,2,3,4,5].map(s => <span key={s} className={`text-sm ${s <= Math.round(Number(rating)) ? "text-amber-400" : "text-slate-700"}`}>★</span>)}</div>}
                 </div>
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Envío ($)</label>
-                <input type="number" min="0" step="100" value={deliveryFee} onChange={e => setDeliveryFee(e.target.value)} placeholder="Gratis si vacío" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+            </div>
+            {/* Delivery zones */}
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-white">Delivery</label>
+                <button onClick={() => setDeliveryEnabled(!deliveryEnabled)} className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer rounded-full transition-colors ${deliveryEnabled ? "bg-emerald-500" : "bg-slate-700"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-1 ${deliveryEnabled ? "translate-x-5 ml-0.5" : "translate-x-1"}`} />
+                </button>
               </div>
+              {deliveryEnabled && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-1">Zona cercana — Radio (km)</label>
+                      <input type="number" min="0.5" step="0.5" value={deliveryCloseRadius} onChange={e => setDeliveryCloseRadius(e.target.value)} placeholder="Ej: 3" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-1">Zona cercana — Precio ($)</label>
+                      <input type="number" min="0" step="100" value={deliveryClosePrice} onChange={e => setDeliveryClosePrice(e.target.value)} placeholder="Ej: 500" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-1">Zona lejana — Radio (km)</label>
+                      <input type="number" min="1" step="0.5" value={deliveryFarRadius} onChange={e => setDeliveryFarRadius(e.target.value)} placeholder="Ej: 7" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-1">Zona lejana — Precio ($)</label>
+                      <input type="number" min="0" step="100" value={deliveryFarPrice} onChange={e => setDeliveryFarPrice(e.target.value)} placeholder="Ej: 1000" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
+                    </div>
+                  </div>
+                  {!deliveryCloseRadius && (
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-1">Tarifa fija (sin zonas)</label>
+                      <input type="number" min="0" step="100" value={deliveryFee} onChange={e => setDeliveryFee(e.target.value)} placeholder="Gratis si vacío" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             <div><label className="block text-xs text-slate-400 mb-1">Tipo de cocina</label>
               <div className="flex flex-wrap gap-1.5">{CUISINE_OPTIONS.map(c => (

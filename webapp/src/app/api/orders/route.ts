@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { restauranteSlug, customerName, customerPhone, customerAddress, items, total, notes, latitude, longitude } = body;
+    const { restauranteSlug, customerName, customerPhone, customerAddress, items, total, notes, latitude, longitude, deliveryMethod, deliveryFee } = body;
 
     if (!restauranteSlug || !customerName || !customerPhone || !items?.length || !total) {
       return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
       items,
       total,
       notes: notes || "",
+      deliveryMethod: deliveryMethod || "delivery",
+      deliveryFee: deliveryFee || 0,
     });
 
     return NextResponse.json(order, { status: 201 });

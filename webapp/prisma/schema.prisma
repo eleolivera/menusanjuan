@@ -86,7 +86,12 @@ model Dealer {
   mercadoPagoCvu   String?
   bankInfo    String?
   rating      Float?                           // Star rating (1.0-5.0), admin-set
-  deliveryFee Float?                           // Delivery fee in ARS, null = no delivery
+  deliveryEnabled    Boolean  @default(true)   // Whether restaurant offers delivery
+  deliveryCloseRadius Float?                   // Close zone radius in km (e.g. 3.0)
+  deliveryClosePrice  Float?                   // Close zone price in ARS
+  deliveryFarRadius   Float?                   // Far zone radius in km (e.g. 7.0)
+  deliveryFarPrice    Float?                   // Far zone price in ARS
+  deliveryFee Float?                           // Legacy flat fee fallback
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -180,6 +185,8 @@ model Order {
   longitude        Float?
   items            Json                              // OrderItem[] as JSON
   total            Float
+  deliveryMethod   String      @default("delivery")  // "delivery" | "pickup"
+  deliveryFee      Float       @default(0)            // Delivery fee charged in ARS
   paymentMethod    String?                           // "mercadopago", "cash", "transfer"
   whatsappSent     Boolean     @default(false)
   notes            String?

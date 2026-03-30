@@ -49,6 +49,7 @@ export async function PATCH(
     cuisineType, description, logoUrl, coverUrl,
     isActive, openHours, mercadoPagoAlias, mercadoPagoCvu, bankInfo,
     sourceProfileId, sourceSite, rating, deliveryFee,
+    deliveryEnabled, deliveryCloseRadius, deliveryClosePrice, deliveryFarRadius, deliveryFarPrice,
   } = body;
 
   const updated = await prisma.dealer.update({
@@ -74,6 +75,11 @@ export async function PATCH(
       ...(sourceSite !== undefined && { sourceSite }),
       ...(rating !== undefined && { rating: rating === null ? null : Number(rating) }),
       ...(deliveryFee !== undefined && { deliveryFee: deliveryFee === null ? null : Number(deliveryFee) }),
+      ...(deliveryEnabled !== undefined && { deliveryEnabled }),
+      ...(deliveryCloseRadius !== undefined && { deliveryCloseRadius: deliveryCloseRadius === null ? null : Number(deliveryCloseRadius) }),
+      ...(deliveryClosePrice !== undefined && { deliveryClosePrice: deliveryClosePrice === null ? null : Number(deliveryClosePrice) }),
+      ...(deliveryFarRadius !== undefined && { deliveryFarRadius: deliveryFarRadius === null ? null : Number(deliveryFarRadius) }),
+      ...(deliveryFarPrice !== undefined && { deliveryFarPrice: deliveryFarPrice === null ? null : Number(deliveryFarPrice) }),
     },
   });
 
