@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { PhoneInput } from "@/components/PhoneInput";
+import { LocationPicker } from "@/components/LocationPicker";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -38,6 +39,9 @@ export default function AdminRestaurantDetail() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [showMap, setShowMap] = useState(false);
   const [cuisineType, setCuisineType] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -91,6 +95,7 @@ export default function AdminRestaurantDetail() {
     const d = await res.json();
     setData(d);
     setName(d.name); setPhone(d.phone); setAddress(d.address || "");
+    setLatitude(d.latitude ?? null); setLongitude(d.longitude ?? null);
     setCuisineType(d.cuisineType); setDescription(d.description || "");
     setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
     setIsActive(d.isActive);
@@ -109,7 +114,7 @@ export default function AdminRestaurantDetail() {
     await fetch(`/api/admin/restaurants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, cuisineType, description, logoUrl, coverUrl, isActive, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, deliveryCloseRadius: deliveryCloseRadius ? Number(deliveryCloseRadius) : null, deliveryClosePrice: deliveryClosePrice ? Number(deliveryClosePrice) : null, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null, deliveryFarPrice: deliveryFarPrice ? Number(deliveryFarPrice) : null }),
+      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, isActive, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, deliveryCloseRadius: deliveryCloseRadius ? Number(deliveryCloseRadius) : null, deliveryClosePrice: deliveryClosePrice ? Number(deliveryClosePrice) : null, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null, deliveryFarPrice: deliveryFarPrice ? Number(deliveryFarPrice) : null }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -362,7 +367,37 @@ Probalo y decime qué te parece!`;
               <div><label className="block text-xs text-slate-400 mb-1">Nombre</label><input value={name} onChange={e => setName(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" /></div>
               <div><PhoneInput value={phone} onChange={setPhone} label="WhatsApp del Restaurante" placeholder="264 555 1234" required darkMode /></div>
             </div>
-            <div><label className="block text-xs text-slate-400 mb-1">Dirección</label><input value={address} onChange={e => setAddress(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" /></div>
+            {/* Location: address + map */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs text-slate-400">Ubicación</label>
+                {latitude && longitude && (
+                  <span className="text-[10px] text-emerald-400">📍 {latitude.toFixed(4)}, {longitude.toFixed(4)}</span>
+                )}
+              </div>
+              {!showMap ? (
+                <div className="flex gap-2">
+                  <div className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white min-h-[42px]">
+                    {address || <span className="text-slate-500">Sin dirección</span>}
+                  </div>
+                  <button onClick={() => setShowMap(true)} className="shrink-0 rounded-xl border border-white/10 px-3 py-2.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">
+                    {latitude ? "Editar" : "Agregar mapa"}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <LocationPicker
+                    onLocationConfirm={(addr, lat, lng) => {
+                      setAddress(addr);
+                      setLatitude(lat);
+                      setLongitude(lng);
+                      setShowMap(false);
+                    }}
+                  />
+                  <button onClick={() => setShowMap(false)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Cancelar</button>
+                </div>
+              )}
+            </div>
             <div><label className="block text-xs text-slate-400 mb-1">Descripción</label><textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none resize-none" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div>
