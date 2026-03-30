@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFullSession, switchActiveRestaurant, destroyRestauranteSession } from "@/lib/restaurante-auth";
+import { getAdminSession } from "@/lib/admin-auth";
 
 export async function GET() {
+  // If admin is logged in, don't return restaurant session
+  const adminSession = await getAdminSession();
+  if (adminSession) {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
+
   const session = await getFullSession();
   if (!session) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
