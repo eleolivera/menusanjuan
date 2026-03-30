@@ -1,5 +1,12 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions"
-  }
+    "allow": [
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(git:*)",
+      "Bash(cd:*)",
+      "Edit(/.claude/skills/sanjuan-design/**)"
+    ]
+  },
+  "enableAllProjectMcpServers": true
 }
