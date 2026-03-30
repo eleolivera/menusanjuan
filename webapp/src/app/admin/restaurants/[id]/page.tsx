@@ -363,7 +363,18 @@ Probalo y decime qué te parece!`;
             {/* Delivery zones */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-white">Delivery</label>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs font-semibold text-white">Delivery</label>
+                  <div className="group relative">
+                    <span className="cursor-help text-slate-500 hover:text-slate-300 transition-colors text-xs">ⓘ</span>
+                    <div className="absolute left-0 bottom-full mb-2 w-56 rounded-lg bg-slate-800 border border-white/10 p-3 text-[11px] text-slate-300 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-20 shadow-xl">
+                      <strong className="text-white block mb-1">¿Cómo funciona?</strong>
+                      Configurá dos zonas por radio (km) desde tu local. El precio de envío se calcula automáticamente según la distancia del cliente.<br/><br/>
+                      Si no querés zonas, dejá los radios vacíos y usá la <strong>tarifa fija</strong> — se aplica igual para todos.<br/><br/>
+                      Si desactivás el toggle, solo se ofrece <strong>retiro en local</strong>.
+                    </div>
+                  </div>
+                </div>
                 <button onClick={() => setDeliveryEnabled(!deliveryEnabled)} className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer rounded-full transition-colors ${deliveryEnabled ? "bg-emerald-500" : "bg-slate-700"}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-1 ${deliveryEnabled ? "translate-x-5 ml-0.5" : "translate-x-1"}`} />
                 </button>
