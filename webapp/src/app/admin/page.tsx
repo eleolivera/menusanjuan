@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { flexMatch } from "@/lib/search";
 
 type Claim = {
   id: string;
@@ -37,6 +38,7 @@ export default function AdminPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
 
   // Check existing session
   useEffect(() => {
@@ -193,9 +195,10 @@ export default function AdminPage() {
           <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
         ) : tab === "restaurants" ? (
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
-            <div className="border-b border-white/5 px-5 py-3 flex justify-between">
-              <h2 className="text-sm font-bold text-white">Restaurantes</h2>
-              <span className="text-xs text-slate-500">{unclaimed} sin dueño · {restaurants.length - unclaimed} con dueño</span>
+            <div className="border-b border-white/5 px-5 py-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-bold text-white shrink-0">Restaurantes</h2>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, slug, dueño..." className="flex-1 max-w-xs rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+              <span className="text-xs text-slate-500 shrink-0">{unclaimed} sin dueño · {restaurants.length - unclaimed} con dueño</span>
             </div>
             <table className="w-full">
               <thead><tr className="border-b border-white/5 text-xs text-slate-500">
@@ -207,7 +210,7 @@ export default function AdminPage() {
                 <th className="px-4 py-2.5 text-right">Acciones</th>
               </tr></thead>
               <tbody>
-                {restaurants.map(r => (
+                {restaurants.filter(r => !search || flexMatch(r.name, search) || flexMatch(r.slug, search) || flexMatch(r.ownerEmail, search) || flexMatch(r.cuisineType, search)).map(r => (
                   <tr key={r.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 cursor-pointer" onClick={() => window.location.href = `/admin/restaurants/${r.id}`}>
                     <td className="px-4 py-3"><div className="text-sm font-semibold text-white hover:text-primary">{r.name}</div><div className="text-[11px] text-slate-500">/{r.slug}</div></td>
                     <td className="px-4 py-3"><div className="text-xs text-white">{r.ownerEmail}</div>{r.isPlaceholder && <span className="text-[10px] text-amber-400">Sin reclamar</span>}</td>

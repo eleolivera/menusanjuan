@@ -5,6 +5,7 @@ import type { Restaurant } from "@/data/restaurants";
 import { RestaurantCard } from "./RestaurantCard";
 import { CuisineFilter } from "./CuisineFilter";
 import { SearchBar } from "./SearchBar";
+import { flexMatch } from "@/lib/search";
 
 export function RestaurantGrid() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -25,10 +26,10 @@ export function RestaurantGrid() {
       const matchesCuisine = cuisine === "all" || r.cuisineType === cuisine;
       const matchesSearch =
         search === "" ||
-        r.name.toLowerCase().includes(search.toLowerCase()) ||
-        r.description.toLowerCase().includes(search.toLowerCase()) ||
-        r.cuisineType.toLowerCase().includes(search.toLowerCase()) ||
-        r.address.toLowerCase().includes(search.toLowerCase());
+        flexMatch(r.name, search) ||
+        flexMatch(r.description, search) ||
+        flexMatch(r.cuisineType, search) ||
+        flexMatch(r.address, search);
       return matchesCuisine && matchesSearch;
     });
   }, [restaurants, cuisine, search]);
