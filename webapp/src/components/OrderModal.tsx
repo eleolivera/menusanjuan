@@ -311,8 +311,8 @@ _Pedido realizado desde MenuSanJuan_`;
                   />
                 )}
 
-                {/* Delivery fee result */}
-                {deliveryMethod === "delivery" && deliveryResult && (
+                {/* Delivery fee result — only when zones/flat fee configured and calculated */}
+                {deliveryMethod === "delivery" && deliveryResult != null && (
                   <div className={`rounded-xl p-4 ${isOutOfRange ? "border border-red-200 bg-red-50" : "border border-emerald-200 bg-emerald-50"}`}>
                     {isOutOfRange ? (
                       <div className="flex items-center gap-2">
@@ -347,7 +347,7 @@ _Pedido realizado desde MenuSanJuan_`;
                 )}
 
                 {/* No pricing configured — consult restaurant */}
-                {deliveryMethod === "delivery" && !hasDeliveryPricing && (
+                {deliveryMethod === "delivery" && (!hasDeliveryPricing || (address && deliveryResult === null)) && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">💬</span>

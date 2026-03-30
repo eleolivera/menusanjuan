@@ -40,14 +40,22 @@ export function calculateDeliveryFee(
   config: DeliveryConfig,
   customerLat: number,
   customerLng: number
-): DeliveryZoneResult {
+): DeliveryZoneResult | null {
+  // Check if any pricing is configured at all
+  const hasZones = config.deliveryCloseRadius != null && config.deliveryClosePrice != null;
+  const hasFlatFee = config.deliveryFee != null;
+
+  // No pricing configured — return null so UI shows "consultá con el restaurante"
+  if (!hasZones && !hasFlatFee) {
+    return null;
+  }
+
   // No restaurant coordinates — use flat fee fallback
   if (config.latitude == null || config.longitude == null) {
-    return {
-      zone: "close",
-      fee: config.deliveryFee ?? 0,
-      distanceKm: 0,
-    };
+    if (hasFlatFee) {
+      return { zone: "close", fee: config.deliveryFee!, distanceKm: 0 };
+    }
+    return null;
   }
 
   const distanceKm = haversineDistance(
@@ -56,9 +64,9 @@ export function calculateDeliveryFee(
   );
 
   // Zone-based pricing
-  if (config.deliveryCloseRadius != null && config.deliveryClosePrice != null) {
-    if (distanceKm <= config.deliveryCloseRadius) {
-      return { zone: "close", fee: config.deliveryClosePrice, distanceKm };
+  if (hasZones) {
+    if (distanceKm <= config.deliveryCloseRadius!) {
+      return { zone: "close", fee: config.deliveryClosePrice!, distanceKm };
     }
 
     if (config.deliveryFarRadius != null && config.deliveryFarPrice != null) {
@@ -71,11 +79,6 @@ export function calculateDeliveryFee(
     return { zone: null, fee: null, distanceKm };
   }
 
-  // No zones configured — use flat fee fallback
-  if (config.deliveryFee != null) {
-    return { zone: "close", fee: config.deliveryFee, distanceKm };
-  }
-
-  // No delivery config at all — free delivery
-  return { zone: "close", fee: 0, distanceKm };
+  // Flat fee fallback
+  return { zone: "close", fee: config.deliveryFee!, distanceKm };
 }
