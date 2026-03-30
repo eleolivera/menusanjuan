@@ -8,5 +8,8 @@
       "Edit(/.claude/skills/sanjuan-design/**)"
     ]
   },
-  "enableAllProjectMcpServers": true
+  "enableAllProjectMcpServers": true,
+  "attribution": {
+    "commit": ""
+  }
 }
