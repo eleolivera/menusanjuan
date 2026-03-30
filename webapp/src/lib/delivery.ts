@@ -43,15 +43,18 @@ export function calculateDeliveryFee(
 ): DeliveryZoneResult | null {
   // Check if any pricing is configured at all
   const hasZones = config.deliveryCloseRadius != null && config.deliveryClosePrice != null;
-  const hasFlatFee = config.deliveryFee != null;
+  const hasFlatFee = config.deliveryFee != null && config.deliveryFee > 0;
 
   // No pricing configured — return null so UI shows "consultá con el restaurante"
   if (!hasZones && !hasFlatFee) {
     return null;
   }
 
-  // No restaurant coordinates — use flat fee fallback
+  // No restaurant coordinates — can't calculate distance
   if (config.latitude == null || config.longitude == null) {
+    // Has zones but no coordinates = can't calculate, show "consultá"
+    if (hasZones) return null;
+    // Has flat fee only = apply flat fee regardless
     if (hasFlatFee) {
       return { zone: "close", fee: config.deliveryFee!, distanceKm: 0 };
     }

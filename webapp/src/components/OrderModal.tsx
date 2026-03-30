@@ -49,9 +49,11 @@ export function OrderModal({
   const [deliveryResult, setDeliveryResult] = useState<DeliveryZoneResult | null>(null);
 
   const hasDelivery = deliveryConfig != null && deliveryConfig.deliveryEnabled !== false;
-  // No pricing configured = restaurant sets fee manually
+  // No usable pricing = restaurant confirms fee manually
+  // Zones without coordinates can't calculate, so that's also "no pricing"
   const hasDeliveryPricing = deliveryConfig != null && (
-    deliveryConfig.deliveryClosePrice != null || deliveryConfig.deliveryFee != null
+    (deliveryConfig.deliveryClosePrice != null && deliveryConfig.latitude != null && deliveryConfig.longitude != null) ||
+    (deliveryConfig.deliveryFee != null && deliveryConfig.deliveryFee > 0)
   );
   const deliveryFee = deliveryMethod === "pickup" ? 0 : (deliveryResult?.fee ?? 0);
   const grandTotal = total + deliveryFee;
