@@ -72,6 +72,13 @@ export function StoreMenu({
       />
 
       <div className="mx-auto max-w-7xl px-4 py-6">
+        {categories.length === 0 && (
+          <div className="py-16 text-center">
+            <div className="text-4xl mb-4">🍽️</div>
+            <h3 className="text-lg font-bold text-text mb-2">Menú en preparación</h3>
+            <p className="text-sm text-text-secondary">Este restaurante está armando su menú. Volvé pronto.</p>
+          </div>
+        )}
         {categories.map((category) => (
           <section
             key={category.id}

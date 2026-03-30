@@ -77,7 +77,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://wa.me/5492644000000"
+                  href="https://wa.me/5492645710889"
                   className="text-sm text-text-secondary hover:text-primary transition-colors"
                 >
                   WhatsApp
@@ -93,7 +93,7 @@ export function Footer() {
             &copy; {new Date().getFullYear()} MenuSanJuan. Todos los derechos
             reservados.
           </p>
-          <Link href="/admin?login" className="text-[10px] text-text-muted/30 hover:text-text-muted transition-colors">
+          <Link href="/admin?login" className="text-[10px] text-text-muted/30 hover:text-text-muted transition-colors py-2 px-2">
             admin
           </Link>
         </div>

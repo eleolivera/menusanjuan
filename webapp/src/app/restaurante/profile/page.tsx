@@ -242,7 +242,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-400">Tipo de cocina</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {CUISINE_OPTIONS.map((c) => (
                   <button key={c} type="button" onClick={() => setCuisineType(c)}
                     className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition-all ${

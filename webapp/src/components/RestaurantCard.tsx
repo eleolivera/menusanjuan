@@ -1,26 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Restaurant } from "@/data/restaurants";
-
-const GRADIENTS = [
-  "from-orange-900 via-red-900 to-rose-950",
-  "from-emerald-900 via-teal-900 to-cyan-950",
-  "from-violet-900 via-purple-900 to-fuchsia-950",
-  "from-blue-900 via-indigo-900 to-slate-950",
-  "from-amber-900 via-orange-900 to-red-950",
-  "from-rose-900 via-pink-900 to-purple-950",
-  "from-teal-900 via-emerald-900 to-green-950",
-  "from-sky-900 via-blue-900 to-indigo-950",
-  "from-fuchsia-900 via-pink-900 to-rose-950",
-  "from-lime-900 via-green-900 to-emerald-950",
-  "from-cyan-900 via-sky-900 to-blue-950",
-  "from-red-900 via-orange-900 to-amber-950",
-];
-function coverGradient(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
-  return `bg-gradient-to-br ${GRADIENTS[Math.abs(hash) % GRADIENTS.length]}`;
-}
+import { coverGradient } from "@/lib/gradients";
 
 export function RestaurantCard({
   restaurant,
@@ -107,7 +88,7 @@ export function RestaurantCard({
               {restaurant.address.split(",")[1]?.trim() || restaurant.address}
             </span>
             <span className="text-xs text-text-muted">
-              {restaurant.itemCount} items
+              {restaurant.itemCount} productos
             </span>
           </div>
           <span className="text-xs font-semibold text-primary">

@@ -92,7 +92,7 @@ export function MenuItemCard({
               {isSelected && (
                 <button
                   onClick={onRemove}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />

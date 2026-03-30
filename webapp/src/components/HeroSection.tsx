@@ -32,7 +32,7 @@ export function HeroSection() {
           style={{ animationDelay: "0.2s", animationFillMode: "backwards" }}
         >
           {[
-            { number: "50+", label: "Restaurantes" },
+            { number: "75+", label: "Restaurantes" },
             { number: "1.200+", label: "Platos" },
             { number: "100%", label: "Gratis" },
           ].map((stat) => (
