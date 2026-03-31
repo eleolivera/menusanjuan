@@ -96,6 +96,7 @@ export async function GET() {
       sortOrder: d.onboardingCard!.sortOrder,
       stageChangedAt: d.onboardingCard!.stageChangedAt,
       lastContactedAt: d.onboardingCard!.lastContactedAt,
+      lastPassword: d.onboardingCard!.lastPassword,
       dealer: {
         id: d.id,
         name: d.name,

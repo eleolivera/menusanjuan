@@ -49,6 +49,13 @@ export async function POST(
     },
   });
 
+  // Store plain password on onboarding card for admin reference
+  await prisma.onboardingCard.upsert({
+    where: { dealerId: id },
+    update: { lastPassword: plainPassword },
+    create: { dealerId: id, lastPassword: plainPassword },
+  });
+
   return NextResponse.json({
     success: true,
     email: user.email,

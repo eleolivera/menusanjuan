@@ -20,6 +20,7 @@ export async function GET(
         orderBy: { requestedAt: "desc" },
       },
       _count: { select: { orders: true } },
+      onboardingCard: { select: { lastPassword: true } },
     },
   });
 
@@ -32,6 +33,7 @@ export async function GET(
     ownerId: dealer.account.user.id,
     isPlaceholder: dealer.account.user.email.endsWith("@menusanjuan.com"),
     orderCount: dealer._count.orders,
+    lastPassword: dealer.onboardingCard?.lastPassword || null,
   });
 }
 

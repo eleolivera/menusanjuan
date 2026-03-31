@@ -30,6 +30,7 @@ type Card = {
   sortOrder: number;
   stageChangedAt: string;
   lastContactedAt: string | null;
+  lastPassword: string | null;
   dealer: {
     id: string;
     name: string;
@@ -272,7 +273,7 @@ export function OnboardingBoard() {
     const creds = cardCreds[card.id];
     const d = card.dealer;
     const email = creds?.email || d.ownerEmail;
-    const password = creds?.password || "[contraseña enviada]";
+    const password = creds?.password || card.lastPassword || "(sin generar)";
     return `Hola! Soy de MenuSanJuan.com
 
 Te creamos una pagina gratuita para *${d.name}* donde tus clientes pueden ver el menu completo con precios y hacer pedidos directo por WhatsApp. Sin intermediarios, sin comisiones — a diferencia de otras apps que se quedan con un porcentaje de cada venta, con nosotros todo lo que vendes es tuyo.
@@ -418,7 +419,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
                     onActivate={() => activateAndMove(card)}
                     onWhatsApp={() => openWhatsApp(card)}
                     activating={activatingCard === card.id}
-                    creds={cardCreds[card.id]}
+                    creds={cardCreds[card.id] || (card.lastPassword ? { email: card.dealer.ownerEmail, password: card.lastPassword } : undefined)}
                     savingNote={savingNote}
                     uploadingImage={uploadingImage}
                   />
