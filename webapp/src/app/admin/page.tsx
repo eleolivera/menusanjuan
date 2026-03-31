@@ -261,9 +261,9 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className={`mx-auto p-6 ${tab === "onboarding" ? "max-w-full" : "max-w-6xl"}`}>
+      <div className={`mx-auto ${tab === "onboarding" ? "px-3 py-4" : "max-w-6xl p-6"}`}>
         {/* Quick stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        {tab !== "onboarding" && <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           {[
             { label: "Restaurantes", value: restaurants.length, color: "text-white" },
             { label: "Sin reclamar", value: unclaimed, color: "text-amber-400" },
@@ -276,7 +276,7 @@ export default function AdminPage() {
               <div className="text-[10px] text-slate-500">{s.label}</div>
             </div>
           ))}
-        </div>
+        </div>}
 
         <div className="flex gap-2 mb-6">
           {[
