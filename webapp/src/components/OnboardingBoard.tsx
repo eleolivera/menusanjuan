@@ -91,6 +91,8 @@ function normalize(s: string) {
 }
 
 export function OnboardingBoard() {
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -112,6 +114,20 @@ export function OnboardingBoard() {
   }, []);
 
   useEffect(() => { fetchCards(); }, [fetchCards]);
+
+  useEffect(() => {
+    function onFsChange() { setIsFullscreen(!!document.fullscreenElement); }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      boardRef.current?.requestFullscreen();
+    }
+  }
 
   // ─── Drag and drop ───
 
@@ -254,7 +270,7 @@ export function OnboardingBoard() {
   }
 
   return (
-    <div>
+    <div ref={boardRef} className={isFullscreen ? "bg-slate-950 p-4 h-screen overflow-hidden" : ""}>
       {/* Search bar */}
       <div className="mb-4 flex items-center gap-3">
         <input
@@ -274,11 +290,18 @@ export function OnboardingBoard() {
           <span>{cards.length} restaurantes</span>
           <span>·</span>
           <span>{cards.filter((c) => c.stage === "ONBOARDED").length} onboardeados</span>
+          <button
+            onClick={toggleFullscreen}
+            className="ml-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-slate-400 hover:bg-white/10 transition-colors"
+            title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+          >
+            {isFullscreen ? "✕ Salir" : "⛶ Full"}
+          </button>
         </div>
       </div>
 
       {/* Kanban columns */}
-      <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: "calc(100vh - 240px)" }}>
+      <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: isFullscreen ? "calc(100vh - 80px)" : "calc(100vh - 240px)" }}>
         {visibleStages.map((stage) => {
           const columnCards = filtered
             .filter((c) => c.stage === stage.key)
