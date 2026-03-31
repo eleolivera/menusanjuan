@@ -237,26 +237,28 @@ export function OnboardingBoard() {
 
   async function activateAndMove(card: Card) {
     setActivatingCard(card.id);
+    // Try to activate — if already active, that's fine, just move the card
     const res = await fetch(`/api/admin/restaurants/${card.dealer.id}/activate-owner`, { method: "POST" });
     if (res.ok) {
       const creds = await res.json();
       setCardCreds((prev) => ({ ...prev, [card.id]: { email: creds.email, password: creds.password } }));
-      // Move to EN_CHARLA
-      setCards((prev) => prev.map((c) => c.id === card.id ? { ...c, stage: "IN_PROGRESS" as OnboardingStage } : c));
-      await fetch("/api/admin/onboarding", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardId: card.id, stage: "IN_PROGRESS" }),
-      });
     }
+    // Always move to EN_CHARLA regardless of activate result
+    setCards((prev) => prev.map((c) => c.id === card.id ? { ...c, stage: "IN_PROGRESS" as OnboardingStage } : c));
+    await fetch("/api/admin/onboarding", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: card.id, stage: "IN_PROGRESS" }),
+    });
     setActivatingCard(null);
   }
 
   function buildWhatsAppMsg(card: Card) {
     const creds = cardCreds[card.id];
     const d = card.dealer;
-    if (creds) {
-      return `Hola! 👋 Soy de MenuSanJuan.com
+    const email = creds?.email || d.ownerEmail;
+    const password = creds?.password || "[contraseña enviada]";
+    return encodeURIComponent(`Hola! 👋 Soy de MenuSanJuan.com
 
 Noté que *${d.name}* no tiene su propia página de pedidos online todavía.
 
@@ -268,28 +270,17 @@ Es 100% gratis, sin comisiones.
 
 Para editar tu menú, horarios, y ver pedidos:
 🔗 menusanjuan.com/restaurante/login
-📧 ${creds.email}
-🔑 ${creds.password}
+📧 ${email}
+🔑 ${password}
 
-Probalo y decime qué te parece!`;
-    }
-    return `Hola! 👋 Soy de MenuSanJuan.com
-
-Noté que *${d.name}* no tiene su propia página de pedidos online todavía.
-
-Te creamos una gratis — ya tiene tu menú cargado con precios e imágenes. Tus clientes pueden ver el menú y hacer pedidos por WhatsApp.
-
-Es 100% gratis, sin comisiones.
-
-🍽️ Tu página: menusanjuan.com/${d.slug}
-
-Probalo y decime qué te parece!`;
+Probalo y decime qué te parece!`);
   }
 
   function openWhatsApp(card: Card) {
     const phone = card.dealer.phone.replace(/\D/g, "");
-    const msg = buildWhatsAppMsg(card);
-    setWhatsappMsg({ cardId: card.id, msg, phone });
+    const encoded = buildWhatsAppMsg(card);
+    // Store decoded for editing in the textarea
+    setWhatsappMsg({ cardId: card.id, msg: decodeURIComponent(encoded), phone });
   }
 
   function sendWhatsApp() {
