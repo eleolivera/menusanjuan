@@ -100,6 +100,7 @@ model Dealer {
   orders        Order[]
   claimRequests ClaimRequest[]
   dealerCuisines DealerCuisineType[]
+  onboardingCard OnboardingCard?
 
   @@index([slug])
   @@index([cuisineType])
@@ -224,6 +225,44 @@ model Order {
   @@index([restauranteSlug, status])
   @@index([restauranteSlug, createdAt])
   @@index([orderNumber])
+}
+
+// ─── Onboarding Kanban ───
+
+enum OnboardingStage {
+  NEEDS_INFO
+  READY
+  QUEUED
+  IN_PROGRESS
+  ONBOARDED
+}
+
+model OnboardingCard {
+  id              String           @id @default(cuid())
+  dealerId        String           @unique
+  stage           OnboardingStage  @default(NEEDS_INFO)
+  sortOrder       Int              @default(0)
+  lastContactedAt DateTime?
+  stageChangedAt  DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  dealer Dealer           @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  notes  OnboardingNote[]
+
+  @@index([stage, sortOrder])
+}
+
+model OnboardingNote {
+  id        String   @id @default(cuid())
+  cardId    String
+  text      String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  card OnboardingCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, createdAt])
 }
 
 enum OrderStatus {

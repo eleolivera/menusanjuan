@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { flexMatch } from "@/lib/search";
+import { OnboardingBoard } from "@/components/OnboardingBoard";
 
 type Claim = {
   id: string;
@@ -33,7 +34,7 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [tab, setTab] = useState<"restaurants" | "claims" | "users" | "settings">("restaurants");
+  const [tab, setTab] = useState<"restaurants" | "onboarding" | "claims" | "users" | "settings">("restaurants");
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -89,6 +90,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!authed) return;
+    if (tab === "onboarding") return; // Board handles its own loading
     setLoading(true);
     if (tab === "claims") fetch("/api/admin/claims").then(r => r.ok ? r.json() : []).then(d => { setClaims(d); setLoading(false); });
     else if (tab === "users") fetch("/api/admin/users").then(r => r.ok ? r.json() : []).then(d => { setUsers(d); setLoading(false); });
@@ -264,7 +266,8 @@ export default function AdminPage() {
         <div className="flex gap-2 mb-6">
           {[
             { key: "restaurants" as const, label: `🍽️ Restaurantes (${restaurants.length})` },
-            { key: "claims" as const, label: `📋 Reclamos`, badge: pendingClaims },
+            { key: "onboarding" as const, label: `📋 Tablero` },
+            { key: "claims" as const, label: `📨 Reclamos`, badge: pendingClaims },
             { key: "users" as const, label: `👥 Usuarios` },
             { key: "settings" as const, label: `⚙️ Configuración` },
           ].map(t => (
@@ -341,6 +344,8 @@ export default function AdminPage() {
             </table>
           </div>
         </>
+        ) : tab === "onboarding" ? (
+          <OnboardingBoard />
         ) : tab === "claims" ? (
           <div className="space-y-4">
             {claims.length === 0 ? <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-12 text-center"><div className="text-3xl mb-3">📋</div><h3 className="text-lg font-bold text-white">Sin reclamos</h3></div> : claims.map(c => (
