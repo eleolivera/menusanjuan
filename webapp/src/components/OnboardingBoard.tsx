@@ -229,17 +229,83 @@ export function OnboardingBoard() {
     e.target.value = "";
   }
 
-  // ─── Contact ───
+  // ─── Activate owner + move to En charla ───
 
-  async function markContacted(cardId: string) {
-    await fetch("/api/admin/onboarding", {
+  const [activatingCard, setActivatingCard] = useState<string | null>(null);
+  const [cardCreds, setCardCreds] = useState<Record<string, { email: string; password: string }>>({});
+  const [whatsappMsg, setWhatsappMsg] = useState<{ cardId: string; msg: string; phone: string } | null>(null);
+
+  async function activateAndMove(card: Card) {
+    setActivatingCard(card.id);
+    const res = await fetch(`/api/admin/restaurants/${card.dealer.id}/activate-owner`, { method: "POST" });
+    if (res.ok) {
+      const creds = await res.json();
+      setCardCreds((prev) => ({ ...prev, [card.id]: { email: creds.email, password: creds.password } }));
+      // Move to EN_CHARLA
+      setCards((prev) => prev.map((c) => c.id === card.id ? { ...c, stage: "IN_PROGRESS" as OnboardingStage } : c));
+      await fetch("/api/admin/onboarding", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: card.id, stage: "IN_PROGRESS" }),
+      });
+    }
+    setActivatingCard(null);
+  }
+
+  function buildWhatsAppMsg(card: Card) {
+    const creds = cardCreds[card.id];
+    const d = card.dealer;
+    if (creds) {
+      return `Hola! 👋 Soy de MenuSanJuan.com
+
+Noté que *${d.name}* no tiene su propia página de pedidos online todavía.
+
+Te creamos una gratis — ya tiene tu menú cargado con precios e imágenes. Tus clientes pueden ver el menú y hacer pedidos por WhatsApp.
+
+Es 100% gratis, sin comisiones.
+
+🍽️ Tu página: menusanjuan.com/${d.slug}
+
+Para editar tu menú, horarios, y ver pedidos:
+🔗 menusanjuan.com/restaurante/login
+📧 ${creds.email}
+🔑 ${creds.password}
+
+Probalo y decime qué te parece!`;
+    }
+    return `Hola! 👋 Soy de MenuSanJuan.com
+
+Noté que *${d.name}* no tiene su propia página de pedidos online todavía.
+
+Te creamos una gratis — ya tiene tu menú cargado con precios e imágenes. Tus clientes pueden ver el menú y hacer pedidos por WhatsApp.
+
+Es 100% gratis, sin comisiones.
+
+🍽️ Tu página: menusanjuan.com/${d.slug}
+
+Probalo y decime qué te parece!`;
+  }
+
+  function openWhatsApp(card: Card) {
+    const phone = card.dealer.phone.replace(/\D/g, "");
+    const msg = buildWhatsAppMsg(card);
+    setWhatsappMsg({ cardId: card.id, msg, phone });
+  }
+
+  function sendWhatsApp() {
+    if (!whatsappMsg) return;
+    const url = `https://wa.me/${whatsappMsg.phone}?text=${encodeURIComponent(whatsappMsg.msg)}`;
+    window.open(url, "_blank");
+    // Auto-update lastContactedAt
+    fetch("/api/admin/onboarding", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId, lastContactedAt: true }),
+      body: JSON.stringify({ cardId: whatsappMsg.cardId, lastContactedAt: true }),
     });
     setCards((prev) =>
-      prev.map((c) => c.id === cardId ? { ...c, lastContactedAt: new Date().toISOString() } : c)
+      prev.map((c) => c.id === whatsappMsg.cardId ? { ...c, lastContactedAt: new Date().toISOString() } : c)
     );
+    setWhatsappMsg(null);
   }
 
   // ─── Filter ───
@@ -336,7 +402,6 @@ export function OnboardingBoard() {
                   <KanbanCardView
                     key={card.id}
                     card={card}
-
                     expanded={expandedCard === card.id}
                     onToggleExpand={() => setExpandedCard(expandedCard === card.id ? null : card.id)}
                     onDragStart={() => handleDragStart(card.id)}
@@ -346,7 +411,10 @@ export function OnboardingBoard() {
                     onDeleteNote={(noteId) => deleteNote(noteId, card.id)}
                     onPaste={(e) => handlePaste(e, card.id)}
                     onImageUpload={(e) => handleImageUpload(e, card.id)}
-                    onMarkContacted={() => markContacted(card.id)}
+                    onActivate={() => activateAndMove(card)}
+                    onWhatsApp={() => openWhatsApp(card)}
+                    activating={activatingCard === card.id}
+                    creds={cardCreds[card.id]}
                     savingNote={savingNote}
                     uploadingImage={uploadingImage}
                   />
@@ -361,6 +429,35 @@ export function OnboardingBoard() {
           );
         })}
       </div>
+
+      {/* WhatsApp message preview/edit modal */}
+      {whatsappMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setWhatsappMsg(null)}>
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-white">Mensaje de WhatsApp</h3>
+              <button onClick={() => setWhatsappMsg(null)} className="text-slate-500 hover:text-white text-lg">✕</button>
+            </div>
+            <textarea
+              value={whatsappMsg.msg}
+              onChange={(e) => setWhatsappMsg({ ...whatsappMsg, msg: e.target.value })}
+              rows={14}
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none resize-none font-mono leading-relaxed"
+            />
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-[10px] text-slate-500">Editá el mensaje antes de enviar</span>
+              <div className="flex gap-2">
+                <button onClick={() => setWhatsappMsg(null)} className="rounded-xl border border-white/10 px-4 py-2 text-xs text-slate-400 hover:bg-white/5 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={sendWhatsApp} className="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors">
+                  Enviar por WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -378,12 +475,14 @@ function KanbanCardView({
   onDeleteNote,
   onPaste,
   onImageUpload,
-  onMarkContacted,
+  onActivate,
+  onWhatsApp,
+  activating,
+  creds,
   savingNote,
   uploadingImage,
 }: {
   card: Card;
-
   expanded: boolean;
   onToggleExpand: () => void;
   onDragStart: () => void;
@@ -393,7 +492,10 @@ function KanbanCardView({
   onDeleteNote: (noteId: string) => void;
   onPaste: (e: React.ClipboardEvent) => void;
   onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onMarkContacted: () => void;
+  onActivate: () => void;
+  onWhatsApp: () => void;
+  activating: boolean;
+  creds?: { email: string; password: string };
   savingNote: boolean;
   uploadingImage: boolean;
 }) {
@@ -484,24 +586,36 @@ function KanbanCardView({
         )}
         {card.stage === "QUEUED" && (
           <>
-            <a href={`/admin/restaurants/${d.id}?tab=owner`} target="_blank" className="rounded-lg bg-purple-400/10 px-2 py-1 text-[10px] font-medium text-purple-400 hover:bg-purple-400/20 transition-colors">
-              Activar cuenta
-            </a>
-            <span className="text-[10px] text-slate-600 py-1">{d.ownerEmail}</span>
+            <button onClick={onActivate} disabled={activating} className="rounded-lg bg-purple-400/10 px-2 py-1 text-[10px] font-medium text-purple-400 hover:bg-purple-400/20 disabled:opacity-50 transition-colors">
+              {activating ? "Activando..." : "Activar cuenta"}
+            </button>
+            {creds ? (
+              <div className="w-full mt-1 rounded-lg bg-emerald-400/10 border border-emerald-400/20 p-2 space-y-0.5">
+                <p className="text-[10px] text-emerald-400 font-bold">Cuenta activada — moviendo a En charla...</p>
+                <p className="text-[10px] text-slate-300">📧 {creds.email}</p>
+                <p className="text-[10px] text-slate-300">🔑 {creds.password}</p>
+              </div>
+            ) : (
+              <span className="text-[10px] text-slate-600 py-1">{d.ownerEmail}</span>
+            )}
           </>
         )}
         {card.stage === "IN_PROGRESS" && (
           <>
             {d.phone && d.phone !== "0000000000" && (
-              <a href={`https://wa.me/${d.phone.replace(/\D/g, "")}`} target="_blank" className="rounded-lg bg-emerald-400/10 px-2 py-1 text-[10px] font-medium text-emerald-400 hover:bg-emerald-400/20 transition-colors">
+              <button onClick={onWhatsApp} className="rounded-lg bg-emerald-400/10 px-2 py-1 text-[10px] font-medium text-emerald-400 hover:bg-emerald-400/20 transition-colors">
                 WhatsApp
-              </a>
+              </button>
             )}
-            <button onClick={onMarkContacted} className="rounded-lg bg-cyan-400/10 px-2 py-1 text-[10px] font-medium text-cyan-400 hover:bg-cyan-400/20 transition-colors">
-              Marcar contactado
-            </button>
+            {creds && (
+              <div className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 p-2 space-y-0.5">
+                <p className="text-[10px] text-slate-400 font-medium">Credenciales:</p>
+                <p className="text-[10px] text-slate-300">📧 {creds.email}</p>
+                <p className="text-[10px] text-slate-300">🔑 {creds.password}</p>
+              </div>
+            )}
             {card.lastContactedAt && (
-              <span className="text-[10px] text-slate-600 py-1">Último: {timeAgo(card.lastContactedAt)}</span>
+              <span className="text-[10px] text-slate-600 py-1">Último contacto: {timeAgo(card.lastContactedAt)}</span>
             )}
           </>
         )}
