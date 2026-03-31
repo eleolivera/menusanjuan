@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { PhoneInput } from "@/components/PhoneInput";
 import { LocationPicker } from "@/components/LocationPicker";
+import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -19,11 +20,6 @@ type Restaurant = {
   orderCount: number;
 };
 
-const CUISINE_OPTIONS = [
-  "Comida Rápida", "Parrilla", "Pizzería", "Cafetería", "Pastas",
-  "Sushi", "Heladería", "Empanadas", "Comida Árabe", "Comida Mexicana",
-  "Comida China", "Vegetariano", "Postres", "Rotisería", "General",
-];
 
 export default function AdminRestaurantDetail() {
   const router = useRouter();
@@ -457,9 +453,7 @@ Probalo y decime qué te parece!`;
               )}
             </div>
             <div><label className="block text-xs text-slate-400 mb-1">Tipo de cocina</label>
-              <div className="flex flex-wrap gap-1.5">{CUISINE_OPTIONS.map(c => (
-                <button key={c} onClick={() => setCuisineType(c)} className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${cuisineType === c ? "bg-primary/15 text-primary border border-primary/30" : "border border-white/10 text-slate-400 hover:border-white/20"}`}>{c}</button>
-              ))}</div>
+              <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setCuisineType(vals[vals.length - 1] || "")} darkMode />
             </div>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary" /><span className="text-xs text-slate-400">Activo</span></label>

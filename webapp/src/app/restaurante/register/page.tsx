@@ -4,12 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PhoneInput } from "@/components/PhoneInput";
-
-const CUISINE_OPTIONS = [
-  "Comida Rápida", "Parrilla", "Pizzería", "Cafetería", "Pastas",
-  "Sushi", "Heladería", "Empanadas", "Comida Árabe", "Comida Mexicana",
-  "Comida China", "Vegetariano", "Postres", "Rotisería", "General",
-];
+import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 
 type UnclaimedRestaurant = {
   id: string;
@@ -368,14 +363,7 @@ export default function RegisterPage() {
               <PhoneInput value={phone} onChange={setPhone} label="WhatsApp del restaurante" placeholder="264 555 1234" required />
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-text">Tipo de cocina</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {CUISINE_OPTIONS.map((c) => (
-                    <button key={c} type="button" onClick={() => setCuisineType(c)}
-                      className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition-all ${
-                        cuisineType === c ? "border-primary bg-primary/10 text-primary" : "border-border/60 text-text-secondary hover:border-primary/40"
-                      }`}>{c}</button>
-                  ))}
-                </div>
+                <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setCuisineType(vals[vals.length - 1] || "")} />
               </div>
             </div>
           )}

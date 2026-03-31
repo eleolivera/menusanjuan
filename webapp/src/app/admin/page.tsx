@@ -50,6 +50,7 @@ export default function AdminPage() {
   const [newRestaName, setNewRestaName] = useState("");
   const [newRestaPhone, setNewRestaPhone] = useState("");
   const [creatingResta, setCreatingResta] = useState(false);
+  const [showMajo, setShowMajo] = useState(true);
 
   // Check existing session
   useEffect(() => {
@@ -61,6 +62,14 @@ export default function AdminPage() {
       })
       .catch(() => setChecking(false));
   }, []);
+
+  // Dismiss Majo splash after 4s once authed
+  useEffect(() => {
+    if (authed && showMajo) {
+      const t = setTimeout(() => setShowMajo(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [authed, showMajo]);
 
   async function handleLogin() {
     const res = await fetch("/api/admin/login", {
@@ -146,6 +155,69 @@ export default function AdminPage() {
             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
           {loginError && <p className="text-xs text-red-400">{loginError}</p>}
           <button onClick={handleLogin} className="w-full rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/20 transition-all">Entrar</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Majo splash — plays every time admin loads, auto-dismisses after 4s
+  if (showMajo) {
+    const particles = Array.from({ length: 50 }, (_, i) => i);
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center overflow-hidden relative" onClick={() => setShowMajo(false)}>
+        <style>{`
+          @keyframes majo-fall {
+            0% { transform: translateY(-10vh) rotate(0deg) scale(0); opacity: 0; }
+            10% { opacity: 1; transform: translateY(0vh) rotate(30deg) scale(1); }
+            90% { opacity: 1; }
+            100% { transform: translateY(105vh) rotate(720deg) scale(0.5); opacity: 0; }
+          }
+          @keyframes majo-text-in {
+            0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+            50% { transform: scale(1.3) rotate(5deg); opacity: 1; }
+            70% { transform: scale(0.9) rotate(-2deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          }
+          @keyframes majo-glow {
+            0%, 100% { text-shadow: 0 0 20px rgba(249,115,22,0.5), 0 0 40px rgba(249,115,22,0.3); }
+            50% { text-shadow: 0 0 40px rgba(249,115,22,0.8), 0 0 80px rgba(249,115,22,0.5), 0 0 120px rgba(251,191,36,0.3); }
+          }
+          @keyframes majo-subtitle {
+            0% { transform: translateY(20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+          }
+          .majo-particle {
+            position: absolute;
+            animation: majo-fall linear forwards;
+            pointer-events: none;
+            font-size: clamp(1rem, 3vw, 2.5rem);
+          }
+        `}</style>
+        {particles.map((i) => {
+          const emojis = ["❤️", "🧡", "💛", "✨", "🌟", "💖", "🔥", "⭐", "💫", "🎉", "💝", "🩷"];
+          const emoji = emojis[i % emojis.length];
+          const left = Math.random() * 100;
+          const delay = Math.random() * 2;
+          const duration = 2.5 + Math.random() * 2;
+          const size = 0.6 + Math.random() * 1.2;
+          return (
+            <span key={i} className="majo-particle" style={{ left: `${left}%`, animationDuration: `${duration}s`, animationDelay: `${delay}s`, fontSize: `${size}rem` }}>
+              {emoji}
+            </span>
+          );
+        })}
+        <div className="text-center z-10">
+          <div style={{ animation: "majo-text-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both" }}>
+            <p className="text-6xl sm:text-8xl font-black bg-gradient-to-r from-orange-400 via-pink-500 to-purple-500 bg-clip-text text-transparent" style={{ WebkitBackgroundClip: "text" }}>
+              TE AMO
+            </p>
+            <p className="text-4xl sm:text-6xl font-black bg-gradient-to-r from-pink-400 via-red-400 to-orange-400 bg-clip-text text-transparent mt-2" style={{ WebkitBackgroundClip: "text" }}>
+              MAJO
+            </p>
+          </div>
+          <p className="text-lg text-slate-400 mt-6" style={{ animation: "majo-subtitle 0.6s ease-out 1.2s both" }}>
+            💖 Mi persona favorita del mundo 💖
+          </p>
         </div>
       </div>
     );

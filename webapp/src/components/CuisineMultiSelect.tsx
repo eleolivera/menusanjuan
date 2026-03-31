@@ -10,7 +10,7 @@ export function CuisineMultiSelect({
   darkMode = false,
 }: {
   selected: string[];
-  onChange: (ids: string[]) => void;
+  onChange: (labels: string[]) => void;
   darkMode?: boolean;
 }) {
   const [options, setOptions] = useState<CuisineOption[]>([]);
@@ -23,11 +23,11 @@ export function CuisineMultiSelect({
       .catch(() => setLoading(false));
   }, []);
 
-  function toggle(id: string) {
-    if (selected.includes(id)) {
-      onChange(selected.filter(s => s !== id));
+  function toggle(label: string) {
+    if (selected.includes(label)) {
+      onChange(selected.filter(s => s !== label));
     } else {
-      onChange([...selected, id]);
+      onChange([...selected, label]);
     }
   }
 
@@ -59,8 +59,8 @@ export function CuisineMultiSelect({
         <button
           key={opt.id}
           type="button"
-          onClick={() => toggle(opt.id)}
-          className={`${btnBase} ${selected.includes(opt.id) ? btnActive : btnInactive}`}
+          onClick={() => toggle(opt.label)}
+          className={`${btnBase} ${selected.includes(opt.label) ? btnActive : btnInactive}`}
         >
           <span className="mr-1">{opt.emoji}</span>
           {opt.label}

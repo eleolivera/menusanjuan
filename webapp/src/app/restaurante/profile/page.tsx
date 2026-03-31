@@ -5,12 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LocationPicker } from "@/components/LocationPicker";
 import { PhoneInput } from "@/components/PhoneInput";
-
-const CUISINE_OPTIONS = [
-  "Comida Rápida", "Parrilla", "Pizzería", "Cafetería", "Pastas",
-  "Sushi", "Heladería", "Empanadas", "Comida Árabe", "Comida Mexicana",
-  "Comida China", "Vegetariano", "Postres", "Rotisería", "General",
-];
+import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 
 const DAYS = [
   { key: "lun", label: "Lunes" },
@@ -242,14 +237,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-400">Tipo de cocina</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {CUISINE_OPTIONS.map((c) => (
-                  <button key={c} type="button" onClick={() => setCuisineType(c)}
-                    className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition-all ${
-                      cuisineType === c ? "border-primary bg-primary/10 text-primary" : "border-white/10 text-slate-400 hover:border-white/20"
-                    }`}>{c}</button>
-                ))}
-              </div>
+              <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setCuisineType(vals[vals.length - 1] || "")} darkMode />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-400">Descripción</label>
