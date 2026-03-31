@@ -6,6 +6,7 @@ export type Restaurant = {
   phone: string;
   address: string;
   cuisineType: string;
+  cuisineTypes?: { label: string; emoji: string }[];
   logoUrl: string | null;
   coverUrl: string | null;
   rating: number;

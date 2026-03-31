@@ -95,15 +95,41 @@ model Dealer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  account       Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account       Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
   categories    MenuCategory[]
   orders        Order[]
   claimRequests ClaimRequest[]
+  dealerCuisines DealerCuisineType[]
 
   @@index([slug])
   @@index([cuisineType])
   @@index([isActive])
   @@index([sourceProfileId])
+}
+
+// ─── Cuisine Types (admin-managed) ───
+
+model CuisineType {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  emoji     String   @default("🍽️")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  dealers   DealerCuisineType[]
+
+  @@index([sortOrder])
+}
+
+model DealerCuisineType {
+  dealerId      String
+  cuisineTypeId String
+
+  dealer      Dealer      @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  cuisineType CuisineType @relation(fields: [cuisineTypeId], references: [id], onDelete: Cascade)
+
+  @@id([dealerId, cuisineTypeId])
+  @@index([cuisineTypeId])
 }
 
 // ─── Claim Requests ───

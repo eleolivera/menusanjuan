@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import type { Restaurant } from "@/data/restaurants";
 import { RestaurantCard } from "./RestaurantCard";
-import { CuisineFilter } from "./CuisineFilter";
+import { CuisinePills } from "./CuisinePills";
 import { SearchBar } from "./SearchBar";
 import { flexMatch } from "@/lib/search";
 
@@ -13,7 +13,6 @@ export function RestaurantGrid() {
   const [cuisine, setCuisine] = useState("all");
   const [search, setSearch] = useState("");
 
-  // Fetch restaurants from DB only
   useEffect(() => {
     fetch("/api/restaurants")
       .then((r) => r.json())
@@ -23,12 +22,14 @@ export function RestaurantGrid() {
 
   const filtered = useMemo(() => {
     return restaurants.filter((r) => {
-      const matchesCuisine = cuisine === "all" || r.cuisineType === cuisine;
+      const cuisineLabels = r.cuisineTypes?.map((ct: any) => ct.label) || [r.cuisineType];
+      const matchesCuisine = cuisine === "all" || cuisineLabels.includes(cuisine);
+      const allCuisineText = cuisineLabels.join(" ");
       const matchesSearch =
         search === "" ||
         flexMatch(r.name, search) ||
         flexMatch(r.description, search) ||
-        flexMatch(r.cuisineType, search) ||
+        flexMatch(allCuisineText, search) ||
         flexMatch(r.address, search);
       return matchesCuisine && matchesSearch;
     });
@@ -49,7 +50,7 @@ export function RestaurantGrid() {
 
         <div className="space-y-4 mb-8">
           <SearchBar value={search} onChange={setSearch} />
-          <CuisineFilter selected={cuisine} onChange={setCuisine} />
+          <CuisinePills selected={cuisine} onSelect={setCuisine} />
         </div>
 
         {loading ? (

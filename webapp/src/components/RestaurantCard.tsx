@@ -52,11 +52,18 @@ export function RestaurantCard({
             {restaurant.isOpen ? "Abierto" : "Cerrado"}
           </span>
         </div>
-        {/* Cuisine badge */}
-        <div className="absolute top-3 right-3">
-          <span className="rounded-lg bg-primary/90 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
-            {restaurant.cuisineType}
-          </span>
+        {/* Cuisine badges */}
+        <div className="absolute top-3 right-3 flex gap-1">
+          {(restaurant.cuisineTypes?.slice(0, 2) || [{ label: restaurant.cuisineType, emoji: "" }]).map((ct: any, i: number) => (
+            <span key={i} className="rounded-lg bg-primary/90 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+              {ct.emoji ? `${ct.emoji} ` : ""}{ct.label}
+            </span>
+          ))}
+          {(restaurant.cuisineTypes?.length || 0) > 2 && (
+            <span className="rounded-lg bg-white/20 px-1.5 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+              +{(restaurant.cuisineTypes?.length || 0) - 2}
+            </span>
+          )}
         </div>
       </div>
 

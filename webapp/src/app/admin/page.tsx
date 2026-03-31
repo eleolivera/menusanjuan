@@ -33,13 +33,20 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [tab, setTab] = useState<"restaurants" | "claims" | "users">("restaurants");
+  const [tab, setTab] = useState<"restaurants" | "claims" | "users" | "settings">("restaurants");
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [showNewResta, setShowNewResta] = useState(false);
+  // Cuisine types (settings tab)
+  const [cuisineTypes, setCuisineTypes] = useState<any[]>([]);
+  const [newTypeLabel, setNewTypeLabel] = useState("");
+  const [newTypeEmoji, setNewTypeEmoji] = useState("");
+  const [editingType, setEditingType] = useState<string | null>(null);
+  const [editTypeLabel, setEditTypeLabel] = useState("");
+  const [editTypeEmoji, setEditTypeEmoji] = useState("");
   const [newRestaName, setNewRestaName] = useState("");
   const [newRestaPhone, setNewRestaPhone] = useState("");
   const [creatingResta, setCreatingResta] = useState(false);
@@ -76,6 +83,7 @@ export default function AdminPage() {
     setLoading(true);
     if (tab === "claims") fetch("/api/admin/claims").then(r => r.ok ? r.json() : []).then(d => { setClaims(d); setLoading(false); });
     else if (tab === "users") fetch("/api/admin/users").then(r => r.ok ? r.json() : []).then(d => { setUsers(d); setLoading(false); });
+    else if (tab === "settings") fetch("/api/admin/cuisine-types").then(r => r.ok ? r.json() : []).then(d => { setCuisineTypes(d); setLoading(false); });
     else fetch("/api/admin/restaurants").then(r => r.ok ? r.json() : []).then(d => { setRestaurants(d); setLoading(false); });
   }, [authed, tab]);
 
@@ -153,7 +161,6 @@ export default function AdminPage() {
           <div>
             <h1 className="text-xl font-bold text-white">Admin</h1>
             <p className="text-xs text-slate-500">{adminEmail}</p>
-            <p className="text-lg font-extrabold bg-gradient-to-r from-pink-400 via-rose-400 to-red-400 bg-clip-text text-transparent animate-pulse">TE AMO MAJO ❤️</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => { setLoading(true); if (tab === "restaurants") fetch("/api/admin/restaurants").then(r => r.json()).then(d => { setRestaurants(d); setLoading(false); }); else if (tab === "claims") fetch("/api/admin/claims").then(r => r.json()).then(d => { setClaims(d); setLoading(false); }); else fetch("/api/admin/users").then(r => r.json()).then(d => { setUsers(d); setLoading(false); }); }}
@@ -187,6 +194,7 @@ export default function AdminPage() {
             { key: "restaurants" as const, label: `🍽️ Restaurantes (${restaurants.length})` },
             { key: "claims" as const, label: `📋 Reclamos`, badge: pendingClaims },
             { key: "users" as const, label: `👥 Usuarios` },
+            { key: "settings" as const, label: `⚙️ Configuración` },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${tab === t.key ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
@@ -291,6 +299,85 @@ export default function AdminPage() {
                 )}
               </div>
             ))}
+          </div>
+        ) : tab === "settings" ? (
+          <div className="space-y-6">
+            {/* Cuisine Types Manager */}
+            <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
+              <div className="border-b border-white/5 px-5 py-3">
+                <h2 className="text-sm font-bold text-white">Tipos de Cocina</h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">Estos tipos se usan en el buscador, filtros, y perfil de cada restaurante</p>
+              </div>
+
+              {/* Add new */}
+              <div className="border-b border-white/5 bg-primary/5 px-5 py-3 flex gap-2">
+                <input value={newTypeEmoji} onChange={e => setNewTypeEmoji(e.target.value)} placeholder="🍔" className="w-14 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center text-sm text-white focus:border-primary focus:outline-none" />
+                <input value={newTypeLabel} onChange={e => setNewTypeLabel(e.target.value)} placeholder="Nuevo tipo de cocina..." className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" onKeyDown={e => { if (e.key === "Enter") document.getElementById("add-type-btn")?.click(); }} />
+                <button id="add-type-btn" disabled={!newTypeLabel.trim()} onClick={async () => {
+                  const res = await fetch("/api/admin/cuisine-types", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: newTypeLabel.trim(), emoji: newTypeEmoji || "🍽️" }) });
+                  if (res.ok) { setNewTypeLabel(""); setNewTypeEmoji(""); const data = await fetch("/api/admin/cuisine-types").then(r => r.json()); setCuisineTypes(data); }
+                }} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50 shrink-0">
+                  + Agregar
+                </button>
+              </div>
+
+              {/* List */}
+              <div className="divide-y divide-white/5">
+                {cuisineTypes.map((ct, i) => (
+                  <div key={ct.id} className="flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors">
+                    {editingType === ct.id ? (
+                      <>
+                        <input value={editTypeEmoji} onChange={e => setEditTypeEmoji(e.target.value)} className="w-10 rounded-md border border-white/10 bg-white/5 px-1.5 py-1 text-center text-sm text-white focus:border-primary focus:outline-none" />
+                        <input value={editTypeLabel} onChange={e => setEditTypeLabel(e.target.value)} className="flex-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-sm text-white focus:border-primary focus:outline-none" />
+                        <button onClick={async () => {
+                          await fetch("/api/admin/cuisine-types", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ct.id, label: editTypeLabel, emoji: editTypeEmoji }) });
+                          setEditingType(null); const data = await fetch("/api/admin/cuisine-types").then(r => r.json()); setCuisineTypes(data);
+                        }} className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-white">Guardar</button>
+                        <button onClick={() => setEditingType(null)} className="text-xs text-slate-500">Cancelar</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xl w-8 text-center">{ct.emoji}</span>
+                        <span className="text-sm font-medium text-white flex-1">{ct.label}</span>
+                        <span className="text-[10px] text-slate-500 shrink-0">{ct.restaurantCount} resta{ct.restaurantCount !== 1 ? "s" : ""}</span>
+                        {/* Move up/down */}
+                        <div className="flex flex-col gap-0.5 shrink-0">
+                          {i > 0 && (
+                            <button onClick={async () => {
+                              const prev = cuisineTypes[i - 1];
+                              await fetch("/api/admin/cuisine-types", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reorder: [{ id: ct.id, sortOrder: prev.sortOrder }, { id: prev.id, sortOrder: ct.sortOrder }] }) });
+                              const data = await fetch("/api/admin/cuisine-types").then(r => r.json()); setCuisineTypes(data);
+                            }} className="text-slate-600 hover:text-white transition-colors">
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+                            </button>
+                          )}
+                          {i < cuisineTypes.length - 1 && (
+                            <button onClick={async () => {
+                              const next = cuisineTypes[i + 1];
+                              await fetch("/api/admin/cuisine-types", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reorder: [{ id: ct.id, sortOrder: next.sortOrder }, { id: next.id, sortOrder: ct.sortOrder }] }) });
+                              const data = await fetch("/api/admin/cuisine-types").then(r => r.json()); setCuisineTypes(data);
+                            }} className="text-slate-600 hover:text-white transition-colors">
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                            </button>
+                          )}
+                        </div>
+                        <button onClick={() => { setEditingType(ct.id); setEditTypeLabel(ct.label); setEditTypeEmoji(ct.emoji); }} className="text-xs text-slate-400 hover:text-primary transition-colors">✏️</button>
+                        {ct.label !== "General" && (
+                          <button onClick={async () => {
+                            if (!confirm(`¿Eliminar "${ct.label}"? ${ct.restaurantCount} restaurante(s) lo usan.`)) return;
+                            await fetch(`/api/admin/cuisine-types?id=${ct.id}`, { method: "DELETE" });
+                            const data = await fetch("/api/admin/cuisine-types").then(r => r.json()); setCuisineTypes(data);
+                          }} className="text-xs text-slate-600 hover:text-red-400 transition-colors">✕</button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+                {cuisineTypes.length === 0 && (
+                  <div className="px-5 py-8 text-center text-sm text-slate-500">Sin tipos de cocina configurados</div>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
