@@ -88,15 +88,30 @@ export default function AdminPage() {
     setAdminEmail("");
   }
 
-  useEffect(() => {
+  const [fetchError, setFetchError] = useState(false);
+
+  function loadTabData() {
     if (!authed) return;
-    if (tab === "onboarding") return; // Board handles its own loading
+    if (tab === "onboarding") return;
     setLoading(true);
-    if (tab === "claims") fetch("/api/admin/claims").then(r => r.ok ? r.json() : []).then(d => { setClaims(d); setLoading(false); });
-    else if (tab === "users") fetch("/api/admin/users").then(r => r.ok ? r.json() : []).then(d => { setUsers(d); setLoading(false); });
-    else if (tab === "settings") fetch("/api/admin/cuisine-types").then(r => r.ok ? r.json() : []).then(d => { setCuisineTypes(d); setLoading(false); });
-    else fetch("/api/admin/restaurants").then(r => r.ok ? r.json() : []).then(d => { setRestaurants(d); setLoading(false); });
-  }, [authed, tab]);
+    setFetchError(false);
+    const endpoint = tab === "claims" ? "/api/admin/claims" : tab === "users" ? "/api/admin/users" : tab === "settings" ? "/api/admin/cuisine-types" : "/api/admin/restaurants";
+    fetch(endpoint)
+      .then(r => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      })
+      .then(d => {
+        if (tab === "claims") setClaims(d);
+        else if (tab === "users") setUsers(d);
+        else if (tab === "settings") setCuisineTypes(d);
+        else setRestaurants(d);
+        setLoading(false);
+      })
+      .catch(() => { setFetchError(true); setLoading(false); });
+  }
+
+  useEffect(() => { loadTabData(); }, [authed, tab]);
 
   async function generateCode(claimId: string) {
     await fetch("/api/admin/claims", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ claimId, action: "generate_code" }) });
@@ -237,7 +252,7 @@ export default function AdminPage() {
             <p className="text-xs text-slate-500">{adminEmail}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => { setLoading(true); if (tab === "restaurants") fetch("/api/admin/restaurants").then(r => r.json()).then(d => { setRestaurants(d); setLoading(false); }); else if (tab === "claims") fetch("/api/admin/claims").then(r => r.json()).then(d => { setClaims(d); setLoading(false); }); else fetch("/api/admin/users").then(r => r.json()).then(d => { setUsers(d); setLoading(false); }); }}
+            <button onClick={loadTabData}
               className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Actualizar</button>
             <a href="/admin/guia" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Guía</a>
             <a href="/admin/playbook" className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary hover:bg-primary/20 transition-colors">Playbook</a>
@@ -281,6 +296,12 @@ export default function AdminPage() {
 
         {loading ? (
           <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
+        ) : fetchError ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="text-3xl">⚠️</div>
+            <p className="text-sm text-slate-400">Error cargando datos — probablemente la base de datos está lenta</p>
+            <button onClick={loadTabData} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark transition-colors">Reintentar</button>
+          </div>
         ) : tab === "restaurants" ? (
           <>
           {/* Quick create restaurant */}
