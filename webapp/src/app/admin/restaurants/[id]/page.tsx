@@ -656,14 +656,25 @@ Probalo y decime qué te parece!`;
                   </>
                 )}
 
-                {/* Already verified but no creds in memory — prompt to regenerate */}
+                {/* Already verified but no creds in memory — one-click regenerate */}
                 {data.isVerified && !activatedCreds && (
-                  <div className="rounded-xl bg-slate-900 border border-white/10 p-4">
-                    <p className="text-xs text-slate-400 mb-3">Esta cuenta ya está habilitada. Para generar nuevas credenciales y ver el mensaje de WhatsApp, desactivá y volvé a activar.</p>
+                  <div className="rounded-xl bg-slate-900 border border-white/10 p-4 space-y-3">
                     <div className="flex items-center gap-2 text-xs text-slate-500">
                       <span>Email:</span>
                       <span className="font-mono text-white">{data.ownerEmail}</span>
                     </div>
+                    <p className="text-xs text-slate-400">La contraseña no se puede recuperar. Podés generar una nueva:</p>
+                    <button
+                      onClick={async () => {
+                        setActivating(true);
+                        await fetch(`/api/admin/restaurants/${id}/activate-owner`, { method: "DELETE" });
+                        await handleToggleOwner(true);
+                      }}
+                      disabled={activating}
+                      className="rounded-xl bg-primary/15 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors disabled:opacity-50"
+                    >
+                      {activating ? "Generando..." : "Regenerar credenciales"}
+                    </button>
                   </div>
                 )}
 

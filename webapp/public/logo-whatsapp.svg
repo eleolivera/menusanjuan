@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#f97316" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <rect width="640" height="640" rx="128" fill="url(#bg)" filter="url(#shadow)"/>
+  <text x="320" y="430" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif"
+        font-weight="800" font-size="360" fill="white" letter-spacing="-10">M</text>
+</svg>

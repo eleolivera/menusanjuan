@@ -237,13 +237,28 @@ export function OnboardingBoard() {
 
   async function activateAndMove(card: Card) {
     setActivatingCard(card.id);
-    // Try to activate — if already active, that's fine, just move the card
-    const res = await fetch(`/api/admin/restaurants/${card.dealer.id}/activate-owner`, { method: "POST" });
+    const dealerUrl = `/api/admin/restaurants/${card.dealer.id}/activate-owner`;
+    // Try to activate
+    let res = await fetch(dealerUrl, { method: "POST" });
+    if (!res.ok) {
+      // Already activated — deactivate first, then reactivate to get fresh creds
+      await fetch(dealerUrl, { method: "DELETE" });
+      res = await fetch(dealerUrl, { method: "POST" });
+    }
     if (res.ok) {
       const creds = await res.json();
       setCardCreds((prev) => ({ ...prev, [card.id]: { email: creds.email, password: creds.password } }));
+      // Save creds as a note for future reference
+      const credsNote = `Credenciales generadas:\nEmail: ${creds.email}\nClave: ${creds.password}`;
+      fetch("/api/admin/onboarding/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: card.id, text: credsNote }),
+      }).then(r => r.ok ? r.json() : null).then(note => {
+        if (note) setCards((prev) => prev.map((c) => c.id === card.id ? { ...c, notes: [note, ...c.notes] } : c));
+      });
     }
-    // Always move to EN_CHARLA regardless of activate result
+    // Move to EN_CHARLA
     setCards((prev) => prev.map((c) => c.id === card.id ? { ...c, stage: "IN_PROGRESS" as OnboardingStage } : c));
     await fetch("/api/admin/onboarding", {
       method: "PATCH",
@@ -599,12 +614,16 @@ function KanbanCardView({
                 WhatsApp
               </button>
             )}
-            {creds && (
+            {creds ? (
               <div className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 p-2 space-y-0.5">
                 <p className="text-[10px] text-slate-400 font-medium">Credenciales:</p>
-                <p className="text-[10px] text-slate-300">📧 {creds.email}</p>
-                <p className="text-[10px] text-slate-300">🔑 {creds.password}</p>
+                <p className="text-[10px] text-slate-300">Email: {creds.email}</p>
+                <p className="text-[10px] text-white font-mono font-bold">Clave: {creds.password}</p>
               </div>
+            ) : (
+              <button onClick={onActivate} disabled={activating} className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">
+                {activating ? "Generando..." : "Regenerar credenciales"}
+              </button>
             )}
             {card.lastContactedAt && (
               <span className="text-[10px] text-slate-600 py-1">Último contacto: {timeAgo(card.lastContactedAt)}</span>
