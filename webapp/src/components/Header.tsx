@@ -57,7 +57,7 @@ export function Header() {
             M
           </div>
           <span className="text-xl font-extrabold tracking-tight text-text">
-            Menu<span className="gradient-text">SJ</span>
+            Menu<span className="gradient-text">SanJuan</span><span className="text-xs font-bold text-text-secondary">.com</span>
           </span>
         </Link>
 
