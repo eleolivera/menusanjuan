@@ -258,22 +258,21 @@ export function OnboardingBoard() {
     const d = card.dealer;
     const email = creds?.email || d.ownerEmail;
     const password = creds?.password || "[contraseña enviada]";
-    return `Hola! 👋 Soy de MenuSanJuan.com
+    return `Hola! Soy de MenuSanJuan.com
 
-Noté que *${d.name}* no tiene su propia página de pedidos online todavía.
+Te creamos una pagina gratuita para *${d.name}* donde tus clientes pueden ver el menu completo con precios y hacer pedidos directo por WhatsApp. Sin intermediarios, sin comisiones — a diferencia de otras apps que se quedan con un porcentaje de cada venta, con nosotros todo lo que vendes es tuyo.
 
-Te creamos una gratis — ya tiene tu menú cargado con precios e imágenes. Tus clientes pueden ver el menú y hacer pedidos por WhatsApp.
+Ya esta armada con tu menu cargado:
+${d.name}: menusanjuan.com/${d.slug}
 
-Es 100% gratis, sin comisiones.
+Para editar tu menu, horarios, y ver pedidos entra aca:
+menusanjuan.com/restaurante/login
+Email: ${email}
+Clave: ${password}
 
-🍽️ Tu página: menusanjuan.com/${d.slug}
+Si tenes la carta actualizada con los precios de hoy, mandamela asi la actualizamos rapido.
 
-Para editar tu menú, horarios, y ver pedidos:
-🔗 menusanjuan.com/restaurante/login
-📧 ${email}
-🔑 ${password}
-
-Probalo y decime qué te parece!`;
+Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. Estamos para hacerte las cosas faciles!`;
   }
 
   function openWhatsApp(card: Card) {

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 export default function RestaurantePage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/restaurante/profile");
+    router.replace("/restaurante/menu");
   }, [router]);
 
   return null;

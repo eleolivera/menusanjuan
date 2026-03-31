@@ -5,14 +5,15 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 
 const DEFAULT_NAV = [
-  { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "🏪" },
-  { href: "/restaurante/dashboard", label: "Dashboard", emoji: "📊" },
-  { href: "/restaurante/pedidos", label: "Pedidos", emoji: "📋" },
   { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
+  { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "🏪" },
+  { href: "/restaurante/pedidos", label: "Pedidos", emoji: "📋" },
+  { href: "/restaurante/dashboard", label: "Dashboard", emoji: "📊" },
 ];
 
 const USAGE_KEY = "msj_nav_usage";
 const USAGE_THRESHOLD = 15; // Total clicks before sorting kicks in
+const WELCOME_KEY = "msj_welcome_seen";
 
 // Pages that should NOT show the sidebar
 const AUTH_PATHS = ["/restaurante/login", "/restaurante/register", "/restaurante/reset-password"];
@@ -35,6 +36,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [restaurantName, setRestaurantName] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [navVersion, setNavVersion] = useState(0);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
@@ -70,6 +72,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           setSlug(data.slug);
           setRestaurantName(data.name || data.slug);
           setAuthed(true);
+          if (!localStorage.getItem(WELCOME_KEY)) setShowWelcome(true);
         } else if (data.authenticated && !data.slug) {
           router.push("/restaurante/register");
         } else {
@@ -188,6 +191,56 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 overflow-y-auto">
         {children}
       </div>
+
+      {/* First-time welcome popup */}
+      {showWelcome && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl mx-4 animate-scale-in">
+            <div className="text-center mb-5">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-amber-500 text-3xl text-white font-bold shadow-lg shadow-primary/25">
+                {restaurantName.charAt(0)}
+              </div>
+              <h2 className="text-xl font-bold text-white">Bienvenido a MenuSanJuan</h2>
+              <p className="text-sm text-slate-400 mt-1">Tu panel de control para <span className="text-primary font-medium">{restaurantName}</span></p>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex items-start gap-3 rounded-xl bg-white/5 p-3">
+                <span className="text-lg mt-0.5">🍽️</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">Menu</p>
+                  <p className="text-xs text-slate-400">Edita tus platos, precios, categorias e imagenes. Es lo primero que ven tus clientes.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl bg-white/5 p-3">
+                <span className="text-lg mt-0.5">🏪</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">Mi Restaurante</p>
+                  <p className="text-xs text-slate-400">Configura tu direccion, horarios, telefono de WhatsApp, y datos de pago.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl bg-white/5 p-3">
+                <span className="text-lg mt-0.5">📋</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">Pedidos</p>
+                  <p className="text-xs text-slate-400">Aca llegan los pedidos de tus clientes. Te llegan por WhatsApp y los ves aca tambien.</p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 text-center mb-4">
+              Tu pagina publica es <a href={`/${slug}`} target="_blank" className="text-primary hover:underline">menusanjuan.com/{slug}</a> — compartila con tus clientes!
+            </p>
+
+            <button
+              onClick={() => { setShowWelcome(false); localStorage.setItem(WELCOME_KEY, "1"); }}
+              className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:shadow-primary/30 transition-all"
+            >
+              Empezar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
