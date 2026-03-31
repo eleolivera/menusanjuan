@@ -258,7 +258,7 @@ export function OnboardingBoard() {
     const d = card.dealer;
     const email = creds?.email || d.ownerEmail;
     const password = creds?.password || "[contraseña enviada]";
-    return encodeURIComponent(`Hola! 👋 Soy de MenuSanJuan.com
+    return `Hola! 👋 Soy de MenuSanJuan.com
 
 Noté que *${d.name}* no tiene su propia página de pedidos online todavía.
 
@@ -273,14 +273,13 @@ Para editar tu menú, horarios, y ver pedidos:
 📧 ${email}
 🔑 ${password}
 
-Probalo y decime qué te parece!`);
+Probalo y decime qué te parece!`;
   }
 
   function openWhatsApp(card: Card) {
     const phone = card.dealer.phone.replace(/\D/g, "");
-    const encoded = buildWhatsAppMsg(card);
-    // Store decoded for editing in the textarea
-    setWhatsappMsg({ cardId: card.id, msg: decodeURIComponent(encoded), phone });
+    const msg = buildWhatsAppMsg(card);
+    setWhatsappMsg({ cardId: card.id, msg, phone });
   }
 
   function sendWhatsApp() {
