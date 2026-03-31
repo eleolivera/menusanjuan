@@ -58,7 +58,7 @@ export default function AdminPage() {
     fetch("/api/admin/session")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data?.authenticated) { setAuthed(true); setAdminEmail(data.email); }
+        if (data?.authenticated) { setAuthed(true); setAdminEmail(data.email); if (window.location.search) window.history.replaceState({}, "", "/admin"); }
         setChecking(false);
       })
       .catch(() => setChecking(false));
@@ -78,7 +78,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    if (res.ok) { setAuthed(true); setAdminEmail(email); }
+    if (res.ok) { setAuthed(true); setAdminEmail(email); window.history.replaceState({}, "", "/admin"); }
     else { const d = await res.json(); setLoginError(d.error || "Error"); }
   }
 

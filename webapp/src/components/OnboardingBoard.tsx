@@ -86,10 +86,15 @@ function completenessIcons(c: Completeness) {
 
 // ─── Main Board ───
 
+function normalize(s: string) {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 export function OnboardingBoard() {
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [hideCompleted, setHideCompleted] = useState(true);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [dragCard, setDragCard] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<OnboardingStage | null>(null);
@@ -224,8 +229,12 @@ export function OnboardingBoard() {
   // ─── Filter ───
 
   const filtered = search
-    ? cards.filter((c) => c.dealer.name.toLowerCase().includes(search.toLowerCase()))
+    ? cards.filter((c) => normalize(c.dealer.name).includes(normalize(search)) || normalize(c.dealer.slug).includes(normalize(search)))
     : cards;
+
+  const visibleStages = hideCompleted
+    ? STAGES.filter((s) => s.key !== "NEEDS_INFO" && s.key !== "READY")
+    : STAGES;
 
   // ─── Loading ───
 
@@ -255,7 +264,13 @@ export function OnboardingBoard() {
           placeholder="Buscar restaurante..."
           className="w-full max-w-sm rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none"
         />
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+        <button
+          onClick={() => setHideCompleted(!hideCompleted)}
+          className={`rounded-xl px-3 py-2.5 text-xs font-medium transition-all border ${hideCompleted ? "border-primary/30 bg-primary/10 text-primary" : "border-white/10 text-slate-400 hover:bg-white/5"}`}
+        >
+          {hideCompleted ? "Solo outreach" : "Todas las columnas"}
+        </button>
+        <div className="flex items-center gap-2 text-xs text-slate-500 ml-auto">
           <span>{cards.length} restaurantes</span>
           <span>·</span>
           <span>{cards.filter((c) => c.stage === "ONBOARDED").length} onboardeados</span>
@@ -264,7 +279,7 @@ export function OnboardingBoard() {
 
       {/* Kanban columns */}
       <div className="flex gap-3 overflow-x-auto pb-4 -mx-2 px-2" style={{ minHeight: "calc(100vh - 240px)" }}>
-        {STAGES.map((stage) => {
+        {visibleStages.map((stage) => {
           const columnCards = filtered
             .filter((c) => c.stage === stage.key)
             .sort((a, b) => a.sortOrder - b.sortOrder || a.dealer.name.localeCompare(b.dealer.name));
@@ -298,7 +313,7 @@ export function OnboardingBoard() {
                   <KanbanCardView
                     key={card.id}
                     card={card}
-                    stage={stage}
+
                     expanded={expandedCard === card.id}
                     onToggleExpand={() => setExpandedCard(expandedCard === card.id ? null : card.id)}
                     onDragStart={() => handleDragStart(card.id)}
@@ -331,7 +346,6 @@ export function OnboardingBoard() {
 
 function KanbanCardView({
   card,
-  stage,
   expanded,
   onToggleExpand,
   onDragStart,
@@ -346,7 +360,7 @@ function KanbanCardView({
   uploadingImage,
 }: {
   card: Card;
-  stage: (typeof STAGES)[number];
+
   expanded: boolean;
   onToggleExpand: () => void;
   onDragStart: () => void;
