@@ -246,7 +246,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto p-6">
+      <div className={`mx-auto p-6 ${tab === "onboarding" ? "max-w-full" : "max-w-6xl"}`}>
         {/* Quick stats */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           {[

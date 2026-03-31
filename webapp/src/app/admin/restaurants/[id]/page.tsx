@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { PhoneInput } from "@/components/PhoneInput";
 import { LocationPicker } from "@/components/LocationPicker";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
@@ -24,12 +24,14 @@ type Restaurant = {
 export default function AdminRestaurantDetail() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const initialTab = (searchParams.get("tab") as "info" | "menu" | "claims" | "owner") || "info";
   const [data, setData] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<"info" | "menu" | "claims" | "owner">("info");
+  const [tab, setTab] = useState<"info" | "menu" | "claims" | "owner">(initialTab);
 
   // Editable fields
   const [name, setName] = useState("");

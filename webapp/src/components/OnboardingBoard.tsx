@@ -278,7 +278,7 @@ export function OnboardingBoard() {
       </div>
 
       {/* Kanban columns */}
-      <div className="flex gap-3 overflow-x-auto pb-4 -mx-2 px-2" style={{ minHeight: "calc(100vh - 240px)" }}>
+      <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: "calc(100vh - 240px)" }}>
         {visibleStages.map((stage) => {
           const columnCards = filtered
             .filter((c) => c.stage === stage.key)
@@ -287,7 +287,7 @@ export function OnboardingBoard() {
           return (
             <div
               key={stage.key}
-              className={`min-w-[280px] max-w-[320px] flex-1 rounded-2xl border p-3 transition-colors ${
+              className={`min-w-[280px] flex-1 rounded-2xl border p-3 transition-colors ${
                 dragOverStage === stage.key
                   ? "border-primary/50 bg-primary/5"
                   : "border-white/5 bg-slate-900/30"
@@ -398,7 +398,7 @@ function KanbanCardView({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">{d.name}</p>
+          <a href={`/admin/restaurants/${d.id}`} target="_blank" className="text-sm font-semibold text-white truncate hover:text-primary transition-colors block">{d.name}</a>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="text-[10px] text-slate-500">{d.slug}</span>
             {d.isPlaceholder && (
@@ -461,7 +461,7 @@ function KanbanCardView({
         )}
         {card.stage === "QUEUED" && (
           <>
-            <a href={`/admin/restaurants/${d.id}`} target="_blank" className="rounded-lg bg-purple-400/10 px-2 py-1 text-[10px] font-medium text-purple-400 hover:bg-purple-400/20 transition-colors">
+            <a href={`/admin/restaurants/${d.id}?tab=owner`} target="_blank" className="rounded-lg bg-purple-400/10 px-2 py-1 text-[10px] font-medium text-purple-400 hover:bg-purple-400/20 transition-colors">
               Activar cuenta
             </a>
             <span className="text-[10px] text-slate-600 py-1">{d.ownerEmail}</span>
@@ -470,7 +470,7 @@ function KanbanCardView({
         {card.stage === "IN_PROGRESS" && (
           <>
             {d.phone && d.phone !== "0000000000" && (
-              <a href={`https://wa.me/54${d.phone.replace(/\D/g, "")}`} target="_blank" className="rounded-lg bg-emerald-400/10 px-2 py-1 text-[10px] font-medium text-emerald-400 hover:bg-emerald-400/20 transition-colors">
+              <a href={`https://wa.me/${d.phone.replace(/\D/g, "")}`} target="_blank" className="rounded-lg bg-emerald-400/10 px-2 py-1 text-[10px] font-medium text-emerald-400 hover:bg-emerald-400/20 transition-colors">
                 WhatsApp
               </a>
             )}
