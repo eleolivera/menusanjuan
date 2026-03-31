@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { flexMatch } from "@/lib/search";
 import { OnboardingBoard } from "@/components/OnboardingBoard";
 
@@ -34,7 +34,25 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [tab, setTab] = useState<"restaurants" | "onboarding" | "claims" | "users" | "settings">("restaurants");
+  type AdminTab = "restaurants" | "onboarding" | "claims" | "users" | "settings";
+  const validTabs: AdminTab[] = ["restaurants", "onboarding", "claims", "users", "settings"];
+  const tabAliases: Record<string, AdminTab> = { tablero: "onboarding", reclamos: "claims", usuarios: "users", configuracion: "settings" };
+
+  function getInitialTab(): AdminTab {
+    if (typeof window === "undefined") return "restaurants";
+    const p = new URLSearchParams(window.location.search).get("tab") || "";
+    if (validTabs.includes(p as AdminTab)) return p as AdminTab;
+    if (tabAliases[p]) return tabAliases[p];
+    return "restaurants";
+  }
+
+  const [tab, setTabState] = useState<AdminTab>(getInitialTab);
+
+  const setTab = useCallback((t: AdminTab) => {
+    setTabState(t);
+    const label = t === "onboarding" ? "tablero" : t;
+    window.history.replaceState({}, "", t === "restaurants" ? "/admin" : `/admin?tab=${label}`);
+  }, []);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [users, setUsers] = useState<any[]>([]);

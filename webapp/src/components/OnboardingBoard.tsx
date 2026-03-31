@@ -331,7 +331,7 @@ export function OnboardingBoard() {
               <p className="text-[10px] text-slate-600 mb-3 leading-relaxed">{stage.description}</p>
 
               {/* Cards */}
-              <div className="space-y-2 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
+              <div className={`space-y-2 overflow-y-auto pr-1 ${isFullscreen ? "max-h-[calc(100vh-160px)]" : "max-h-[calc(100vh-300px)]"}`}>
                 {columnCards.map((card) => (
                   <KanbanCardView
                     key={card.id}
