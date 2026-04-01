@@ -297,12 +297,12 @@ export default function AdminPage() {
           ))}
         </div>}
 
-        <div className={`flex gap-2 ${tab === "onboarding" ? "mb-2" : "mb-6"}`}>
+        <div className="flex gap-2 mb-2 shrink-0">
           {[
-            { key: "onboarding" as const, label: tab === "onboarding" ? "📋 Tablero" : `📋 Tablero` },
-            { key: "claims" as const, label: tab === "onboarding" ? "📨" : `📨 Reclamos`, badge: pendingClaims },
-            { key: "users" as const, label: tab === "onboarding" ? "👥" : `👥 Usuarios` },
-            { key: "settings" as const, label: tab === "onboarding" ? "⚙️" : `⚙️ Configuración` },
+            { key: "onboarding" as const, label: "📋 Tablero" },
+            { key: "claims" as const, label: "📨 Reclamos", badge: pendingClaims },
+            { key: "users" as const, label: "👥 Usuarios" },
+            { key: "settings" as const, label: "⚙️ Config" },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${tab === t.key ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
@@ -310,12 +310,10 @@ export default function AdminPage() {
               {t.badge ? <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{t.badge}</span> : null}
             </button>
           ))}
-          {tab === "onboarding" && (
-            <div className="flex items-center gap-2 ml-auto">
-              <a href="/admin/playbook" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 hover:bg-white/5 transition-colors">Playbook</a>
-              <button onClick={handleLogout} className="rounded-lg border border-red-500/20 px-2.5 py-1.5 text-[10px] text-red-400 hover:bg-red-500/10 transition-colors">Salir</button>
-            </div>
-          )}
+          <div className="flex items-center gap-2 ml-auto">
+            <a href="/admin/playbook" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 hover:bg-white/5 transition-colors">Playbook</a>
+            <button onClick={handleLogout} className="rounded-lg border border-red-500/20 px-2.5 py-1.5 text-[10px] text-red-400 hover:bg-red-500/10 transition-colors">Salir</button>
+          </div>
         </div>
 
         {loading ? (
