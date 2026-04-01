@@ -262,24 +262,26 @@ export default function AdminPage() {
   const unclaimed = restaurants.filter(r => r.isPlaceholder).length;
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <header className="border-b border-white/5 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-white">Admin</h1>
-            <p className="text-xs text-slate-500">{adminEmail}</p>
+    <div className={`bg-slate-950 ${tab === "onboarding" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
+      {tab !== "onboarding" && (
+        <header className="border-b border-white/5 px-6 py-4">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-white">Admin</h1>
+              <p className="text-xs text-slate-500">{adminEmail}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={loadTabData}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Actualizar</button>
+              <a href="/admin/guia" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Guía</a>
+              <a href="/admin/playbook" className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary hover:bg-primary/20 transition-colors">Playbook</a>
+              <button onClick={handleLogout} className="rounded-lg border border-red-500/20 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors">Salir</button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={loadTabData}
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Actualizar</button>
-            <a href="/admin/guia" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Guía</a>
-            <a href="/admin/playbook" className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary hover:bg-primary/20 transition-colors">Playbook</a>
-            <button onClick={handleLogout} className="rounded-lg border border-red-500/20 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors">Salir</button>
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <div className={`mx-auto ${tab === "onboarding" ? "px-3 py-4" : "max-w-6xl p-6"}`}>
+      <div className={`mx-auto ${tab === "onboarding" ? "px-3 py-2 h-full flex flex-col" : "max-w-6xl p-6"}`}>
         {/* Quick stats */}
         {tab !== "onboarding" && <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           {[
@@ -296,20 +298,26 @@ export default function AdminPage() {
           ))}
         </div>}
 
-        <div className="flex gap-2 mb-6">
+        <div className={`flex gap-2 ${tab === "onboarding" ? "mb-2" : "mb-6"}`}>
           {[
-            { key: "restaurants" as const, label: `🍽️ Restaurantes (${restaurants.length})` },
-            { key: "onboarding" as const, label: `📋 Tablero` },
-            { key: "claims" as const, label: `📨 Reclamos`, badge: pendingClaims },
-            { key: "users" as const, label: `👥 Usuarios` },
-            { key: "settings" as const, label: `⚙️ Configuración` },
+            { key: "restaurants" as const, label: tab === "onboarding" ? "🍽️" : `🍽️ Restaurantes (${restaurants.length})` },
+            { key: "onboarding" as const, label: tab === "onboarding" ? "📋 Tablero" : `📋 Tablero` },
+            { key: "claims" as const, label: tab === "onboarding" ? "📨" : `📨 Reclamos`, badge: pendingClaims },
+            { key: "users" as const, label: tab === "onboarding" ? "👥" : `👥 Usuarios` },
+            { key: "settings" as const, label: tab === "onboarding" ? "⚙️" : `⚙️ Configuración` },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${tab === t.key ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
+              className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${tab === t.key ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
               {t.label}
               {t.badge ? <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{t.badge}</span> : null}
             </button>
           ))}
+          {tab === "onboarding" && (
+            <div className="flex items-center gap-2 ml-auto">
+              <a href="/admin/playbook" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 hover:bg-white/5 transition-colors">Playbook</a>
+              <button onClick={handleLogout} className="rounded-lg border border-red-500/20 px-2.5 py-1.5 text-[10px] text-red-400 hover:bg-red-500/10 transition-colors">Salir</button>
+            </div>
+          )}
         </div>
 
         {loading ? (

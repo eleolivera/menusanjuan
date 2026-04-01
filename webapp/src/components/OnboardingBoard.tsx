@@ -353,9 +353,9 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
   }
 
   return (
-    <div ref={boardRef} className={isFullscreen ? "bg-slate-950 p-4 h-screen overflow-hidden" : ""}>
+    <div ref={boardRef} className={`flex flex-col ${isFullscreen ? "bg-slate-950 p-4 h-screen overflow-hidden" : "flex-1"}`} style={{ minHeight: 0 }}>
       {/* Search bar */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-2 flex items-center gap-3 shrink-0">
         <input
           type="text"
           value={search}
@@ -384,7 +384,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
       </div>
 
       {/* Kanban columns */}
-      <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: isFullscreen ? "calc(100vh - 80px)" : "calc(100vh - 240px)" }}>
+      <div className="flex gap-3 overflow-x-auto flex-1" style={{ minHeight: 0 }}>
         {visibleStages.map((stage) => {
           const columnCards = filtered
             .filter((c) => c.stage === stage.key)
@@ -393,7 +393,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
           return (
             <div
               key={stage.key}
-              className={`min-w-[280px] flex-1 rounded-2xl border p-3 transition-colors ${
+              className={`min-w-[280px] flex-1 rounded-2xl border p-3 transition-colors flex flex-col ${
                 dragOverStage === stage.key
                   ? "border-primary/50 bg-primary/5"
                   : "border-white/5 bg-slate-900/30"
@@ -414,7 +414,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
               <p className="text-[10px] text-slate-600 mb-3 leading-relaxed">{stage.description}</p>
 
               {/* Cards */}
-              <div className={`space-y-2 overflow-y-auto pr-1 ${isFullscreen ? "max-h-[calc(100vh-160px)]" : "max-h-[calc(100vh-300px)]"}`}>
+              <div className="space-y-2 overflow-y-auto pr-1 flex-1" style={{ minHeight: 0 }}>
                 {columnCards.map((card) => (
                   <KanbanCardView
                     key={card.id}
