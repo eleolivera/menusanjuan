@@ -64,12 +64,13 @@ export function RestaurantModal({
   const [cuisineType, _setCuisineType] = useState("");
   const [description, _setDescription] = useState("");
   const [isActive, _setIsActive] = useState(true);
-  const setName = (v: string) => { _setName(v); setDirty(true); };
-  const setPhone = (v: string) => { _setPhone(v); setDirty(true); };
-  const setAddress = (v: string) => { _setAddress(v); setDirty(true); };
-  const setCuisineType = (v: string) => { _setCuisineType(v); setDirty(true); };
-  const setDescription = (v: string) => { _setDescription(v); setDirty(true); };
-  const setIsActive = (v: boolean) => { _setIsActive(v); setDirty(true); };
+  const initialData = useRef<Record<string, any>>({});
+  const setName = (v: string) => { _setName(v); if (v !== initialData.current.name) setDirty(true); };
+  const setPhone = (v: string) => { _setPhone(v); if (v !== initialData.current.phone) setDirty(true); };
+  const setAddress = (v: string) => { _setAddress(v); if (v !== initialData.current.address) setDirty(true); };
+  const setCuisineType = (v: string) => { _setCuisineType(v); if (v !== initialData.current.cuisineType) setDirty(true); };
+  const setDescription = (v: string) => { _setDescription(v); if (v !== initialData.current.description) setDirty(true); };
+  const setIsActive = (v: boolean) => { _setIsActive(v); if (v !== initialData.current.isActive) setDirty(true); };
   const [hours, setHours] = useState<HoursMap>(parseHours(null));
   const [logoUrl, setLogoUrl] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
@@ -79,6 +80,8 @@ export function RestaurantModal({
   const [activating, setActivating] = useState(false);
   const [activatedCode, setActivatedCode] = useState<string | null>(null);
   const [whatsAppMsg, setWhatsAppMsg] = useState("");
+  const [assignEmail, setAssignEmail] = useState("");
+  const [assignMsg, setAssignMsg] = useState("");
 
   function updateHours(key: string, field: string, value: string | boolean) {
     setHours((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } })); setDirty(true);
@@ -89,11 +92,14 @@ export function RestaurantModal({
       .then((r) => r.json())
       .then((d) => {
         setData(d);
-        setName(d.name); setPhone(d.phone); setAddress(d.address || "");
-        setCuisineType(d.cuisineType); setDescription(d.description || "");
-        setIsActive(d.isActive); setHours(parseHours(d.openHours));
+        // Use raw setters to avoid marking dirty on initial load
+        _setName(d.name); _setPhone(d.phone); _setAddress(d.address || "");
+        _setCuisineType(d.cuisineType); _setDescription(d.description || "");
+        _setIsActive(d.isActive); setHours(parseHours(d.openHours));
         setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
         if (d.lastPassword) setActivatedCode(d.lastPassword);
+        initialData.current = { name: d.name, phone: d.phone, address: d.address || "", cuisineType: d.cuisineType, description: d.description || "", isActive: d.isActive };
+        setDirty(false);
         setLoading(false);
       });
   }
@@ -410,6 +416,29 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
                     {activating ? "Generando..." : "Regenerar codigo"}
                   </button>
                 )}
+              </div>
+
+              {/* Assign owner email */}
+              <div className="rounded-xl border border-white/5 bg-slate-900/30 p-4 space-y-3">
+                <h3 className="text-sm font-bold text-white">Asignar dueño por email</h3>
+                <p className="text-[10px] text-slate-500">Si el email ya existe, se vincula automaticamente. Si no, se guarda y se vincula cuando se registre.</p>
+                <div className="flex gap-2">
+                  <input value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} placeholder="email@dueño.com"
+                    className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                  <button disabled={!assignEmail.includes("@")} onClick={async () => {
+                    const res = await fetch(`/api/admin/restaurants/${restaurantId}/assign`, {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ email: assignEmail.trim().toLowerCase() }),
+                    });
+                    const d = await res.json();
+                    if (res.ok) { setAssignMsg(d.message || (d.linked ? `Vinculado a ${assignEmail}` : `Guardado como pendiente`)); setAssignEmail(""); fetchData(); }
+                    else setAssignMsg(d.error || "Error");
+                    setTimeout(() => setAssignMsg(""), 5000);
+                  }} className="rounded-xl bg-primary/15 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-primary/25 disabled:opacity-30 transition-colors">
+                    Asignar
+                  </button>
+                </div>
+                {assignMsg && <p className="text-xs text-emerald-400">{assignMsg}</p>}
               </div>
 
               {/* WhatsApp message */}
