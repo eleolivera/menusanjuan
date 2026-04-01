@@ -553,9 +553,18 @@ function KanbanCardView({
   const comp = card.completeness;
   const icons = completenessIcons(comp);
 
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+
   return (
     <div
       draggable
+      onMouseDown={(e) => { dragStartPos.current = { x: e.clientX, y: e.clientY }; }}
+      onClick={(e) => {
+        if (!dragStartPos.current) return;
+        const dx = Math.abs(e.clientX - dragStartPos.current.x);
+        const dy = Math.abs(e.clientY - dragStartPos.current.y);
+        if (dx < 5 && dy < 5) onCardClick(); // Only open if not dragging
+      }}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         onDragStart();
