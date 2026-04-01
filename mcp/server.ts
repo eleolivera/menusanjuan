@@ -166,7 +166,7 @@ server.tool(
     const dealerId = cuid();
     const email = `${slug}@menusanjuan.com`;
 
-    await query('INSERT INTO "User" (id, email, password, name, phone, "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, NOW(), NOW())',
+    await query('INSERT INTO "User" (id, email, password, name, phone, "mustChangePassword", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, false, NOW(), NOW())',
       [userId, email, hashPassword("menusj2024"), args.name, args.phone || "0000000000"]);
 
     await query('INSERT INTO "Account" (id, "userId", type, "createdAt") VALUES ($1, $2, $3, NOW())',
@@ -447,6 +447,109 @@ server.tool(
     await query('UPDATE "Dealer" SET "coverUrl" = $1, "updatedAt" = NOW() WHERE slug = $2', [url, restaurant_slug]);
 
     return { content: [{ type: "text", text: `Set Google Places cover for /${restaurant_slug}: ${url}` }] };
+  }
+);
+
+// ── List onboarding cards ──
+server.tool(
+  "list_onboarding",
+  "List all onboarding cards with restaurant info, stage, completeness, and notes.",
+  {
+    stage: z.enum(["NEEDS_INFO", "READY", "QUEUED", "IN_PROGRESS", "ONBOARDED"]).optional().describe("Filter by stage"),
+  },
+  async ({ stage }) => {
+    const where = stage ? `WHERE oc.stage = '${stage}'` : "";
+    const res = await query(`
+      SELECT oc.id, oc.stage, oc."lastPassword", oc."lastContactedAt", oc."stageChangedAt",
+        d.id as "dealerId", d.name, d.slug, d.phone, d.address, d."logoUrl", d."coverUrl", d."isActive", d."isVerified",
+        u.email as "ownerEmail",
+        (SELECT count(*) FROM "MenuCategory" WHERE "dealerId" = d.id) as "categoryCount",
+        (SELECT count(*) FROM "MenuItem" mi JOIN "MenuCategory" mc ON mi."categoryId" = mc.id WHERE mc."dealerId" = d.id) as "itemCount"
+      FROM "OnboardingCard" oc
+      JOIN "Dealer" d ON oc."dealerId" = d.id
+      JOIN "Account" a ON d."accountId" = a.id
+      JOIN "User" u ON a."userId" = u.id
+      ${where}
+      ORDER BY oc.stage, d.name
+    `);
+    return { content: [{ type: "text", text: JSON.stringify(res.rows, null, 2) }] };
+  }
+);
+
+// ── Move onboarding card to a stage ──
+server.tool(
+  "move_onboarding_card",
+  "Move a restaurant's onboarding card to a new stage.",
+  {
+    dealer_slug: z.string().describe("Restaurant slug"),
+    stage: z.enum(["NEEDS_INFO", "READY", "QUEUED", "IN_PROGRESS", "ONBOARDED"]).describe("Target stage"),
+  },
+  async ({ dealer_slug, stage }) => {
+    const dealer = (await query('SELECT id FROM "Dealer" WHERE slug = $1', [dealer_slug])).rows[0];
+    if (!dealer) return { content: [{ type: "text", text: "Restaurant not found" }] };
+
+    const res = await query(`
+      UPDATE "OnboardingCard" SET stage = $1, "stageChangedAt" = NOW(), "updatedAt" = NOW()
+      WHERE "dealerId" = $2 RETURNING id, stage
+    `, [stage, dealer.id]);
+
+    if (res.rowCount === 0) return { content: [{ type: "text", text: "No onboarding card found for this restaurant" }] };
+
+    // Auto-activate if moved to ONBOARDED
+    if (stage === "ONBOARDED") {
+      await query('UPDATE "Dealer" SET "isActive" = true, "isVerified" = true, "updatedAt" = NOW() WHERE id = $1', [dealer.id]);
+    }
+
+    return { content: [{ type: "text", text: `Moved /${dealer_slug} to ${stage}` }] };
+  }
+);
+
+// ── Generate access code for restaurant owner ──
+server.tool(
+  "generate_access_code",
+  "Generate a 6-char access code for a restaurant owner. Sets mustChangePassword=true so they must set their own password on first login.",
+  {
+    dealer_slug: z.string().describe("Restaurant slug"),
+  },
+  async ({ dealer_slug }) => {
+    const dealer = (await query('SELECT d.id, d.slug, d.name, u.id as "userId", u.email FROM "Dealer" d JOIN "Account" a ON d."accountId" = a.id JOIN "User" u ON a."userId" = u.id WHERE d.slug = $1', [dealer_slug])).rows[0];
+    if (!dealer) return { content: [{ type: "text", text: "Restaurant not found" }] };
+
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+
+    await query('UPDATE "User" SET password = $1, "mustChangePassword" = true, "updatedAt" = NOW() WHERE id = $2', [hashPassword(code), dealer.userId]);
+    await query('UPDATE "Dealer" SET "isVerified" = true, "claimedAt" = NOW(), "updatedAt" = NOW() WHERE id = $1', [dealer.id]);
+    await query(`
+      INSERT INTO "OnboardingCard" (id, "dealerId", "lastPassword", "stageChangedAt", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, NOW(), NOW(), NOW())
+      ON CONFLICT ("dealerId") DO UPDATE SET "lastPassword" = $3, "updatedAt" = NOW()
+    `, [cuid(), dealer.id, code]);
+
+    return { content: [{ type: "text", text: JSON.stringify({ slug: dealer_slug, email: dealer.email, code, name: dealer.name }, null, 2) }] };
+  }
+);
+
+// ── Add onboarding note ──
+server.tool(
+  "add_onboarding_note",
+  "Add a note to a restaurant's onboarding card.",
+  {
+    dealer_slug: z.string().describe("Restaurant slug"),
+    text: z.string().describe("Note text"),
+  },
+  async ({ dealer_slug, text }) => {
+    const dealer = (await query('SELECT id FROM "Dealer" WHERE slug = $1', [dealer_slug])).rows[0];
+    if (!dealer) return { content: [{ type: "text", text: "Restaurant not found" }] };
+
+    const card = (await query('SELECT id FROM "OnboardingCard" WHERE "dealerId" = $1', [dealer.id])).rows[0];
+    if (!card) return { content: [{ type: "text", text: "No onboarding card found" }] };
+
+    const noteId = cuid();
+    await query('INSERT INTO "OnboardingNote" (id, "cardId", text, "createdAt") VALUES ($1, $2, $3, NOW())', [noteId, card.id, text]);
+
+    return { content: [{ type: "text", text: `Note added to /${dealer_slug}` }] };
   }
 );
 
