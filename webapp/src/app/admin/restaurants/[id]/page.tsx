@@ -56,6 +56,25 @@ export default function AdminRestaurantDetail() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
 
+  // Hours
+  type HoursMap = Record<string, { open: string; close: string; closed: boolean }>;
+  const DAYS = [
+    { key: "lun", label: "Lun" }, { key: "mar", label: "Mar" }, { key: "mie", label: "Mié" },
+    { key: "jue", label: "Jue" }, { key: "vie", label: "Vie" }, { key: "sab", label: "Sáb" }, { key: "dom", label: "Dom" },
+  ];
+  function parseHours(json: string | null): HoursMap {
+    if (!json) {
+      const d: HoursMap = {};
+      DAYS.forEach((day) => { d[day.key] = { open: "08:00", close: "23:00", closed: day.key === "dom" }; });
+      return d;
+    }
+    try { return JSON.parse(json); } catch { return parseHours(null); }
+  }
+  const [hours, setHours] = useState<HoursMap>(parseHours(null));
+  function updateHours(key: string, field: string, value: string | boolean) {
+    setHours((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  }
+
   // Owner assignment
   const [assignEmail, setAssignEmail] = useState("");
   const [assignMsg, setAssignMsg] = useState("");
@@ -97,7 +116,7 @@ export default function AdminRestaurantDetail() {
     setLatitude(d.latitude ?? null); setLongitude(d.longitude ?? null);
     setCuisineType(d.cuisineType); setDescription(d.description || "");
     setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
-    setIsActive(d.isActive);
+    setIsActive(d.isActive); setHours(parseHours(d.openHours));
     setRating(d.rating != null ? String(d.rating) : "");
     setDeliveryFee(d.deliveryFee != null ? String(d.deliveryFee) : "");
     setDeliveryEnabled(d.deliveryEnabled !== false);
@@ -113,7 +132,7 @@ export default function AdminRestaurantDetail() {
     await fetch(`/api/admin/restaurants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, isActive, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, deliveryCloseRadius: deliveryCloseRadius ? Number(deliveryCloseRadius) : null, deliveryClosePrice: deliveryClosePrice ? Number(deliveryClosePrice) : null, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null, deliveryFarPrice: deliveryFarPrice ? Number(deliveryFarPrice) : null }),
+      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, isActive, openHours: JSON.stringify(hours), rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, deliveryCloseRadius: deliveryCloseRadius ? Number(deliveryCloseRadius) : null, deliveryClosePrice: deliveryClosePrice ? Number(deliveryClosePrice) : null, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null, deliveryFarPrice: deliveryFarPrice ? Number(deliveryFarPrice) : null }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -457,6 +476,31 @@ Probalo y decime qué te parece!`;
             </div>
             <div><label className="block text-xs text-slate-400 mb-1">Tipo de cocina</label>
               <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setCuisineType(vals[vals.length - 1] || "")} darkMode />
+            </div>
+            {/* Hours */}
+            <div><label className="block text-xs text-slate-400 mb-2">Horarios de Atención</label>
+              <div className="space-y-1.5">
+                {DAYS.map((day) => (
+                  <div key={day.key} className="flex items-center gap-2">
+                    <span className="w-10 text-[11px] font-medium text-slate-400">{day.label}</span>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" checked={!hours[day.key]?.closed} onChange={(e) => updateHours(day.key, "closed", !e.target.checked)}
+                        className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary h-3.5 w-3.5" />
+                    </label>
+                    {!hours[day.key]?.closed ? (
+                      <div className="flex items-center gap-1.5">
+                        <input type="time" value={hours[day.key]?.open || "08:00"} onChange={(e) => updateHours(day.key, "open", e.target.value)}
+                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white focus:border-primary focus:outline-none" />
+                        <span className="text-[10px] text-slate-600">—</span>
+                        <input type="time" value={hours[day.key]?.close || "23:00"} onChange={(e) => updateHours(day.key, "close", e.target.value)}
+                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white focus:border-primary focus:outline-none" />
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-600">Cerrado</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary" /><span className="text-xs text-slate-400">Activo</span></label>
