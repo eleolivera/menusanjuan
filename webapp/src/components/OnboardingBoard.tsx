@@ -342,15 +342,23 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
 
   if (loading) {
     return (
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {STAGES.map((s) => (
-          <div key={s.key} className="min-w-[280px] flex-1 rounded-2xl border border-white/5 bg-slate-900/30 p-3">
-            <div className="h-6 w-32 rounded bg-white/5 animate-pulse mb-3" />
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 rounded-xl bg-white/5 animate-pulse mb-2" />
-            ))}
-          </div>
-        ))}
+      <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
+        <div className="mb-2 flex items-center gap-3 shrink-0">
+          <div className="h-10 w-64 rounded-xl bg-white/5 animate-pulse" />
+          <div className="h-10 w-28 rounded-xl bg-white/5 animate-pulse" />
+        </div>
+        <div className="flex gap-3 flex-1" style={{ minHeight: 0 }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex-1 rounded-2xl border border-white/5 bg-slate-900/30 p-3 flex flex-col">
+              <div className="h-5 w-28 rounded bg-white/5 animate-pulse mb-3" />
+              <div className="space-y-2 flex-1">
+                {Array.from({ length: 3 + i }, (_, j) => (
+                  <div key={j} className="h-28 rounded-xl bg-white/5 animate-pulse" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
