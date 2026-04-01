@@ -27,6 +27,25 @@ export async function POST(request: NextRequest) {
       data: { password: hashPassword(newPassword), mustChangePassword: false },
     });
 
+    // Notify admin: add note + move card to ONBOARDED
+    const firstDealer = user.accounts[0]?.dealer;
+    if (firstDealer) {
+      const card = await prisma.onboardingCard.findUnique({ where: { dealerId: firstDealer.id } });
+      if (card) {
+        await prisma.onboardingNote.create({
+          data: { cardId: card.id, text: `El dueno ingreso con el codigo y eligio su propia contraseña (${user.email})` },
+        });
+        await prisma.onboardingCard.update({
+          where: { id: card.id },
+          data: { stage: "ONBOARDED", stageChangedAt: new Date() },
+        });
+      }
+      await prisma.dealer.update({
+        where: { id: firstDealer.id },
+        data: { isActive: true, isVerified: true },
+      });
+    }
+
     return NextResponse.json({ success: true });
   }
 
@@ -74,14 +93,22 @@ export async function POST(request: NextRequest) {
     const firstDealer = user.accounts[0]?.dealer;
     await createSession(newUser.id, firstDealer?.slug || undefined);
 
-    // Add note to onboarding card
+    // Notify admin: add note + move card to ONBOARDED
     if (firstDealer) {
       const card = await prisma.onboardingCard.findUnique({ where: { dealerId: firstDealer.id } });
       if (card) {
         await prisma.onboardingNote.create({
-          data: { cardId: card.id, text: `Dueno real creado: ${name} (${email})` },
+          data: { cardId: card.id, text: `Dueno real creado: ${name} (${email}) — creo su propia cuenta` },
+        });
+        await prisma.onboardingCard.update({
+          where: { id: card.id },
+          data: { stage: "ONBOARDED", stageChangedAt: new Date() },
         });
       }
+      await prisma.dealer.update({
+        where: { id: firstDealer.id },
+        data: { isActive: true, isVerified: true },
+      });
     }
 
     return NextResponse.json({ success: true, slug: firstDealer?.slug });
