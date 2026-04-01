@@ -619,7 +619,7 @@ function KanbanCardView({
 
       {/* Common action buttons */}
       <div className="flex flex-wrap gap-1.5 mb-1">
-        <a href={`/${d.slug}`} target="_blank" className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">Ver</a>
+        <a href={`https://menusanjuan.com/${d.slug}`} target="_blank" className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">Ver</a>
         <a href={`https://www.google.com/search?q=${encodeURIComponent(d.name + " San Juan")}`} target="_blank" className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">Google</a>
 
         {/* Stage-specific */}

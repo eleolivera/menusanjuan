@@ -199,7 +199,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
             <div className="flex items-center gap-3">
               <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors text-lg">←</button>
               <div>
-                <a href={`/${data.slug}`} target="_blank" className="text-lg font-bold text-white hover:text-primary transition-colors">{data.name}</a>
+                <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="text-lg font-bold text-white hover:text-primary transition-colors">{data.name}</a>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-slate-500">/{data.slug}</span>
                   <span className="text-xs text-slate-600">·</span>
@@ -220,7 +220,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
                   {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
               )}
-              <a href={`/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Ver publica</a>
+              <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Ver publica</a>
               <a href={`https://www.google.com/search?q=${encodeURIComponent(data.name + " San Juan")}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Google</a>
             </div>
           </div>

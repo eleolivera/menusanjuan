@@ -318,7 +318,7 @@ Probalo y decime qué te parece!`;
           </div>
           <div className="flex items-center gap-2">
             {saved && <span className="text-xs text-emerald-400">Guardado</span>}
-            <a href={`/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Ver pública</a>
+            <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Ver pública</a>
           </div>
         </div>
       </header>
@@ -661,7 +661,7 @@ Probalo y decime qué te parece!`;
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-slate-400">Página</span>
-                        <a href={`/${activatedCreds.slug}`} target="_blank" className="text-sm text-primary hover:underline">menusanjuan.com/{activatedCreds.slug}</a>
+                        <a href={`https://menusanjuan.com/${activatedCreds.slug}`} target="_blank" className="text-sm text-primary hover:underline">menusanjuan.com/{activatedCreds.slug}</a>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-slate-400">Login</span>
