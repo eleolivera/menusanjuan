@@ -258,26 +258,10 @@ export default function AdminPage() {
   }
 
   const pendingClaims = claims.filter(c => c.status === "PENDING" || c.status === "CODE_SENT").length;
-  const unclaimed = restaurants.filter(r => r.isPlaceholder).length;
 
   return (
-    <div className={`bg-slate-950 ${tab === "onboarding" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
-      <div className={`mx-auto ${tab === "onboarding" ? "px-3 py-2 h-full flex flex-col" : "max-w-6xl p-6"}`}>
-        {/* Quick stats — only on non-tablero tabs */}
-        {tab !== "onboarding" && <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-          {[
-            { label: "Restaurantes", value: restaurants.length, color: "text-white" },
-            { label: "Sin reclamar", value: unclaimed, color: "text-amber-400" },
-            { label: "Con dueño", value: restaurants.length - unclaimed, color: "text-emerald-400" },
-            { label: "Reclamos pendientes", value: pendingClaims, color: "text-blue-400" },
-            { label: "Usuarios", value: users.length || "—", color: "text-slate-400" },
-          ].map((s, i) => (
-            <div key={i} className="rounded-xl border border-white/5 bg-slate-900/50 px-4 py-3">
-              <div className={`text-xl font-extrabold ${s.color}`}>{s.value}</div>
-              <div className="text-[10px] text-slate-500">{s.label}</div>
-            </div>
-          ))}
-        </div>}
+    <div className="bg-slate-950 h-screen overflow-hidden">
+      <div className="px-3 py-2 h-full flex flex-col">
 
         <div className="flex gap-2 mb-2 shrink-0">
           {[
@@ -309,7 +293,7 @@ export default function AdminPage() {
         ) : tab === "onboarding" ? (
           <OnboardingBoard />
         ) : tab === "claims" ? (
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1" style={{ minHeight: 0 }}>
             {claims.length === 0 ? <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-12 text-center"><div className="text-3xl mb-3">📋</div><h3 className="text-lg font-bold text-white">Sin reclamos</h3></div> : claims.map(c => (
               <div key={c.id} className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
                 <div className="flex justify-between mb-3">
@@ -340,7 +324,7 @@ export default function AdminPage() {
             ))}
           </div>
         ) : tab === "settings" ? (
-          <div className="space-y-6">
+          <div className="space-y-6 overflow-y-auto flex-1" style={{ minHeight: 0 }}>
             {/* Cuisine Types Manager */}
             <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
               <div className="border-b border-white/5 px-5 py-3">
@@ -419,7 +403,7 @@ export default function AdminPage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
+          <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-auto flex-1" style={{ minHeight: 0 }}>
             <div className="border-b border-white/5 px-5 py-3"><h2 className="text-sm font-bold text-white">Usuarios ({users.length})</h2></div>
             <table className="w-full">
               <thead><tr className="border-b border-white/5 text-xs text-slate-500">
