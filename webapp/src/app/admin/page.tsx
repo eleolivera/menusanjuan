@@ -102,8 +102,7 @@ export default function AdminPage() {
 
   async function handleLogout() {
     await fetch("/api/admin/session", { method: "DELETE" });
-    setAuthed(false);
-    setAdminEmail("");
+    window.location.href = "/admin?login";
   }
 
   const [fetchError, setFetchError] = useState(false);
