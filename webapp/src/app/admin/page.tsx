@@ -34,16 +34,16 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  type AdminTab = "restaurants" | "onboarding" | "claims" | "users" | "settings";
-  const validTabs: AdminTab[] = ["restaurants", "onboarding", "claims", "users", "settings"];
+  type AdminTab = "onboarding" | "claims" | "users" | "settings";
+  const validTabs: AdminTab[] = ["onboarding", "claims", "users", "settings"];
   const tabAliases: Record<string, AdminTab> = { tablero: "onboarding", reclamos: "claims", usuarios: "users", configuracion: "settings" };
 
   function getInitialTab(): AdminTab {
-    if (typeof window === "undefined") return "restaurants";
+    if (typeof window === "undefined") return "onboarding";
     const p = new URLSearchParams(window.location.search).get("tab") || "";
     if (validTabs.includes(p as AdminTab)) return p as AdminTab;
     if (tabAliases[p]) return tabAliases[p];
-    return "restaurants";
+    return "onboarding";
   }
 
   const [tab, setTabState] = useState<AdminTab>(getInitialTab);
@@ -51,7 +51,7 @@ export default function AdminPage() {
   const setTab = useCallback((t: AdminTab) => {
     setTabState(t);
     const label = t === "onboarding" ? "tablero" : t;
-    window.history.replaceState({}, "", t === "restaurants" ? "/admin" : `/admin?tab=${label}`);
+    window.history.replaceState({}, "", t === "onboarding" ? "/admin" : `/admin?tab=${label}`);
   }, []);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -113,7 +113,7 @@ export default function AdminPage() {
     if (tab === "onboarding") return;
     setLoading(true);
     setFetchError(false);
-    const endpoint = tab === "claims" ? "/api/admin/claims" : tab === "users" ? "/api/admin/users" : tab === "settings" ? "/api/admin/cuisine-types" : "/api/admin/restaurants";
+    const endpoint = tab === "claims" ? "/api/admin/claims" : tab === "users" ? "/api/admin/users" : "/api/admin/cuisine-types";
     fetch(endpoint)
       .then(r => {
         if (!r.ok) throw new Error("fetch failed");
@@ -122,8 +122,7 @@ export default function AdminPage() {
       .then(d => {
         if (tab === "claims") setClaims(d);
         else if (tab === "users") setUsers(d);
-        else if (tab === "settings") setCuisineTypes(d);
-        else setRestaurants(d);
+        else setCuisineTypes(d);
         setLoading(false);
       })
       .catch(() => { setFetchError(true); setLoading(false); });
@@ -300,7 +299,6 @@ export default function AdminPage() {
 
         <div className={`flex gap-2 ${tab === "onboarding" ? "mb-2" : "mb-6"}`}>
           {[
-            { key: "restaurants" as const, label: tab === "onboarding" ? "🍽️" : `🍽️ Restaurantes (${restaurants.length})` },
             { key: "onboarding" as const, label: tab === "onboarding" ? "📋 Tablero" : `📋 Tablero` },
             { key: "claims" as const, label: tab === "onboarding" ? "📨" : `📨 Reclamos`, badge: pendingClaims },
             { key: "users" as const, label: tab === "onboarding" ? "👥" : `👥 Usuarios` },
@@ -328,69 +326,6 @@ export default function AdminPage() {
             <p className="text-sm text-slate-400">Error cargando datos — probablemente la base de datos está lenta</p>
             <button onClick={loadTabData} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark transition-colors">Reintentar</button>
           </div>
-        ) : tab === "restaurants" ? (
-          <>
-          {/* Quick create restaurant */}
-          {showNewResta && (
-            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 mb-4 animate-fade-in">
-              <h3 className="text-sm font-bold text-white mb-3">Nuevo Restaurante</h3>
-              <div className="flex gap-3">
-                <input value={newRestaName} onChange={e => setNewRestaName(e.target.value)} placeholder="Nombre del restaurante *" className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                <input value={newRestaPhone} onChange={e => setNewRestaPhone(e.target.value)} placeholder="WhatsApp (opcional)" className="w-40 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                <button disabled={!newRestaName.trim() || creatingResta} onClick={async () => {
-                  setCreatingResta(true);
-                  const res = await fetch("/api/admin/restaurants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newRestaName.trim(), phone: newRestaPhone || "0000000000" }) });
-                  if (res.ok) { const d = await res.json(); setShowNewResta(false); setNewRestaName(""); setNewRestaPhone(""); window.location.href = `/admin/restaurants/${d.id}`; }
-                  setCreatingResta(false);
-                }} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50 shrink-0">
-                  {creatingResta ? "Creando..." : "Crear"}
-                </button>
-                <button onClick={() => setShowNewResta(false)} className="text-xs text-slate-500 hover:text-slate-300">Cancelar</button>
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
-            <div className="border-b border-white/5 px-5 py-3 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-bold text-white shrink-0">Restaurantes</h2>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, slug, dueño..." className="flex-1 max-w-xs rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-              <button onClick={() => setShowNewResta(true)} className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors">+ Nuevo</button>
-            </div>
-            <table className="w-full">
-              <thead><tr className="border-b border-white/5 text-xs text-slate-500">
-                <th className="px-4 py-2.5 text-left">Restaurante</th>
-                <th className="px-4 py-2.5 text-left">Dueño</th>
-                <th className="px-4 py-2.5 text-center">Estado</th>
-                <th className="px-4 py-2.5 text-center">Menú</th>
-                <th className="px-4 py-2.5 text-center">Pedidos</th>
-                <th className="px-4 py-2.5 text-right">Acciones</th>
-              </tr></thead>
-              <tbody>
-                {restaurants.filter(r => !search || flexMatch(r.name, search) || flexMatch(r.slug, search) || flexMatch(r.ownerEmail, search) || flexMatch(r.cuisineType, search)).map(r => (
-                  <tr key={r.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 cursor-pointer" onClick={() => window.location.href = `/admin/restaurants/${r.id}`}>
-                    <td className="px-4 py-3"><div className="text-sm font-semibold text-white hover:text-primary">{r.name}</div><div className="text-[11px] text-slate-500">/{r.slug}</div></td>
-                    <td className="px-4 py-3"><div className="text-xs text-white">{r.ownerEmail}</div>{r.isPlaceholder && <span className="text-[10px] text-amber-400">Sin reclamar</span>}</td>
-                    <td className="px-4 py-3 text-center">{r.isVerified ? <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">Verificado</span> : r.isPlaceholder ? <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400">Disponible</span> : <span className="rounded-md bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-400">Registrado</span>}</td>
-                    <td className="px-4 py-3 text-center text-xs text-slate-400">{r.categoryCount}</td>
-                    <td className="px-4 py-3 text-center text-xs text-slate-400">{r.orderCount}</td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => toggleRestaurant(r.id, r.isActive)}
-                          className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${r.isActive ? "bg-emerald-500/15 text-emerald-400 hover:bg-red-500/15 hover:text-red-400" : "bg-slate-500/15 text-slate-400 hover:bg-emerald-500/15 hover:text-emerald-400"}`}>
-                          {r.isActive ? "Desactivar" : "Activar"}
-                        </button>
-                        <button onClick={() => deleteRestaurant(r.id, r.name)}
-                          className="rounded-md px-2 py-1 text-[10px] font-medium text-slate-600 hover:bg-red-500/15 hover:text-red-400 transition-colors">
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
         ) : tab === "onboarding" ? (
           <OnboardingBoard />
         ) : tab === "claims" ? (

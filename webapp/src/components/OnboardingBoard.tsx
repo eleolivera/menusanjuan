@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { RestaurantModal } from "@/components/RestaurantModal";
 
 // ─── Types ───
 
@@ -104,6 +105,8 @@ export function OnboardingBoard() {
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [modalRestaurantId, setModalRestaurantId] = useState<string | null>(null);
+  const [modalKanbanStage, setModalKanbanStage] = useState<OnboardingStage | null>(null);
 
   const fetchCards = useCallback(async () => {
     const res = await fetch("/api/admin/onboarding");
@@ -420,6 +423,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
                     key={card.id}
                     card={card}
                     expanded={expandedCard === card.id}
+                    onCardClick={() => { setModalRestaurantId(card.dealer.id); setModalKanbanStage(card.stage); }}
                     onToggleExpand={() => setExpandedCard(expandedCard === card.id ? null : card.id)}
                     onDragStart={() => handleDragStart(card.id)}
                     noteText={expandedCard === card.id ? noteText : ""}
@@ -479,6 +483,26 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
           </div>
         </div>
       )}
+
+      {/* Restaurant detail modal */}
+      {modalRestaurantId && (
+        <RestaurantModal
+          restaurantId={modalRestaurantId}
+          kanbanStage={modalKanbanStage || undefined}
+          onClose={() => { setModalRestaurantId(null); setModalKanbanStage(null); fetchCards(); }}
+          onStageChange={async (stage) => {
+            const card = cards.find((c) => c.dealer.id === modalRestaurantId);
+            if (!card) return;
+            setCards((prev) => prev.map((c) => c.dealer.id === modalRestaurantId ? { ...c, stage } : c));
+            setModalKanbanStage(stage);
+            await fetch("/api/admin/onboarding", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cardId: card.id, stage }),
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -499,6 +523,7 @@ function KanbanCardView({
   onActivate,
   onResetCode,
   onWhatsApp,
+  onCardClick,
   activating,
   creds,
   savingNote,
@@ -506,6 +531,7 @@ function KanbanCardView({
 }: {
   card: Card;
   expanded: boolean;
+  onCardClick: () => void;
   onToggleExpand: () => void;
   onDragStart: () => void;
   noteText: string;
@@ -546,7 +572,7 @@ function KanbanCardView({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <a href={`/admin/restaurants/${d.id}`} target="_blank" className="text-sm font-semibold text-white truncate hover:text-primary transition-colors block">{d.name}</a>
+          <button onClick={onCardClick} className="text-sm font-semibold text-white truncate hover:text-primary transition-colors block text-left">{d.name}</button>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="text-[10px] text-slate-500">{d.slug}</span>
             {d.isPlaceholder && (
@@ -582,30 +608,21 @@ function KanbanCardView({
         <span>{d.orderCount} pedidos</span>
       </div>
 
-      {/* Stage-specific action buttons */}
+      {/* Common action buttons */}
       <div className="flex flex-wrap gap-1.5 mb-1">
+        <a href={`/${d.slug}`} target="_blank" className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">Ver</a>
+        <a href={`https://www.google.com/search?q=${encodeURIComponent(d.name + " San Juan")}`} target="_blank" className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">Google</a>
+
+        {/* Stage-specific */}
         {card.stage === "NEEDS_INFO" && (
-          <>
-            <a href={`/admin/restaurants/${d.id}`} target="_blank" className="rounded-lg bg-amber-400/10 px-2 py-1 text-[10px] font-medium text-amber-400 hover:bg-amber-400/20 transition-colors">
-              Editar info
-            </a>
-            <a href={`/${d.slug}`} target="_blank" className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">
-              Ver página
-            </a>
-            <a href={`/admin/restaurants/${d.id}#menu`} target="_blank" className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">
-              Ver menú
-            </a>
-          </>
+          <button onClick={onCardClick} className="rounded-lg bg-amber-400/10 px-2 py-1 text-[10px] font-medium text-amber-400 hover:bg-amber-400/20 transition-colors">
+            Editar
+          </button>
         )}
         {card.stage === "READY" && (
-          <>
-            <a href={`/${d.slug}`} target="_blank" className="rounded-lg bg-blue-400/10 px-2 py-1 text-[10px] font-medium text-blue-400 hover:bg-blue-400/20 transition-colors">
-              Ver página
-            </a>
-            <a href={`/admin/restaurants/${d.id}`} target="_blank" className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">
-              Revisar
-            </a>
-          </>
+          <button onClick={onCardClick} className="rounded-lg bg-blue-400/10 px-2 py-1 text-[10px] font-medium text-blue-400 hover:bg-blue-400/20 transition-colors">
+            Revisar
+          </button>
         )}
         {card.stage === "QUEUED" && (
           <>
@@ -651,9 +668,6 @@ function KanbanCardView({
         )}
         {card.stage === "ONBOARDED" && (
           <>
-            <a href={`/${d.slug}`} target="_blank" className="rounded-lg bg-emerald-400/10 px-2 py-1 text-[10px] font-medium text-emerald-400 hover:bg-emerald-400/20 transition-colors">
-              Ver pagina
-            </a>
             <button onClick={onResetCode} disabled={activating} className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">
               {activating ? "..." : "Resetear codigo"}
             </button>
