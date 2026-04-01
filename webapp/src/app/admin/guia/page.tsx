@@ -28,7 +28,7 @@ export default function AdminGuide() {
         <Section title="Links Rápidos" emoji="🔗" number={0}>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: "Admin Panel", href: "/admin?login" },
+              { label: "Admin Panel", href: "/admin" },
               { label: "Registrar Restaurante", href: "/restaurante/register" },
               { label: "Login Restaurante", href: "/restaurante/login" },
               { label: "Página Marketing", href: "/para-restaurantes" },
@@ -44,7 +44,7 @@ export default function AdminGuide() {
 
         <Section title="Agregar un Restaurante (Admin)" emoji="➕" number={1}>
           <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700">
-            <li>Ir a <a href="/admin?login" target="_blank" className="text-primary underline">Admin Panel</a></li>
+            <li>Ir a <a href="/admin" target="_blank" className="text-primary underline">Admin Panel</a></li>
             <li>Click el botón <strong>+ Nuevo</strong> arriba a la derecha de la tabla. Poné nombre y WhatsApp. Te lleva directo a la página del restaurante para completar todo.</li>
             <li>Completá: nombre, teléfono, dirección, tipo de cocina, descripción</li>
             <li>En la pestaña <strong>Menú</strong>: creá categorías y agregá items con precios</li>

@@ -217,7 +217,7 @@ Muchos restaurantes lo usan para pedidos directos + PedidosYa para delivery. As�
           <div className="space-y-4">
             <Step n={1} title="Conseguir el menú" desc="Pedí una foto del menú por WhatsApp, o sacale foto en persona. Si tienen menú en redes, descargalo de ahí." />
             <Step n={2} title="Subir el restaurante" desc="En el admin, click '+ Nuevo' para crear el restaurante. Completá nombre y WhatsApp. Te lleva directo a editar los detalles." />
-            <Step n={3} title="Revisar en admin" desc="Entrá a menusanjuan.com/admin?login → click en el restaurante → revisá nombre, menú, precios. Ajustá lo que haga falta." />
+            <Step n={3} title="Revisar en admin" desc="Entrá a menusanjuan.com/admin → click en el restaurante → revisá nombre, menú, precios. Ajustá lo que haga falta." />
             <Step n={4} title="Activar" desc="En el admin, click 'Activar'. El restaurante aparece en el marketplace." />
             <Step n={5} title="Activar al dueño" desc="En el admin → Dueño → toggle 'Cuenta Habilitada' → se generan credenciales → usá el botón 'Enviar por WhatsApp' para mandarle todo al dueño" />
             <Step n={6} title="Enviar el link" desc="Mandá el mensaje 'Cuando la página está lista' (arriba) con el link de su página." />
@@ -274,7 +274,7 @@ Muchos restaurantes lo usan para pedidos directos + PedidosYa para delivery. As�
         <Section title="Links Útiles" emoji="🔗" number={0}>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: "Admin Panel", href: "/admin?login" },
+              { label: "Admin Panel", href: "/admin" },
               { label: "Guía Técnica", href: "/admin/guia" },
               { label: "Crear Cuenta (demo)", href: "/restaurante/register" },
               { label: "Login Restaurante", href: "/restaurante/login" },

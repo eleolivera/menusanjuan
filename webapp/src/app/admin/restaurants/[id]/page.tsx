@@ -109,7 +109,7 @@ export default function AdminRestaurantDetail() {
 
   async function fetchData() {
     const res = await fetch(`/api/admin/restaurants/${id}`);
-    if (!res.ok) { router.push("/admin?login"); return; }
+    if (!res.ok) { router.push("/admin"); return; }
     const d = await res.json();
     setData(d);
     setName(d.name); setPhone(d.phone); setAddress(d.address || "");
@@ -308,7 +308,7 @@ Probalo y decime qué te parece!`;
       <header className="border-b border-white/5 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.push("/admin?login")} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
+            <button onClick={() => router.push("/admin")} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
             </button>
             <div>

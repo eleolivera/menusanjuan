@@ -93,9 +93,6 @@ export function Footer() {
             &copy; {new Date().getFullYear()} MenuSanJuan. Todos los derechos
             reservados.
           </p>
-          <Link href="/admin?login" className="text-[10px] text-text-muted/30 hover:text-text-muted transition-colors py-2 px-2">
-            admin
-          </Link>
         </div>
       </div>
     </footer>

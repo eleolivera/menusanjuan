@@ -102,7 +102,7 @@ export default function AdminPage() {
 
   async function handleLogout() {
     await fetch("/api/admin/session", { method: "DELETE" });
-    window.location.href = "/admin?login";
+    window.location.href = "/admin";
   }
 
   const [fetchError, setFetchError] = useState(false);
@@ -165,20 +165,8 @@ export default function AdminPage() {
   // Still checking session
   if (checking) return <div className="min-h-screen bg-slate-950" />;
 
-  // Not authed — show nothing unless ?login is in URL
+  // Not authed — show login form
   if (!authed) {
-    if (typeof window !== "undefined" && !window.location.search.includes("login")) {
-      return (
-        <div className="min-h-screen mesh-gradient flex flex-1 items-center justify-center px-4 py-20">
-          <div className="text-center animate-fade-in">
-            <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/5 to-orange-50 text-5xl">🍽️</div>
-            <h1 className="text-4xl font-extrabold text-text tracking-tight mb-3">404</h1>
-            <p className="text-lg text-text-secondary mb-8">Esta página no existe o fue movida.</p>
-            <a href="/" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-all">Volver al Inicio</a>
-          </div>
-        </div>
-      );
-    }
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <div className="w-full max-w-sm rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-3">
