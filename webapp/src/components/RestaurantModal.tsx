@@ -55,14 +55,21 @@ export function RestaurantModal({
   const [tab, setTab] = useState<"info" | "menu" | "owner">("info");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  // Editable fields
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [cuisineType, setCuisineType] = useState("");
-  const [description, setDescription] = useState("");
-  const [isActive, setIsActive] = useState(true);
+  // Editable fields — wrap setters to track dirty state
+  const [name, _setName] = useState("");
+  const [phone, _setPhone] = useState("");
+  const [address, _setAddress] = useState("");
+  const [cuisineType, _setCuisineType] = useState("");
+  const [description, _setDescription] = useState("");
+  const [isActive, _setIsActive] = useState(true);
+  const setName = (v: string) => { _setName(v); setDirty(true); };
+  const setPhone = (v: string) => { _setPhone(v); setDirty(true); };
+  const setAddress = (v: string) => { _setAddress(v); setDirty(true); };
+  const setCuisineType = (v: string) => { _setCuisineType(v); setDirty(true); };
+  const setDescription = (v: string) => { _setDescription(v); setDirty(true); };
+  const setIsActive = (v: boolean) => { _setIsActive(v); setDirty(true); };
   const [hours, setHours] = useState<HoursMap>(parseHours(null));
   const [logoUrl, setLogoUrl] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
@@ -74,7 +81,7 @@ export function RestaurantModal({
   const [whatsAppMsg, setWhatsAppMsg] = useState("");
 
   function updateHours(key: string, field: string, value: string | boolean) {
-    setHours((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+    setHours((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } })); setDirty(true);
   }
 
   function fetchData() {
@@ -123,7 +130,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, phone, address, cuisineType, description, isActive, logoUrl, coverUrl, openHours: JSON.stringify(hours) }),
     });
-    setSaving(false); setSaved(true);
+    setSaving(false); setSaved(true); setDirty(false);
     setTimeout(() => setSaved(false), 2000);
     fetchData();
   }
@@ -191,13 +198,16 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
   const menuItemCount = data.categories.reduce((s, c) => s + c.items.length, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="ml-auto w-full max-w-4xl bg-slate-950 border-l border-white/10 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => {
+      if (dirty && !confirm("Tenes cambios sin guardar. ¿Seguro que queres salir?")) return;
+      onClose();
+    }}>
+      <div className="w-full max-w-4xl h-[90vh] bg-slate-950 rounded-2xl border border-white/10 overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur border-b border-white/5 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors text-lg">←</button>
+              <button onClick={() => { if (dirty && !confirm("Tenes cambios sin guardar. ¿Seguro que queres salir?")) return; onClose(); }} className="text-slate-500 hover:text-white transition-colors text-lg">←</button>
               <div>
                 <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="text-lg font-bold text-white hover:text-primary transition-colors">{data.name}</a>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -250,7 +260,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1" style={{ minHeight: 0 }}>
           {/* ─── Info tab ─── */}
           {tab === "info" && (
             <div className="space-y-4">
@@ -333,11 +343,6 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
                 </label>
               </div>
 
-              <div className="flex gap-2">
-                <button onClick={handleSave} disabled={saving} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50">
-                  {saving ? "Guardando..." : saved ? "Guardado ✓" : "Guardar"}
-                </button>
-              </div>
             </div>
           )}
 
@@ -420,6 +425,20 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
             </div>
           )}
         </div>
+
+        {/* Sticky save bar */}
+        {tab === "info" && (
+          <div className="shrink-0 border-t border-white/5 bg-slate-950/95 backdrop-blur px-6 py-3 flex items-center justify-between">
+            {dirty ? (
+              <span className="text-xs text-amber-400">Cambios sin guardar</span>
+            ) : (
+              <span className="text-xs text-slate-600">Sin cambios</span>
+            )}
+            <button onClick={handleSave} disabled={saving || !dirty} className={`rounded-xl px-6 py-2.5 text-sm font-semibold transition-all ${dirty ? "bg-primary text-white hover:bg-primary-dark" : "bg-white/5 text-slate-600"} disabled:opacity-50`}>
+              {saving ? "Guardando..." : saved ? "Guardado ✓" : "Guardar"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
