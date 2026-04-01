@@ -56,7 +56,12 @@ export default function RestauranteLoginPage() {
         return;
       }
 
-      window.location.href = "/restaurante";
+      const data = await res.json();
+      if (data.mustChangePassword) {
+        window.location.href = "/restaurante/setup";
+      } else {
+        window.location.href = "/restaurante";
+      }
     } catch {
       setError("Error de conexión");
     } finally {

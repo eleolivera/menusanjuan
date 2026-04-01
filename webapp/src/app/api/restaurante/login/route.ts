@@ -10,13 +10,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Ingresá email y contraseña" }, { status: 400 });
     }
 
-    const slug = await loginWithEmail(email, password);
+    const result = await loginWithEmail(email, password);
 
-    if (!slug) {
+    if (!result) {
       return NextResponse.json({ error: "Email o contraseña incorrectos" }, { status: 401 });
     }
 
-    return NextResponse.json({ success: true, slug });
+    return NextResponse.json({ success: true, slug: result.slug, mustChangePassword: result.mustChangePassword });
   } catch (err: any) {
     console.error("Login error:", err.message);
     return NextResponse.json({ error: "Error del servidor. Intentá de nuevo." }, { status: 500 });

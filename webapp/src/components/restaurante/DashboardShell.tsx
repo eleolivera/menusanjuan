@@ -16,7 +16,7 @@ const USAGE_THRESHOLD = 15; // Total clicks before sorting kicks in
 const WELCOME_KEY = "msj_welcome_seen";
 
 // Pages that should NOT show the sidebar
-const AUTH_PATHS = ["/restaurante/login", "/restaurante/register", "/restaurante/reset-password"];
+const AUTH_PATHS = ["/restaurante/login", "/restaurante/register", "/restaurante/reset-password", "/restaurante/setup"];
 
 function getUsage(): Record<string, number> {
   try { return JSON.parse(localStorage.getItem(USAGE_KEY) || "{}"); } catch { return {}; }
@@ -68,6 +68,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         return r.json();
       })
       .then((data) => {
+        if (data.authenticated && data.mustChangePassword) {
+          router.push("/restaurante/setup");
+          return;
+        }
         if (data.authenticated && data.slug) {
           setSlug(data.slug);
           setRestaurantName(data.name || data.slug);

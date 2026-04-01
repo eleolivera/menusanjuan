@@ -127,6 +127,7 @@ export async function getFullSession() {
       name: user.name,
       phone: user.phone,
       role: user.role,
+      mustChangePassword: user.mustChangePassword,
     },
     restaurants,
     activeRestaurant: activeRestaurant || null,
@@ -158,8 +159,8 @@ export async function destroyRestauranteSession() {
   cookieStore.delete(COOKIE_NAME);
 }
 
-// Login with email + password — returns userId
-export async function loginWithEmail(email: string, password: string): Promise<string | null> {
+// Login with email + password
+export async function loginWithEmail(email: string, password: string): Promise<{ slug: string; mustChangePassword: boolean } | null> {
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
@@ -176,5 +177,5 @@ export async function loginWithEmail(email: string, password: string): Promise<s
   const firstDealer = user.accounts[0]?.dealer;
   await createSession(user.id, firstDealer?.slug || undefined);
 
-  return firstDealer?.slug || user.id;
+  return { slug: firstDealer?.slug || user.id, mustChangePassword: user.mustChangePassword };
 }

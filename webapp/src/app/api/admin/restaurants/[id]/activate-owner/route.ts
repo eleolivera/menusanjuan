@@ -3,14 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/admin-auth";
 import { hashPassword } from "@/lib/restaurante-auth";
 
-function generatePassword(): string {
-  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
-  let pwd = "";
-  for (let i = 0; i < 8; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
-  return pwd;
+function generateCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No O/0/I/1
+  let code = "";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
 }
 
-// POST — enable placeholder owner (generate credentials, mark verified)
+// POST — enable placeholder owner (generate code, mark verified)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -30,36 +30,29 @@ export async function POST(
     return NextResponse.json({ error: "Este restaurante ya tiene un dueño real" }, { status: 400 });
   }
 
-  // Generate a readable password
-  const plainPassword = generatePassword();
-  const hashedPassword = hashPassword(plainPassword);
+  const code = generateCode();
+  const hashedPassword = hashPassword(code);
 
-  // Update the user password
   await prisma.user.update({
     where: { id: user.id },
-    data: { password: hashedPassword },
+    data: { password: hashedPassword, mustChangePassword: true },
   });
 
-  // Mark restaurant as verified/claimed
   await prisma.dealer.update({
     where: { id },
-    data: {
-      isVerified: true,
-      claimedAt: new Date(),
-    },
+    data: { isVerified: true, claimedAt: new Date() },
   });
 
-  // Store plain password on onboarding card for admin reference
   await prisma.onboardingCard.upsert({
     where: { dealerId: id },
-    update: { lastPassword: plainPassword },
-    create: { dealerId: id, lastPassword: plainPassword },
+    update: { lastPassword: code },
+    create: { dealerId: id, lastPassword: code },
   });
 
   return NextResponse.json({
     success: true,
     email: user.email,
-    password: plainPassword,
+    code,
     slug: dealer.slug,
     name: dealer.name,
   });
@@ -79,17 +72,13 @@ export async function DELETE(
   });
   if (!dealer) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
-  // Only allow disabling placeholder accounts
   if (!dealer.account.user.email.endsWith("@menusanjuan.com")) {
     return NextResponse.json({ error: "Solo se pueden desactivar cuentas placeholder" }, { status: 400 });
   }
 
   await prisma.dealer.update({
     where: { id },
-    data: {
-      isVerified: false,
-      claimedAt: null,
-    },
+    data: { isVerified: false, claimedAt: null },
   });
 
   return NextResponse.json({ success: true });

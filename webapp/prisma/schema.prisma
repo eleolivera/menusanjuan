@@ -20,6 +20,7 @@ model User {
   verifyCode    String?                      // 6-digit email verification code
   resetCode     String?                      // 6-digit password reset code
   resetExpires  DateTime?                    // Reset code expiry
+  mustChangePassword Boolean @default(false) // Force password change on next login
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

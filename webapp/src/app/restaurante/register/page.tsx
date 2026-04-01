@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PhoneInput } from "@/components/PhoneInput";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
@@ -18,8 +18,13 @@ type UnclaimedRestaurant = {
   categoryCount: number;
 };
 
-export default function RegisterPage() {
+export default function RegisterPageWrapper() {
+  return <Suspense><RegisterPage /></Suspense>;
+}
+
+function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   // Steps:
   // 1 = pick from list or "create new"
   // 2 = account (name, email, password)
@@ -60,6 +65,15 @@ export default function RegisterPage() {
       fetch("/api/restaurante/unclaimed").then((r) => r.json()).catch(() => []),
     ]).then(([session, unclaimedData]) => {
       setUnclaimed(unclaimedData || []);
+      // Pre-select restaurant from ?claim= param
+      const claimId = searchParams.get("claim");
+      if (claimId && unclaimedData) {
+        const match = unclaimedData.find((r: UnclaimedRestaurant) => r.id === claimId);
+        if (match) {
+          setSelectedClaim(match);
+          setMode("claim");
+        }
+      }
       if (session?.authenticated) {
         setIsLoggedIn(true);
         setEmail(session.user.email);

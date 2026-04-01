@@ -32,6 +32,7 @@ export async function GET() {
       logoUrl: session.activeRestaurant?.logoUrl,
       coverUrl: session.activeRestaurant?.coverUrl,
       email: session.user.email,
+      mustChangePassword: session.user.mustChangePassword,
     });
   } catch (err: any) {
     console.error("Session error:", err.message);

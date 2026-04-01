@@ -248,9 +248,9 @@ export function OnboardingBoard() {
     }
     if (res.ok) {
       const creds = await res.json();
-      setCardCreds((prev) => ({ ...prev, [card.id]: { email: creds.email, password: creds.password } }));
+      setCardCreds((prev) => ({ ...prev, [card.id]: { email: creds.email, password: creds.code } }));
       // Save creds as a note for future reference
-      const credsNote = `Credenciales generadas:\nEmail: ${creds.email}\nClave: ${creds.password}`;
+      const credsNote = `Codigo generado:\nEmail: ${creds.email}\nCodigo: ${creds.code}`;
       fetch("/api/admin/onboarding/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -273,7 +273,7 @@ export function OnboardingBoard() {
     const creds = cardCreds[card.id];
     const d = card.dealer;
     const email = creds?.email || d.ownerEmail;
-    const password = creds?.password || card.lastPassword || "(sin generar)";
+    const code = creds?.password || card.lastPassword || "(sin generar)";
     return `Hola! Soy de MenuSanJuan.com
 
 Te creamos una pagina gratuita para *${d.name}* donde tus clientes pueden ver el menu completo con precios y hacer pedidos directo por WhatsApp. Sin intermediarios, sin comisiones — a diferencia de otras apps que se quedan con un porcentaje de cada venta, con nosotros todo lo que vendes es tuyo.
@@ -281,14 +281,26 @@ Te creamos una pagina gratuita para *${d.name}* donde tus clientes pueden ver el
 Ya esta armada con tu menu cargado:
 ${d.name}: menusanjuan.com/${d.slug}
 
-Para editar tu menu, horarios, y ver pedidos entra aca:
+Para entrar a tu panel y gestionar todo:
 menusanjuan.com/restaurante/login
 Email: ${email}
-Clave: ${password}
+Codigo de acceso: ${code}
+
+La primera vez que entres te va a pedir que elijas tu propia contraseña.
 
 Si tenes la carta actualizada con los precios de hoy, mandamela asi la actualizamos rapido.
 
 Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. Estamos para hacerte las cosas faciles!`;
+  }
+
+  async function resetCode(card: Card) {
+    setActivatingCard(card.id);
+    const res = await fetch(`/api/admin/restaurants/${card.dealer.id}/reset-code`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setCardCreds((prev) => ({ ...prev, [card.id]: { email: data.email, password: data.code } }));
+    }
+    setActivatingCard(null);
   }
 
   function openWhatsApp(card: Card) {
@@ -417,6 +429,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
                     onPaste={(e) => handlePaste(e, card.id)}
                     onImageUpload={(e) => handleImageUpload(e, card.id)}
                     onActivate={() => activateAndMove(card)}
+                    onResetCode={() => resetCode(card)}
                     onWhatsApp={() => openWhatsApp(card)}
                     activating={activatingCard === card.id}
                     creds={cardCreds[card.id] || (card.lastPassword ? { email: card.dealer.ownerEmail, password: card.lastPassword } : undefined)}
@@ -484,6 +497,7 @@ function KanbanCardView({
   onPaste,
   onImageUpload,
   onActivate,
+  onResetCode,
   onWhatsApp,
   activating,
   creds,
@@ -501,6 +515,7 @@ function KanbanCardView({
   onPaste: (e: React.ClipboardEvent) => void;
   onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onActivate: () => void;
+  onResetCode: () => void;
   onWhatsApp: () => void;
   activating: boolean;
   creds?: { email: string; password: string };
@@ -619,23 +634,29 @@ function KanbanCardView({
               <div className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 p-2 space-y-0.5">
                 <p className="text-[10px] text-slate-400 font-medium">Credenciales:</p>
                 <p className="text-[10px] text-slate-300">Email: {creds.email}</p>
-                <p className="text-[10px] text-white font-mono font-bold">Clave: {creds.password}</p>
+                <p className="text-[10px] text-white font-mono font-bold">Codigo: {creds.password}</p>
               </div>
             ) : (
               <button onClick={onActivate} disabled={activating} className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">
                 {activating ? "Generando..." : "Regenerar credenciales"}
               </button>
             )}
+            <button onClick={onResetCode} disabled={activating} className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">
+              {activating ? "..." : "Resetear codigo"}
+            </button>
             {card.lastContactedAt && (
-              <span className="text-[10px] text-slate-600 py-1">Último contacto: {timeAgo(card.lastContactedAt)}</span>
+              <span className="text-[10px] text-slate-600 py-1">Ultimo contacto: {timeAgo(card.lastContactedAt)}</span>
             )}
           </>
         )}
         {card.stage === "ONBOARDED" && (
           <>
             <a href={`/${d.slug}`} target="_blank" className="rounded-lg bg-emerald-400/10 px-2 py-1 text-[10px] font-medium text-emerald-400 hover:bg-emerald-400/20 transition-colors">
-              Ver página
+              Ver pagina
             </a>
+            <button onClick={onResetCode} disabled={activating} className="rounded-lg bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-white/10 transition-colors">
+              {activating ? "..." : "Resetear codigo"}
+            </button>
             <span className="text-[10px] py-1">
               {d.isActive ? <span className="text-emerald-400">Activo</span> : <span className="text-red-400">Inactivo</span>}
               {d.isVerified && <span className="text-blue-400 ml-1">✓</span>}
