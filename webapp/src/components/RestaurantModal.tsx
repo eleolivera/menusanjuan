@@ -222,6 +222,19 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
               )}
               <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Ver publica</a>
               <a href={`https://www.google.com/search?q=${encodeURIComponent(data.name + " San Juan")}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Google</a>
+              {data.phone && data.phone !== "0000000000" && (
+                <button onClick={openWhatsApp} className="rounded-lg bg-[#25D366]/15 px-3 py-1.5 text-xs font-medium text-[#25D366] hover:bg-[#25D366]/25 transition-colors">WhatsApp</button>
+              )}
+              {data.isPlaceholder && !data.isVerified && (
+                <button onClick={handleActivate} disabled={activating} className="rounded-lg bg-purple-400/15 px-3 py-1.5 text-xs font-medium text-purple-400 hover:bg-purple-400/25 disabled:opacity-50 transition-colors">
+                  {activating ? "..." : "Activar"}
+                </button>
+              )}
+              {(data.isVerified || activatedCode) && (
+                <button onClick={handleResetCode} disabled={activating} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 disabled:opacity-50 transition-colors">
+                  {activating ? "..." : "Resetear codigo"}
+                </button>
+              )}
             </div>
           </div>
 

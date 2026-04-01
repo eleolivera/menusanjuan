@@ -561,9 +561,12 @@ function KanbanCardView({
       onMouseDown={(e) => { dragStartPos.current = { x: e.clientX, y: e.clientY }; }}
       onClick={(e) => {
         if (!dragStartPos.current) return;
+        // Don't open modal when clicking buttons, links, inputs, or textareas
+        const tag = (e.target as HTMLElement).closest("button, a, input, textarea, select, [data-no-modal]");
+        if (tag) return;
         const dx = Math.abs(e.clientX - dragStartPos.current.x);
         const dy = Math.abs(e.clientY - dragStartPos.current.y);
-        if (dx < 5 && dy < 5) onCardClick(); // Only open if not dragging
+        if (dx < 5 && dy < 5) onCardClick();
       }}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
