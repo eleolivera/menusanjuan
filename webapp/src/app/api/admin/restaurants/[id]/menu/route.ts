@@ -48,7 +48,32 @@ export async function POST(
     return NextResponse.json(item, { status: 201 });
   }
 
-  return NextResponse.json({ error: "type must be 'category' or 'item'" }, { status: 400 });
+  if (body.type === "option-group") {
+    const maxSort = await prisma.optionGroup.aggregate({
+      where: { menuItemId: body.menuItemId },
+      _max: { sortOrder: true },
+    });
+    const group = await prisma.optionGroup.create({
+      data: {
+        menuItemId: body.menuItemId,
+        title: body.title,
+        minSelections: body.minSelections ?? 0,
+        maxSelections: body.maxSelections ?? 1,
+        sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+        options: {
+          create: (body.options || []).map((o: any, i: number) => ({
+            name: o.name,
+            priceDelta: o.priceDelta ?? 0,
+            sortOrder: i,
+          })),
+        },
+      },
+      include: { options: { orderBy: { sortOrder: "asc" } } },
+    });
+    return NextResponse.json(group, { status: 201 });
+  }
+
+  return NextResponse.json({ error: "type must be 'category', 'item', or 'option-group'" }, { status: 400 });
 }
 
 // PATCH — update category or item
@@ -87,6 +112,24 @@ export async function PATCH(
     return NextResponse.json(updated);
   }
 
+  if (body.type === "option-group" && body.id) {
+    const updateData: any = {};
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.minSelections !== undefined) updateData.minSelections = body.minSelections;
+    if (body.maxSelections !== undefined) updateData.maxSelections = body.maxSelections;
+    await prisma.optionGroup.update({ where: { id: body.id }, data: updateData });
+    if (body.options) {
+      await prisma.optionChoice.deleteMany({ where: { optionGroupId: body.id } });
+      await prisma.optionChoice.createMany({
+        data: body.options.map((o: any, i: number) => ({
+          optionGroupId: body.id, name: o.name, priceDelta: o.priceDelta ?? 0, available: o.available ?? true, sortOrder: i,
+        })),
+      });
+    }
+    const result = await prisma.optionGroup.findUnique({ where: { id: body.id }, include: { options: { orderBy: { sortOrder: "asc" } } } });
+    return NextResponse.json(result);
+  }
+
   return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 }
 
@@ -106,6 +149,8 @@ export async function DELETE(
     await prisma.menuCategory.delete({ where: { id: targetId } });
   } else if (type === "item") {
     await prisma.menuItem.delete({ where: { id: targetId } });
+  } else if (type === "option-group") {
+    await prisma.optionGroup.delete({ where: { id: targetId } });
   }
 
   return NextResponse.json({ success: true });

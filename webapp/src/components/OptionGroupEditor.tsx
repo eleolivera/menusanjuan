@@ -7,10 +7,11 @@ type Props = {
   menuItemId: string;
   groups: OptionGroupData[];
   onUpdate: () => void;
-  apiBase?: string; // "/api/restaurante/menu/items/option-groups" or admin equivalent
+  apiBase?: string;
+  useAdminApi?: boolean; // When true, uses admin menu API pattern (type: "option-group")
 };
 
-export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/api/restaurante/menu/items/option-groups" }: Props) {
+export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/api/restaurante/menu/items/option-groups", useAdminApi }: Props) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -45,11 +46,11 @@ export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/ap
     const opts = newOptions.filter((o) => o.name.trim());
     if (!newTitle.trim() || opts.length === 0) return;
     setSaving(true);
-    await fetch(apiBase, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ menuItemId, title: newTitle.trim(), minSelections: newMin, maxSelections: newMax, options: opts }),
-    });
+    if (useAdminApi) {
+      await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "option-group", menuItemId, title: newTitle.trim(), minSelections: newMin, maxSelections: newMax, options: opts }) });
+    } else {
+      await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ menuItemId, title: newTitle.trim(), minSelections: newMin, maxSelections: newMax, options: opts }) });
+    }
     setSaving(false);
     resetNew();
     onUpdate();
@@ -59,11 +60,11 @@ export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/ap
     if (!editingId) return;
     const opts = editOptions.filter((o) => o.name.trim());
     setSaving(true);
-    await fetch(apiBase, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editingId, title: editTitle.trim(), minSelections: editMin, maxSelections: editMax, options: opts }),
-    });
+    if (useAdminApi) {
+      await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "option-group", id: editingId, title: editTitle.trim(), minSelections: editMin, maxSelections: editMax, options: opts }) });
+    } else {
+      await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingId, title: editTitle.trim(), minSelections: editMin, maxSelections: editMax, options: opts }) });
+    }
     setSaving(false);
     setEditingId(null);
     onUpdate();
@@ -71,7 +72,11 @@ export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/ap
 
   async function handleDelete(id: string) {
     if (!confirm("Eliminar este grupo de opciones?")) return;
-    await fetch(`${apiBase}?id=${id}`, { method: "DELETE" });
+    if (useAdminApi) {
+      await fetch(`${apiBase}?type=option-group&targetId=${id}`, { method: "DELETE" });
+    } else {
+      await fetch(`${apiBase}?id=${id}`, { method: "DELETE" });
+    }
     onUpdate();
   }
 

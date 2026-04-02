@@ -14,7 +14,7 @@ export async function GET(
     where: { id },
     include: {
       account: { include: { user: { select: { id: true, email: true, name: true, phone: true } } } },
-      categories: { include: { items: { orderBy: { sortOrder: "asc" } } }, orderBy: { sortOrder: "asc" } },
+      categories: { include: { items: { orderBy: { sortOrder: "asc" }, include: { optionGroups: { orderBy: { sortOrder: "asc" }, include: { options: { orderBy: { sortOrder: "asc" } } } } } } }, orderBy: { sortOrder: "asc" } },
       claimRequests: {
         include: { user: { select: { email: true, name: true } } },
         orderBy: { requestedAt: "desc" },
