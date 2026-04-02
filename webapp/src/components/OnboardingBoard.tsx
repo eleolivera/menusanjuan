@@ -154,6 +154,21 @@ export function OnboardingBoard() {
     const card = cards.find((c) => c.id === dragCard);
     if (!card || card.stage === stage) { setDragCard(null); return; }
 
+    // Auto-activate when moving to EN_CHARLA or ONBOARDED
+    if ((stage === "IN_PROGRESS" || stage === "ONBOARDED") && !card.dealer.isVerified) {
+      const dealerUrl = `/api/admin/restaurants/${card.dealer.id}/activate-owner`;
+      let res = await fetch(dealerUrl, { method: "POST" });
+      if (!res.ok) {
+        // Already activated — deactivate + reactivate for fresh code
+        await fetch(dealerUrl, { method: "DELETE" });
+        res = await fetch(dealerUrl, { method: "POST" });
+      }
+      if (res.ok) {
+        const creds = await res.json();
+        setCardCreds((prev) => ({ ...prev, [card.id]: { email: creds.email, password: creds.code } }));
+      }
+    }
+
     // Optimistic update
     setCards((prev) => prev.map((c) => c.id === dragCard ? { ...c, stage } : c));
     setDragCard(null);
