@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PhoneInput } from "@/components/PhoneInput";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { OptionGroupEditor } from "@/components/OptionGroupEditor";
-import { KanbanBoard } from "@/components/restaurante/KanbanBoard";
-import type { Order, OrderStatus } from "@/lib/orders-store";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -362,7 +360,17 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
 
           {/* ─── Orders tab ─── */}
           {tab === "orders" && (
-            <AdminOrdersTab slug={data.slug} restaurantName={data.name} />
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <p className="text-sm text-slate-400">{data.orderCount} pedidos totales</p>
+              <a
+                href={`/admin/orders/${data.slug}`}
+                target="_blank"
+                className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all"
+              >
+                Abrir Kanban de Pedidos
+              </a>
+              <p className="text-[10px] text-slate-600">Se abre en una nueva pestaña</p>
+            </div>
           )}
 
           {/* ─── Owner tab ─── */}
@@ -609,42 +617,3 @@ function AdminMenuTab({ restaurantId, data, onRefresh }: { restaurantId: string;
   );
 }
 
-// ─── Admin Orders Tab ───
-
-function AdminOrdersTab({ slug, restaurantName }: { slug: string; restaurantName: string }) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchOrders = useCallback(() => {
-    fetch(`/api/orders?restaurante=${slug}`)
-      .then((r) => r.json())
-      .then((d) => { setOrders(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [slug]);
-
-  useEffect(() => {
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 15000);
-    return () => clearInterval(interval);
-  }, [fetchOrders]);
-
-  async function updateStatus(orderId: string, status: OrderStatus) {
-    await fetch(`/api/orders/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status, updatedAt: new Date().toISOString() } : o));
-  }
-
-  if (loading) {
-    return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
-  }
-
-  return (
-    <div className="flex flex-col" style={{ minHeight: "400px" }}>
-      <div className="text-xs text-slate-500 mb-2">{orders.length} pedidos hoy</div>
-      <KanbanBoard orders={orders} onUpdateStatus={updateStatus} restaurantName={restaurantName} />
-    </div>
-  );
-}
