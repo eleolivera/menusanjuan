@@ -3,23 +3,10 @@
 import { useState } from "react";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import { OrderCard } from "./OrderCard";
+import { ORDER_STATUSES } from "@/lib/admin-config";
+import { timeAgo, formatARS } from "@/lib/admin-utils";
 
-const COLUMNS: { status: OrderStatus; label: string; color: string; bgColor: string }[] = [
-  { status: "GENERATED", label: "Nuevo", color: "text-amber-400", bgColor: "bg-amber-400/10 border-amber-400/20" },
-  { status: "PAID", label: "Pagado", color: "text-emerald-400", bgColor: "bg-emerald-400/10 border-emerald-400/20" },
-  { status: "PROCESSING", label: "En Cocina", color: "text-blue-400", bgColor: "bg-blue-400/10 border-blue-400/20" },
-  { status: "DELIVERED", label: "Entregado", color: "text-slate-400", bgColor: "bg-slate-400/10 border-slate-400/20" },
-  { status: "CANCELLED", label: "Cancelado", color: "text-red-400", bgColor: "bg-red-400/10 border-red-400/20" },
-];
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
-}
+const COLUMNS = ORDER_STATUSES;
 
 export function KanbanBoard({
   orders,
@@ -111,7 +98,7 @@ export function KanbanBoard({
                       <p className="text-xs font-medium text-white truncate">{order.customerName}</p>
                       <p className="text-[10px] text-slate-500 truncate mt-0.5">{itemSummary}{more}</p>
                       <div className="flex items-center justify-between mt-1.5">
-                        <span className="text-xs font-bold text-white">${order.total.toLocaleString("es-AR")}</span>
+                        <span className="text-xs font-bold text-white">{formatARS(order.total)}</span>
                         <span className="text-[9px] text-slate-600">
                           {order.deliveryMethod === "pickup" ? "Retiro" : "Delivery"}
                         </span>

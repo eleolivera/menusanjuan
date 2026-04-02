@@ -169,13 +169,22 @@ export default function AdminPage() {
   if (!authed) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-        <div className="w-full max-w-sm rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-3">
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email"
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} placeholder="Contraseña"
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-          {loginError && <p className="text-xs text-red-400">{loginError}</p>}
-          <button onClick={handleLogin} className="w-full rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/20 transition-all">Entrar</button>
+        <div className="w-full max-w-sm animate-fade-in">
+          <div className="text-center mb-6">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-xl shadow-lg shadow-primary/25">M</div>
+            <p className="text-xs text-slate-600">MenuSanJuan Admin</p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-3">
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" autoFocus
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} placeholder="Contraseña"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+            {loginError && <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{loginError}</p>}
+            <button onClick={handleLogin} disabled={!email || !password}
+              className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all disabled:opacity-30">
+              Entrar
+            </button>
+          </div>
         </div>
       </div>
     );

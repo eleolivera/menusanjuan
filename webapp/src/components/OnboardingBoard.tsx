@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { RestaurantModal } from "@/components/RestaurantModal";
-
-// ─── Types ───
-
-type OnboardingStage = "NEEDS_INFO" | "READY" | "QUEUED" | "IN_PROGRESS" | "ONBOARDED";
+import { ONBOARDING_STAGES, type OnboardingStage } from "@/lib/admin-config";
+import { timeAgo, normalize, formatARS, buildOnboardingWhatsAppMsg } from "@/lib/admin-utils";
 
 type Completeness = {
   hasLogo: boolean;
@@ -53,43 +51,16 @@ type Card = {
   notes: Note[];
 };
 
-// ─── Column definitions ───
-
-const STAGES: { key: OnboardingStage; label: string; color: string; bgColor: string; description: string }[] = [
-  { key: "NEEDS_INFO", label: "Falta info", color: "text-amber-400", bgColor: "bg-amber-400/10 border-amber-400/20", description: "Faltan fotos, dirección, WhatsApp o menú" },
-  { key: "READY", label: "Listo", color: "text-blue-400", bgColor: "bg-blue-400/10 border-blue-400/20", description: "Info completa, listo para contactar al dueño" },
-  { key: "QUEUED", label: "Cola de contacto", color: "text-purple-400", bgColor: "bg-purple-400/10 border-purple-400/20", description: "En cola para enviar mensaje / activar cuenta" },
-  { key: "IN_PROGRESS", label: "En charla", color: "text-cyan-400", bgColor: "bg-cyan-400/10 border-cyan-400/20", description: "Ya contactamos, en conversación" },
-  { key: "ONBOARDED", label: "Onboardeado", color: "text-emerald-400", bgColor: "bg-emerald-400/10 border-emerald-400/20", description: "Activo y verificado" },
-];
-
-// ─── Helpers ───
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d`;
-}
+const STAGES = ONBOARDING_STAGES;
 
 function completenessIcons(c: Completeness) {
-  const items: { label: string; ok: boolean; icon: string }[] = [
-    { label: "Logo", ok: c.hasLogo, icon: "🖼️" },
-    { label: "Portada", ok: c.hasCover, icon: "📸" },
-    { label: "Dirección", ok: c.hasAddress, icon: "📍" },
-    { label: "WhatsApp", ok: c.hasPhone, icon: "📱" },
-    { label: "Menú", ok: c.hasMenu, icon: "🍽️" },
+  return [
+    { label: "Logo", ok: c.hasLogo, icon: "L" },
+    { label: "Portada", ok: c.hasCover, icon: "P" },
+    { label: "Direccion", ok: c.hasAddress, icon: "D" },
+    { label: "WhatsApp", ok: c.hasPhone, icon: "W" },
+    { label: "Menu", ok: c.hasMenu, icon: "M" },
   ];
-  return items;
-}
-
-// ─── Main Board ───
-
-function normalize(s: string) {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 export function OnboardingBoard() {
@@ -289,26 +260,8 @@ export function OnboardingBoard() {
 
   function buildWhatsAppMsg(card: Card) {
     const creds = cardCreds[card.id];
-    const d = card.dealer;
-    const email = creds?.email || d.ownerEmail;
-    const code = creds?.password || card.lastPassword || "(sin generar)";
-    return `Hola! Soy de MenuSanJuan.com
-
-Te creamos una pagina gratuita para *${d.name}* donde tus clientes pueden ver el menu completo con precios y hacer pedidos directo por WhatsApp. Sin intermediarios, sin comisiones — a diferencia de otras apps que se quedan con un porcentaje de cada venta, con nosotros todo lo que vendes es tuyo.
-
-Ya esta armada con tu menu cargado:
-${d.name}: menusanjuan.com/${d.slug}
-
-Para entrar a tu panel y gestionar todo:
-menusanjuan.com/restaurante/login
-Email: ${email}
-Codigo de acceso: ${code}
-
-La primera vez que entres te va a pedir que elijas tu propia contraseña.
-
-Si tenes la carta actualizada con los precios de hoy, mandamela asi la actualizamos rapido.
-
-Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. Estamos para hacerte las cosas faciles!`;
+    const code = creds?.password || card.lastPassword || null;
+    return buildOnboardingWhatsAppMsg(card.dealer, code);
   }
 
   async function resetCode(card: Card) {
@@ -619,19 +572,24 @@ function KanbanCardView({
       </div>
 
       {/* Completeness */}
-      <div className="flex gap-1 mb-2">
+      <div className="flex gap-0.5 mb-2">
         {icons.map((item) => (
           <span
             key={item.label}
             title={`${item.label}: ${item.ok ? "OK" : "Falta"}`}
-            className={`text-[11px] rounded px-1 py-0.5 ${
-              item.ok ? "bg-emerald-400/10 opacity-60" : "bg-red-400/10"
+            className={`text-[9px] font-bold rounded w-5 h-5 flex items-center justify-center ${
+              item.ok ? "bg-emerald-400/15 text-emerald-400" : "bg-red-400/10 text-red-400/60"
             }`}
           >
             {item.icon}
           </span>
         ))}
-        <span className="text-[10px] text-slate-500 ml-auto">{comp.score}/{comp.total}</span>
+        <div className="ml-auto flex items-center gap-1">
+          <div className="w-12 h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-full rounded-full bg-emerald-400/60 transition-all" style={{ width: `${(comp.score / comp.total) * 100}%` }} />
+          </div>
+          <span className="text-[9px] text-slate-600">{comp.score}/{comp.total}</span>
+        </div>
       </div>
 
       {/* Stats row */}
