@@ -450,6 +450,74 @@ server.tool(
   }
 );
 
+// ── Add option group to menu item ──
+server.tool(
+  "add_option_group",
+  "Add an option/customization group to a menu item (e.g. 'Elegir gustos', 'Extras', 'Tamano'). Returns the created group with options.",
+  {
+    menu_item_id: z.string().describe("Menu item ID"),
+    title: z.string().describe("Group title (e.g. 'Elegir gustos', 'Extras')"),
+    min_selections: z.number().optional().describe("Minimum selections required (0 = optional, default 0)"),
+    max_selections: z.number().optional().describe("Maximum selections allowed (1 = single-select, default 1)"),
+    options: z.array(z.object({
+      name: z.string().describe("Option name (e.g. 'Chocolate', 'Bacon')"),
+      price_delta: z.number().optional().describe("Price change in ARS (default 0)"),
+    })).describe("List of options"),
+  },
+  async ({ menu_item_id, title, min_selections, max_selections, options }) => {
+    // Verify item exists
+    const item = (await query('SELECT id FROM "MenuItem" WHERE id = $1', [menu_item_id])).rows[0];
+    if (!item) return { content: [{ type: "text", text: "Menu item not found" }] };
+
+    const groupId = cuid();
+    const maxSort = (await query('SELECT COALESCE(MAX("sortOrder"), -1) as max FROM "OptionGroup" WHERE "menuItemId" = $1', [menu_item_id])).rows[0];
+
+    await query(
+      'INSERT INTO "OptionGroup" (id, "menuItemId", title, "minSelections", "maxSelections", "sortOrder") VALUES ($1, $2, $3, $4, $5, $6)',
+      [groupId, menu_item_id, title, min_selections ?? 0, max_selections ?? 1, (maxSort.max || 0) + 1]
+    );
+
+    for (let i = 0; i < options.length; i++) {
+      const opt = options[i];
+      await query(
+        'INSERT INTO "OptionChoice" (id, "optionGroupId", name, "priceDelta", "sortOrder") VALUES ($1, $2, $3, $4, $5)',
+        [cuid(), groupId, opt.name, opt.price_delta ?? 0, i]
+      );
+    }
+
+    return { content: [{ type: "text", text: JSON.stringify({ id: groupId, title, minSelections: min_selections ?? 0, maxSelections: max_selections ?? 1, optionCount: options.length }, null, 2) }] };
+  }
+);
+
+// ── List option groups for a menu item ──
+server.tool(
+  "list_option_groups",
+  "List all option/customization groups for a menu item.",
+  {
+    menu_item_id: z.string().describe("Menu item ID"),
+  },
+  async ({ menu_item_id }) => {
+    const groups = (await query(
+      'SELECT og.*, json_agg(json_build_object(\'id\', oc.id, \'name\', oc.name, \'priceDelta\', oc."priceDelta", \'available\', oc.available) ORDER BY oc."sortOrder") as options FROM "OptionGroup" og LEFT JOIN "OptionChoice" oc ON og.id = oc."optionGroupId" WHERE og."menuItemId" = $1 GROUP BY og.id ORDER BY og."sortOrder"',
+      [menu_item_id]
+    )).rows;
+    return { content: [{ type: "text", text: JSON.stringify(groups, null, 2) }] };
+  }
+);
+
+// ── Delete option group ──
+server.tool(
+  "delete_option_group",
+  "Delete an option group and all its options.",
+  {
+    option_group_id: z.string().describe("Option group ID to delete"),
+  },
+  async ({ option_group_id }) => {
+    await query('DELETE FROM "OptionGroup" WHERE id = $1', [option_group_id]);
+    return { content: [{ type: "text", text: `Deleted option group ${option_group_id}` }] };
+  }
+);
+
 // ── List onboarding cards ──
 server.tool(
   "list_onboarding",
