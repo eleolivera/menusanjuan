@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import { KanbanBoard } from "@/components/restaurante/KanbanBoard";
-import { OrderTotals } from "@/components/restaurante/OrderTotals";
 
 // Get today's date in AR timezone as YYYY-MM-DD
 function getArDateString(offset = 0): string {
@@ -142,9 +141,9 @@ export default function RestauranteDashboard() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="sticky top-0 z-40 border-b border-white/5 glass-dark px-6 py-4">
+        <header className="shrink-0 border-b border-white/5 px-6 py-3">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-white">Pedidos</h1>
@@ -248,37 +247,13 @@ export default function RestauranteDashboard() {
           </div>
         </header>
 
-        <div className="p-6 space-y-6">
+        <div className="px-3 py-2 flex-1 flex flex-col" style={{ minHeight: 0 }}>
           {loading ? (
-            <div className="flex items-center justify-center py-20">
+            <div className="flex-1 flex items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <>
-              {/* Historical banner */}
-              {!isToday && (
-                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400">📅</span>
-                    <span className="text-sm text-amber-300">
-                      Viendo pedidos del <strong>{formatDateLabel(selectedDate)}</strong>
-                    </span>
-                  </div>
-                  <button
-                    onClick={goToday}
-                    className="text-xs font-medium text-amber-400 hover:text-amber-300 underline transition-colors"
-                  >
-                    Volver a hoy
-                  </button>
-                </div>
-              )}
-
-              {/* Totals */}
-              <OrderTotals orders={orders} />
-
-              {/* Kanban */}
-              <KanbanBoard orders={orders} onUpdateStatus={updateStatus} restaurantName={restaurantName || slug} />
-            </>
+            <KanbanBoard orders={orders} onUpdateStatus={updateStatus} restaurantName={restaurantName || slug} />
           )}
         </div>
       </div>

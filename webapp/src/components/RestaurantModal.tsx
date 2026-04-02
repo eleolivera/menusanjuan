@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { PhoneInput } from "@/components/PhoneInput";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { OptionGroupEditor } from "@/components/OptionGroupEditor";
+import { KanbanBoard } from "@/components/restaurante/KanbanBoard";
+import type { Order, OrderStatus } from "@/lib/orders-store";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -53,7 +55,7 @@ export function RestaurantModal({
 }) {
   const [data, setData] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"info" | "menu" | "owner">("info");
+  const [tab, setTab] = useState<"info" | "menu" | "orders" | "owner">("info");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -257,10 +259,10 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
 
           {/* Tabs */}
           <div className="flex gap-2 mt-3">
-            {(["info", "menu", "owner"] as const).map((t) => (
+            {(["info", "menu", "orders", "owner"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)}
                 className={`rounded-xl px-4 py-1.5 text-xs font-medium transition-all ${tab === t ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
-                {t === "info" ? "Informacion" : t === "menu" ? `Menu (${menuItemCount})` : "Dueño"}
+                {t === "info" ? "Info" : t === "menu" ? `Menu (${menuItemCount})` : t === "orders" ? `Pedidos (${data.orderCount})` : "Dueno"}
               </button>
             ))}
           </div>
@@ -356,6 +358,11 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
           {/* ─── Menu tab ─── */}
           {tab === "menu" && (
             <AdminMenuTab restaurantId={restaurantId} data={data} onRefresh={fetchData} />
+          )}
+
+          {/* ─── Orders tab ─── */}
+          {tab === "orders" && (
+            <AdminOrdersTab slug={data.slug} restaurantName={data.name} />
           )}
 
           {/* ─── Owner tab ─── */}
@@ -598,6 +605,46 @@ function AdminMenuTab({ restaurantId, data, onRefresh }: { restaurantId: string;
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Admin Orders Tab ───
+
+function AdminOrdersTab({ slug, restaurantName }: { slug: string; restaurantName: string }) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchOrders = useCallback(() => {
+    fetch(`/api/orders?restaurante=${slug}`)
+      .then((r) => r.json())
+      .then((d) => { setOrders(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [slug]);
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 15000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
+
+  async function updateStatus(orderId: string, status: OrderStatus) {
+    await fetch(`/api/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status, updatedAt: new Date().toISOString() } : o));
+  }
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+  }
+
+  return (
+    <div className="flex flex-col" style={{ minHeight: "400px" }}>
+      <div className="text-xs text-slate-500 mb-2">{orders.length} pedidos hoy</div>
+      <KanbanBoard orders={orders} onUpdateStatus={updateStatus} restaurantName={restaurantName} />
     </div>
   );
 }
