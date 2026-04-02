@@ -8,6 +8,17 @@ import { CategoryNav } from "./CategoryNav";
 import { MenuItemCard } from "./MenuItemCard";
 import { FloatingCart } from "./FloatingCart";
 import { OrderModal } from "./OrderModal";
+import { ItemCustomizeSheet, type SelectedOptions } from "./ItemCustomizeSheet";
+
+export type CartEntry = {
+  cartKey: string;
+  item: MenuItemData;
+  quantity: number;
+  selectedOptions: SelectedOptions;
+  optionsDelta: number;
+};
+
+let cartKeyCounter = 0;
 
 export function StoreMenu({
   restaurant,
@@ -18,50 +29,89 @@ export function StoreMenu({
   categories: MenuCategoryData[];
   deliveryConfig?: DeliveryConfig | null;
 }) {
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [cart, setCart] = useState<CartEntry[]>([]);
   const [activeCategory, setActiveCategory] = useState(categories[0]?.id || "");
   const [showModal, setShowModal] = useState(false);
+  const [customizingItem, setCustomizingItem] = useState<MenuItemData | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
-  const addItem = useCallback((itemId: string) => {
-    setQuantities((prev) => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
+  const addItem = useCallback((item: MenuItemData) => {
+    if (item.optionGroups && item.optionGroups.length > 0) {
+      setCustomizingItem(item);
+    } else {
+      // Simple item — find existing entry or create new
+      setCart((prev) => {
+        const existing = prev.find((e) => e.item.id === item.id && e.selectedOptions.length === 0);
+        if (existing) {
+          return prev.map((e) => e.cartKey === existing.cartKey ? { ...e, quantity: e.quantity + 1 } : e);
+        }
+        return [...prev, { cartKey: `ck-${++cartKeyCounter}`, item, quantity: 1, selectedOptions: [], optionsDelta: 0 }];
+      });
+    }
   }, []);
 
-  const removeItem = useCallback((itemId: string) => {
-    setQuantities((prev) => {
-      const next = { ...prev };
-      if (next[itemId] > 1) {
-        next[itemId]--;
-      } else {
-        delete next[itemId];
-      }
-      return next;
+  const addCustomized = useCallback((item: MenuItemData, quantity: number, selectedOptions: SelectedOptions, optionsDelta: number) => {
+    setCart((prev) => [...prev, {
+      cartKey: `ck-${++cartKeyCounter}`,
+      item,
+      quantity,
+      selectedOptions,
+      optionsDelta,
+    }]);
+    setCustomizingItem(null);
+  }, []);
+
+  const incrementEntry = useCallback((cartKey: string) => {
+    setCart((prev) => prev.map((e) => e.cartKey === cartKey ? { ...e, quantity: e.quantity + 1 } : e));
+  }, []);
+
+  const decrementEntry = useCallback((cartKey: string) => {
+    setCart((prev) => {
+      const entry = prev.find((e) => e.cartKey === cartKey);
+      if (!entry) return prev;
+      if (entry.quantity <= 1) return prev.filter((e) => e.cartKey !== cartKey);
+      return prev.map((e) => e.cartKey === cartKey ? { ...e, quantity: e.quantity - 1 } : e);
+    });
+  }, []);
+
+  // Also support simple add/remove by itemId for items without options (backward compat for MenuItemCard)
+  const simpleAdd = useCallback((itemId: string) => {
+    const allItems = categories.flatMap((c) => c.items);
+    const item = allItems.find((i) => i.id === itemId);
+    if (item) addItem(item);
+  }, [categories, addItem]);
+
+  const simpleRemove = useCallback((itemId: string) => {
+    setCart((prev) => {
+      const entry = prev.find((e) => e.item.id === itemId && e.selectedOptions.length === 0);
+      if (!entry) return prev;
+      if (entry.quantity <= 1) return prev.filter((e) => e.cartKey !== entry.cartKey);
+      return prev.map((e) => e.cartKey === entry.cartKey ? { ...e, quantity: e.quantity - 1 } : e);
     });
   }, []);
 
   const scrollToCategory = useCallback((catId: string) => {
     setActiveCategory(catId);
-    sectionRefs.current[catId]?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    sectionRefs.current[catId]?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  // Compute cart
-  const allItems = categories.flatMap((c) => c.items);
-  const cartItems = Object.entries(quantities)
-    .filter(([, qty]) => qty > 0)
-    .map(([itemId, quantity]) => ({
-      item: allItems.find((i) => i.id === itemId)!,
-      quantity,
-    }))
-    .filter((ci) => ci.item);
+  // Compute totals
+  const totalItems = cart.reduce((s, e) => s + e.quantity, 0);
+  const totalPrice = cart.reduce((s, e) => s + (e.item.price + e.optionsDelta) * e.quantity, 0);
 
-  const totalItems = cartItems.reduce((s, ci) => s + ci.quantity, 0);
-  const totalPrice = cartItems.reduce(
-    (s, ci) => s + ci.item.price * ci.quantity,
-    0
-  );
+  // Get simple quantity for a specific item (for MenuItemCard display)
+  function getSimpleQty(itemId: string): number {
+    return cart.filter((e) => e.item.id === itemId && e.selectedOptions.length === 0).reduce((s, e) => s + e.quantity, 0);
+  }
+
+  // Convert cart to the format OrderModal expects
+  const cartForModal = cart.map((e) => ({
+    item: e.item,
+    quantity: e.quantity,
+    cartKey: e.cartKey,
+    selectedOptions: e.selectedOptions,
+    optionsDelta: e.optionsDelta,
+  }));
 
   return (
     <>
@@ -75,8 +125,8 @@ export function StoreMenu({
         {categories.length === 0 && (
           <div className="py-16 text-center">
             <div className="text-4xl mb-4">🍽️</div>
-            <h3 className="text-lg font-bold text-text mb-2">Menú en preparación</h3>
-            <p className="text-sm text-text-secondary">Este restaurante está armando su menú. Volvé pronto.</p>
+            <h3 className="text-lg font-bold text-text mb-2">Menu en preparacion</h3>
+            <p className="text-sm text-text-secondary">Este restaurante esta armando su menu. Volve pronto.</p>
           </div>
         )}
         {categories.map((category) => (
@@ -96,9 +146,10 @@ export function StoreMenu({
                   <MenuItemCard
                     key={item.id}
                     item={item}
-                    quantity={quantities[item.id] || 0}
-                    onAdd={() => addItem(item.id)}
-                    onRemove={() => removeItem(item.id)}
+                    quantity={getSimpleQty(item.id)}
+                    onAdd={() => addItem(item)}
+                    onRemove={() => simpleRemove(item.id)}
+                    hasOptions={!!(item.optionGroups && item.optionGroups.length > 0)}
                   />
                 ))}
             </div>
@@ -114,15 +165,23 @@ export function StoreMenu({
 
       {showModal && (
         <OrderModal
-          items={cartItems}
+          items={cartForModal}
           total={totalPrice}
           restaurantName={restaurant.name}
           restaurantPhone={restaurant.phone}
           restauranteSlug={restaurant.slug}
           deliveryConfig={deliveryConfig}
           onClose={() => setShowModal(false)}
-          onRemove={removeItem}
-          onAdd={addItem}
+          onRemove={decrementEntry}
+          onAdd={incrementEntry}
+        />
+      )}
+
+      {customizingItem && (
+        <ItemCustomizeSheet
+          item={customizingItem}
+          onAdd={(qty, opts, delta) => addCustomized(customizingItem, qty, opts, delta)}
+          onClose={() => setCustomizingItem(null)}
         />
       )}
     </>

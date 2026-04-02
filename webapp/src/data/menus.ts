@@ -1,3 +1,18 @@
+export type OptionChoiceData = {
+  id: string;
+  name: string;
+  priceDelta: number;
+  available: boolean;
+};
+
+export type OptionGroupData = {
+  id: string;
+  title: string;
+  minSelections: number;
+  maxSelections: number;
+  options: OptionChoiceData[];
+};
+
 export type MenuItemData = {
   id: string;
   name: string;
@@ -7,6 +22,7 @@ export type MenuItemData = {
   badge?: string;
   rating?: number;
   available: boolean;
+  optionGroups?: OptionGroupData[];
 };
 
 export type MenuCategoryData = {

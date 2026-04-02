@@ -7,7 +7,17 @@ export async function getMenuBySlug(slug: string): Promise<MenuCategoryData[]> {
 
   const dbCategories = await prisma.menuCategory.findMany({
     where: { dealerId: dealer.id },
-    include: { items: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          optionGroups: {
+            orderBy: { sortOrder: "asc" },
+            include: { options: { orderBy: { sortOrder: "asc" } } },
+          },
+        },
+      },
+    },
     orderBy: { sortOrder: "asc" },
   });
 
@@ -24,6 +34,18 @@ export async function getMenuBySlug(slug: string): Promise<MenuCategoryData[]> {
       badge: item.badge || undefined,
       rating: item.rating || undefined,
       available: item.available,
+      optionGroups: item.optionGroups.map((g) => ({
+        id: g.id,
+        title: g.title,
+        minSelections: g.minSelections,
+        maxSelections: g.maxSelections,
+        options: g.options.map((o) => ({
+          id: o.id,
+          name: o.name,
+          priceDelta: o.priceDelta,
+          available: o.available,
+        })),
+      })),
     })),
   }));
 }

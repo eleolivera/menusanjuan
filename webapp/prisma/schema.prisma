@@ -192,10 +192,38 @@ model MenuItem {
   stock       Int?                 // null = unlimited
   minStock    Int?                 // Alert threshold
 
-  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category     MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  optionGroups OptionGroup[]
 
   @@index([categoryId, sortOrder])
   @@index([available])
+}
+
+model OptionGroup {
+  id            String   @id @default(cuid())
+  menuItemId    String
+  title         String                         // "Elegir gustos", "Extras", "Tamaño"
+  minSelections Int      @default(0)           // 0 = optional, 1+ = required
+  maxSelections Int      @default(1)           // 1 = single-select, N = multi-select
+  sortOrder     Int      @default(0)
+
+  menuItem MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  options  OptionChoice[]
+
+  @@index([menuItemId, sortOrder])
+}
+
+model OptionChoice {
+  id            String  @id @default(cuid())
+  optionGroupId String
+  name          String                         // "Bacon", "Crocante", "Chocolate"
+  priceDelta    Float   @default(0)           // Price change in ARS
+  available     Boolean @default(true)
+  sortOrder     Int     @default(0)
+
+  optionGroup OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+
+  @@index([optionGroupId, sortOrder])
 }
 
 // ─── Orders ───

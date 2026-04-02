@@ -13,11 +13,13 @@ export function MenuItemCard({
   quantity,
   onAdd,
   onRemove,
+  hasOptions,
 }: {
   item: MenuItemData;
   quantity: number;
   onAdd: () => void;
   onRemove: () => void;
+  hasOptions?: boolean;
 }) {
   const isSelected = quantity > 0;
 
@@ -83,9 +85,14 @@ export function MenuItemCard({
         </div>
 
         <div className="flex items-center justify-between mt-2">
-          <span className="text-sm font-bold text-text tracking-tight">
-            ${item.price.toLocaleString("es-AR")}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold text-text tracking-tight">
+              ${item.price.toLocaleString("es-AR")}
+            </span>
+            {hasOptions && (
+              <span className="text-[9px] text-primary font-medium bg-primary/10 rounded px-1 py-0.5">Personalizable</span>
+            )}
+          </div>
 
           {item.available ? (
             <div className="flex items-center gap-1.5">

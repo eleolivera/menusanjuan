@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { MenuItemData } from "@/data/menus";
+import type { SelectedOptions } from "./ItemCustomizeSheet";
 import { LocationPicker } from "./LocationPicker";
 import { PhoneInput } from "./PhoneInput";
 import { formatForWhatsApp } from "@/lib/phone";
@@ -10,6 +11,9 @@ import { type DeliveryConfig, calculateDeliveryFee, type DeliveryZoneResult } fr
 type CartItem = {
   item: MenuItemData;
   quantity: number;
+  cartKey: string;
+  selectedOptions: SelectedOptions;
+  optionsDelta: number;
 };
 
 export function OrderModal({
@@ -30,8 +34,8 @@ export function OrderModal({
   restauranteSlug: string;
   deliveryConfig?: DeliveryConfig | null;
   onClose: () => void;
-  onRemove: (itemId: string) => void;
-  onAdd: (itemId: string) => void;
+  onRemove: (cartKey: string) => void;
+  onAdd: (cartKey: string) => void;
 }) {
   const [step, setStep] = useState<"cart" | "method" | "info" | "confirm" | "sent">("cart");
   const [name, setName] = useState("");
@@ -83,10 +87,18 @@ export function OrderModal({
 
   function buildWhatsAppMessage(orderNum: string) {
     const itemLines = items
-      .map(
-        (ci) =>
-          `  ${ci.quantity}x ${ci.item.name} — $${(ci.item.price * ci.quantity).toLocaleString("es-AR")}`
-      )
+      .map((ci) => {
+        const linePrice = (ci.item.price + ci.optionsDelta) * ci.quantity;
+        let line = `  ${ci.quantity}x ${ci.item.name} — $${linePrice.toLocaleString("es-AR")}`;
+        if (ci.selectedOptions.length > 0) {
+          const optLines = ci.selectedOptions.map((so) => {
+            const choiceNames = so.choices.map((c) => c.priceDelta > 0 ? `${c.name} (+$${c.priceDelta.toLocaleString("es-AR")})` : c.name).join(", ");
+            return `     > ${so.group}: ${choiceNames}`;
+          });
+          line += "\n" + optLines.join("\n");
+        }
+        return line;
+      })
       .join("\n");
 
     const methodLabel = deliveryMethod === "pickup" ? "Retiro en local" : "Delivery";
@@ -138,7 +150,9 @@ _Pedido realizado desde MenuSanJuan_`;
             name: ci.item.name,
             quantity: ci.quantity,
             unitPrice: ci.item.price,
-            total: ci.item.price * ci.quantity,
+            optionsDelta: ci.optionsDelta,
+            selectedOptions: ci.selectedOptions,
+            total: (ci.item.price + ci.optionsDelta) * ci.quantity,
           })),
           total: grandTotal,
           deliveryMethod,
@@ -199,21 +213,26 @@ _Pedido realizado desde MenuSanJuan_`;
             <>
               <div className="space-y-3 mb-6">
                 {items.map((ci) => (
-                  <div key={ci.item.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-surface-alt p-3">
+                  <div key={ci.cartKey} className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-surface-alt p-3">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-text truncate">{ci.item.name}</div>
-                      <div className="text-xs text-text-muted">${ci.item.price.toLocaleString("es-AR")} c/u</div>
+                      {ci.selectedOptions.length > 0 && (
+                        <div className="text-[10px] text-text-muted mt-0.5">
+                          {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                        </div>
+                      )}
+                      <div className="text-xs text-text-muted">${(ci.item.price + ci.optionsDelta).toLocaleString("es-AR")} c/u</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => onRemove(ci.item.id)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors">
+                      <button onClick={() => onRemove(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors">
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" /></svg>
                       </button>
                       <span className="min-w-[1.25rem] text-center text-sm font-bold text-text">{ci.quantity}</span>
-                      <button onClick={() => onAdd(ci.item.id)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-white transition-colors">
+                      <button onClick={() => onAdd(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-white transition-colors">
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                       </button>
                     </div>
-                    <div className="text-sm font-bold text-text w-20 text-right">${(ci.item.price * ci.quantity).toLocaleString("es-AR")}</div>
+                    <div className="text-sm font-bold text-text w-20 text-right">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</div>
                   </div>
                 ))}
               </div>
@@ -404,9 +423,16 @@ _Pedido realizado desde MenuSanJuan_`;
               <div className="rounded-xl border border-border/50 bg-surface-alt p-4 mb-4">
                 <div className="text-xs font-bold text-primary uppercase tracking-wider mb-3">Resumen</div>
                 {items.map((ci) => (
-                  <div key={ci.item.id} className="flex justify-between py-1 text-sm">
-                    <span className="text-text-secondary">{ci.quantity}x {ci.item.name}</span>
-                    <span className="font-semibold text-text">${(ci.item.price * ci.quantity).toLocaleString("es-AR")}</span>
+                  <div key={ci.cartKey} className="py-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-text-secondary">{ci.quantity}x {ci.item.name}</span>
+                      <span className="font-semibold text-text">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</span>
+                    </div>
+                    {ci.selectedOptions.length > 0 && (
+                      <div className="text-[10px] text-text-muted ml-4">
+                        {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                      </div>
+                    )}
                   </div>
                 ))}
                 <div className="mt-2 border-t border-border/50 pt-2 flex justify-between text-sm">
