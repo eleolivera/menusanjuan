@@ -53,7 +53,7 @@ export function RestaurantModal({
 }) {
   const [data, setData] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"info" | "menu" | "orders" | "owner">("info");
+  const [tab, setTab] = useState<"info" | "menu" | "owner">("info");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -257,12 +257,16 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
 
           {/* Tabs */}
           <div className="flex gap-2 mt-3">
-            {(["info", "menu", "orders", "owner"] as const).map((t) => (
+            {(["info", "menu", "owner"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)}
                 className={`rounded-xl px-4 py-1.5 text-xs font-medium transition-all ${tab === t ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
-                {t === "info" ? "Info" : t === "menu" ? `Menu (${menuItemCount})` : t === "orders" ? `Pedidos (${data.orderCount})` : "Dueno"}
+                {t === "info" ? "Info" : t === "menu" ? `Menu (${menuItemCount})` : "Dueno"}
               </button>
             ))}
+            <a href={`/admin/orders/${data.slug}`} target="_blank"
+              className="rounded-xl px-4 py-1.5 text-xs font-medium border border-white/10 text-slate-400 hover:bg-white/5 transition-all">
+              Pedidos
+            </a>
           </div>
         </div>
 
@@ -358,20 +362,6 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
             <AdminMenuTab restaurantId={restaurantId} data={data} onRefresh={fetchData} />
           )}
 
-          {/* ─── Orders tab ─── */}
-          {tab === "orders" && (
-            <div className="flex flex-col items-center justify-center py-12 gap-4">
-              <p className="text-sm text-slate-400">{data.orderCount} pedidos totales</p>
-              <a
-                href={`/admin/orders/${data.slug}`}
-                target="_blank"
-                className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all"
-              >
-                Abrir Kanban de Pedidos
-              </a>
-              <p className="text-[10px] text-slate-600">Se abre en una nueva pestaña</p>
-            </div>
-          )}
 
           {/* ─── Owner tab ─── */}
           {tab === "owner" && (
