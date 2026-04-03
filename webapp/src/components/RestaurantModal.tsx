@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { PhoneInput } from "@/components/PhoneInput";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { OptionGroupEditor } from "@/components/OptionGroupEditor";
+import { MenuEditor } from "@/components/MenuEditor";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -359,7 +360,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
 
           {/* ─── Menu tab ─── */}
           {tab === "menu" && (
-            <AdminMenuTab restaurantId={restaurantId} data={data} onRefresh={fetchData} />
+            <MenuEditor categories={data.categories} onRefresh={fetchData} apiBase={`/api/admin/restaurants/${restaurantId}/menu`} useAdminApi />
           )}
 
 
@@ -453,157 +454,4 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
   );
 }
 
-// ─── Admin Menu Tab (full CRUD) ───
-
-function AdminMenuTab({ restaurantId, data, onRefresh }: { restaurantId: string; data: any; onRefresh: () => void }) {
-  const [addingCat, setAddingCat] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
-  const [newCatEmoji, setNewCatEmoji] = useState("");
-  const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [addingItemCat, setAddingItemCat] = useState<string | null>(null);
-  const [itemForm, setItemForm] = useState({ name: "", description: "", price: "", imageUrl: "", badge: "" });
-
-  const menuApi = `/api/admin/restaurants/${restaurantId}/menu`;
-
-  async function addCategory() {
-    if (!newCatName.trim()) return;
-    await fetch(menuApi, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "category", name: newCatName.trim(), emoji: newCatEmoji || null }) });
-    setNewCatName(""); setNewCatEmoji(""); setAddingCat(false); onRefresh();
-  }
-
-  async function deleteCategory(catId: string, catName: string) {
-    if (!confirm(`Eliminar "${catName}" y todos sus items?`)) return;
-    await fetch(`${menuApi}?type=category&targetId=${catId}`, { method: "DELETE" }); onRefresh();
-  }
-
-  async function addItem(categoryId: string) {
-    if (!itemForm.name.trim() || !itemForm.price) return;
-    await fetch(menuApi, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", categoryId, name: itemForm.name.trim(), description: itemForm.description || null, price: Number(itemForm.price), imageUrl: itemForm.imageUrl || null, badge: itemForm.badge || null }) });
-    setItemForm({ name: "", description: "", price: "", imageUrl: "", badge: "" }); setAddingItemCat(null); onRefresh();
-  }
-
-  async function updateItem(itemId: string) {
-    await fetch(menuApi, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", itemId, name: itemForm.name, description: itemForm.description || null, price: Number(itemForm.price), imageUrl: itemForm.imageUrl || null, badge: itemForm.badge || null }) });
-    setEditingItem(null); onRefresh();
-  }
-
-  async function toggleItem(itemId: string, available: boolean) {
-    await fetch(menuApi, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", itemId, available: !available }) }); onRefresh();
-  }
-
-  async function deleteItem(itemId: string) {
-    await fetch(`${menuApi}?type=item&targetId=${itemId}`, { method: "DELETE" }); onRefresh();
-  }
-
-  function startEditItem(item: any) {
-    setEditingItem(item.id);
-    setItemForm({ name: item.name, description: item.description || "", price: String(item.price), imageUrl: item.imageUrl || "", badge: item.badge || "" });
-  }
-
-  // Admin option-group API adapter (wraps the admin menu API for OptionGroupEditor)
-  const optionGroupApi = {
-    async create(menuItemId: string, data: any) {
-      return fetch(menuApi, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "option-group", menuItemId, ...data }) });
-    },
-    async update(data: any) {
-      return fetch(menuApi, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "option-group", ...data }) });
-    },
-    async remove(id: string) {
-      return fetch(`${menuApi}?type=option-group&targetId=${id}`, { method: "DELETE" });
-    },
-  };
-
-  return (
-    <div className="space-y-3">
-      {/* Add category */}
-      {addingCat ? (
-        <div className="flex gap-2">
-          <input value={newCatEmoji} onChange={(e) => setNewCatEmoji(e.target.value)} placeholder="Emoji" className="w-14 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center text-sm text-white focus:border-primary focus:outline-none" />
-          <input value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Nombre de la categoria" onKeyDown={(e) => e.key === "Enter" && addCategory()} className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-          <button onClick={addCategory} disabled={!newCatName.trim()} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Crear</button>
-          <button onClick={() => setAddingCat(false)} className="text-xs text-slate-500">Cancelar</button>
-        </div>
-      ) : (
-        <button onClick={() => setAddingCat(true)} className="text-xs text-primary hover:underline">+ Agregar categoria</button>
-      )}
-
-      {data.categories.length === 0 && (
-        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-12 text-center">
-          <p className="text-slate-500">Sin categorias de menu</p>
-        </div>
-      )}
-
-      {data.categories.map((cat: any) => (
-        <div key={cat.id} className="rounded-xl border border-white/5 bg-slate-900/30">
-          <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
-            <span className="text-sm font-semibold text-white">{cat.emoji} {cat.name}</span>
-            <div className="flex items-center gap-2">
-              <button onClick={() => { setAddingItemCat(cat.id); setItemForm({ name: "", description: "", price: "", imageUrl: "", badge: "" }); }} className="text-[10px] text-primary hover:underline">+ Item</button>
-              <button onClick={() => deleteCategory(cat.id, cat.name)} className="text-[10px] text-slate-600 hover:text-red-400">Eliminar</button>
-            </div>
-          </div>
-
-          <div className="divide-y divide-white/5">
-            {cat.items.map((item: any) => (
-              <div key={item.id} className="px-4 py-2">
-                {editingItem === item.id ? (
-                  <div className="space-y-2 py-1">
-                    <div className="flex gap-2">
-                      <input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} placeholder="Nombre" className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
-                      <input value={itemForm.price} onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })} placeholder="Precio" type="number" className="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
-                    </div>
-                    <input value={itemForm.description} onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} placeholder="Descripcion" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
-                    <div className="flex gap-2">
-                      <input value={itemForm.imageUrl} onChange={(e) => setItemForm({ ...itemForm, imageUrl: e.target.value })} placeholder="URL de imagen" className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
-                      <input value={itemForm.badge} onChange={(e) => setItemForm({ ...itemForm, badge: e.target.value })} placeholder="Badge" className="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none" />
-                    </div>
-                    {/* Option groups editor */}
-                    <OptionGroupEditor
-                      menuItemId={item.id}
-                      groups={(item.optionGroups || []).map((g: any) => ({ id: g.id, title: g.title, minSelections: g.minSelections, maxSelections: g.maxSelections, options: g.options.map((o: any) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available })) }))}
-                      onUpdate={onRefresh}
-                      apiBase={menuApi}
-                      useAdminApi
-                    />
-                    <div className="flex gap-2">
-                      <button onClick={() => updateItem(item.id)} className="rounded-lg bg-primary px-3 py-1 text-[10px] font-semibold text-white">Guardar</button>
-                      <button onClick={() => setEditingItem(null)} className="text-[10px] text-slate-500">Cancelar</button>
-                      <button onClick={() => { deleteItem(item.id); setEditingItem(null); }} className="text-[10px] text-red-400 ml-auto">Eliminar</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3 cursor-pointer" onClick={() => startEditItem(item)}>
-                    {item.imageUrl && <img src={item.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-white truncate">{item.name}</p>
-                      {item.description && <p className="text-[10px] text-slate-500 truncate">{item.description}</p>}
-                      {item.optionGroups?.length > 0 && <p className="text-[9px] text-primary">{item.optionGroups.length} grupo(s) de opciones</p>}
-                    </div>
-                    <span className="text-xs text-primary font-semibold">${item.price.toLocaleString("es-AR")}</span>
-                    <button onClick={(e) => { e.stopPropagation(); toggleItem(item.id, item.available); }} className={`text-[10px] ${item.available ? "text-emerald-400" : "text-red-400"}`}>{item.available ? "Activo" : "Inactivo"}</button>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Add item form */}
-            {addingItemCat === cat.id && (
-              <div className="px-4 py-3 space-y-2 bg-primary/5">
-                <div className="flex gap-2">
-                  <input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} placeholder="Nombre del item *" className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                  <input value={itemForm.price} onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })} placeholder="Precio *" type="number" className="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                </div>
-                <input value={itemForm.description} onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} placeholder="Descripcion (opcional)" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                <div className="flex gap-2">
-                  <button onClick={() => addItem(cat.id)} disabled={!itemForm.name.trim() || !itemForm.price} className="rounded-lg bg-primary px-3 py-1 text-[10px] font-semibold text-white disabled:opacity-50">Agregar</button>
-                  <button onClick={() => setAddingItemCat(null)} className="text-[10px] text-slate-500">Cancelar</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
