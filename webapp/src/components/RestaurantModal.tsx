@@ -54,7 +54,7 @@ export function RestaurantModal({
 }) {
   const [data, setData] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"info" | "menu" | "owner">("info");
+  const [tab, setTab] = useState<"info" | "menu" | "owner">("menu");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
