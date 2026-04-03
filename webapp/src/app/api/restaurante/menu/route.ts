@@ -9,7 +9,7 @@ export async function GET() {
 
   const categories = await prisma.menuCategory.findMany({
     where: { dealerId: dealer.id },
-    include: { items: { orderBy: { sortOrder: "asc" } } },
+    include: { items: { orderBy: { sortOrder: "asc" }, include: { optionGroups: { orderBy: { sortOrder: "asc" }, include: { options: { orderBy: { sortOrder: "asc" } } } } } } },
     orderBy: { sortOrder: "asc" },
   });
 

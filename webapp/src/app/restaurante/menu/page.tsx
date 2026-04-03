@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { OptionGroupEditor } from "@/components/OptionGroupEditor";
+import type { OptionGroupData } from "@/data/menus";
 
 type MenuItem = {
   id: string;
@@ -12,6 +14,7 @@ type MenuItem = {
   badge: string | null;
   available: boolean;
   sortOrder: number;
+  optionGroups?: OptionGroupData[];
 };
 
 type Category = {
@@ -81,7 +84,15 @@ export default function MenuManagementPage() {
   function fetchMenu() {
     fetch("/api/restaurante/menu")
       .then((r) => r.json())
-      .then((d) => { setCategories(d); setLoading(false); });
+      .then((d: Category[]) => {
+        setCategories(d);
+        setLoading(false);
+        // Refresh editingItem if it's open (e.g. after option group change)
+        if (editingItem) {
+          const freshItem = d.flatMap((c) => c.items).find((i) => i.id === editingItem.id);
+          if (freshItem) setEditingItem(freshItem);
+        }
+      });
   }
 
   async function handleAddCategory() {
@@ -329,6 +340,9 @@ export default function MenuManagementPage() {
                         {!item.available && (
                           <span className="rounded-md bg-red-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-red-400">No disponible</span>
                         )}
+                        {item.optionGroups && item.optionGroups.length > 0 && (
+                          <span className="rounded-md bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-purple-400">{item.optionGroups.length} opciones</span>
+                        )}
                       </div>
                       {item.description && (
                         <p className="text-xs text-slate-500 truncate">{item.description}</p>
@@ -376,17 +390,19 @@ export default function MenuManagementPage() {
 
       {/* Edit Item Modal */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingItem(null)} />
-          <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 p-6 shadow-2xl animate-scale-in">
-            <h3 className="text-lg font-bold text-white mb-4">Editar Item</h3>
-            <div className="space-y-3">
+          <div className="relative w-full max-w-md max-h-[85vh] rounded-2xl bg-slate-900 border border-white/10 shadow-2xl animate-scale-in flex flex-col overflow-hidden">
+            <div className="px-6 pt-6 pb-3 shrink-0">
+              <h3 className="text-lg font-bold text-white">Editar Item</h3>
+            </div>
+            <div className="px-6 overflow-y-auto flex-1 space-y-3" style={{ minHeight: 0 }}>
               <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
                 placeholder="Nombre" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
               <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)}
                 placeholder="Precio" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
               <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
-                placeholder="Descripción" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                placeholder="Descripcion" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Imagen</label>
                 {editImage && (
@@ -413,8 +429,15 @@ export default function MenuManagementPage() {
               </div>
               <input type="text" value={editBadge} onChange={(e) => setEditBadge(e.target.value)}
                 placeholder="Badge (Popular, Nuevo...)" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+
+              {/* Option Groups */}
+              <OptionGroupEditor
+                menuItemId={editingItem.id}
+                groups={(editingItem.optionGroups || []).map((g) => ({ id: g.id, title: g.title, minSelections: g.minSelections, maxSelections: g.maxSelections, options: g.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available })) }))}
+                onUpdate={fetchMenu}
+              />
             </div>
-            <div className="mt-4 flex gap-3">
+            <div className="px-6 py-4 flex gap-3 shrink-0 border-t border-white/5">
               <button onClick={() => setEditingItem(null)}
                 className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 transition-colors">
                 Cancelar
