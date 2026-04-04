@@ -212,62 +212,64 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
     }}>
       <div className="w-full max-w-4xl h-[90vh] bg-slate-950 rounded-2xl border border-white/10 overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur border-b border-white/5 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button onClick={() => { if (dirty && !confirm("Tenes cambios sin guardar. ¿Seguro que queres salir?")) return; onClose(); }} className="text-slate-500 hover:text-white transition-colors text-lg">←</button>
-              <div>
-                <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="text-lg font-bold text-white hover:text-primary transition-colors">{data.name}</a>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-slate-500">/{data.slug}</span>
-                  <span className="text-xs text-slate-600">·</span>
-                  <span className="text-xs text-slate-500">{data.orderCount} pedidos</span>
-                  {data.isPlaceholder && <span className="text-[10px] bg-amber-400/10 text-amber-400 px-1.5 rounded">sin dueño</span>}
-                  {data.isVerified && <span className="text-[10px] bg-emerald-400/10 text-emerald-400 px-1.5 rounded">verificado</span>}
+        <div className="sticky top-0 z-10 bg-slate-950 border-b border-white/5">
+          {/* Row 1: Name + close */}
+          <div className="px-5 pt-4 pb-2 flex items-start justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              {data.logoUrl ? (
+                <img src={data.logoUrl} alt="" className="h-10 w-10 rounded-xl object-cover shrink-0" />
+              ) : (
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center shrink-0 text-white font-bold text-sm">{data.name.charAt(0)}</div>
+              )}
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-white truncate">{data.name}</h2>
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  <span className="text-[10px] text-slate-500">/{data.slug}</span>
+                  {data.isPlaceholder && <span className="text-[9px] bg-amber-400/10 text-amber-400 px-1 py-0.5 rounded font-medium">sin dueno</span>}
+                  {data.isVerified && <span className="text-[9px] bg-emerald-400/10 text-emerald-400 px-1 py-0.5 rounded font-medium">verificado</span>}
+                  {data.isActive ? <span className="text-[9px] bg-emerald-400/10 text-emerald-400 px-1 py-0.5 rounded font-medium">activo</span> : <span className="text-[9px] bg-red-400/10 text-red-400 px-1 py-0.5 rounded font-medium">inactivo</span>}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Kanban stage dropdown */}
-              {kanbanStage && onStageChange && (
-                <select
-                  value={kanbanStage}
-                  onChange={(e) => onStageChange(e.target.value as OnboardingStage)}
-                  className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
-                >
-                  {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
-              )}
-              <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Ver publica</a>
-              <a href={`https://www.google.com/search?q=${encodeURIComponent(data.name + " San Juan")}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Google</a>
-              {data.phone && data.phone !== "0000000000" && (
-                <button onClick={openWhatsApp} className="rounded-lg bg-[#25D366]/15 px-3 py-1.5 text-xs font-medium text-[#25D366] hover:bg-[#25D366]/25 transition-colors">WhatsApp</button>
-              )}
-              {data.isPlaceholder && !data.isVerified && (
-                <button onClick={handleActivate} disabled={activating} className="rounded-lg bg-purple-400/15 px-3 py-1.5 text-xs font-medium text-purple-400 hover:bg-purple-400/25 disabled:opacity-50 transition-colors">
-                  {activating ? "..." : "Activar"}
-                </button>
-              )}
-              {(data.isVerified || activatedCode) && (
-                <button onClick={handleResetCode} disabled={activating} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 disabled:opacity-50 transition-colors">
-                  {activating ? "..." : "Resetear codigo"}
-                </button>
-              )}
-            </div>
+            <button onClick={() => { if (dirty && !confirm("Tenes cambios sin guardar. Seguro que queres salir?")) return; onClose(); }} className="rounded-lg p-1.5 text-slate-500 hover:text-white hover:bg-white/5 transition-colors shrink-0">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2 mt-3">
+          {/* Row 2: Actions */}
+          <div className="px-5 pb-2 flex items-center gap-1.5 flex-wrap">
+            <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-slate-400 hover:bg-white/5 transition-colors">Ver publica</a>
+            <a href={`https://www.google.com/search?q=${encodeURIComponent(data.name + " San Juan")}`} target="_blank" className="rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-slate-400 hover:bg-white/5 transition-colors">Google</a>
+            <a href={`/admin/orders/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-slate-400 hover:bg-white/5 transition-colors">Pedidos</a>
+            {data.phone && data.phone !== "0000000000" && (
+              <button onClick={openWhatsApp} className="rounded-lg bg-[#25D366]/10 border border-[#25D366]/20 px-2.5 py-1 text-[10px] font-medium text-[#25D366] hover:bg-[#25D366]/20 transition-colors">WhatsApp</button>
+            )}
+            {data.isPlaceholder && !data.isVerified && (
+              <button onClick={handleActivate} disabled={activating} className="rounded-lg bg-purple-400/10 border border-purple-400/20 px-2.5 py-1 text-[10px] font-medium text-purple-400 hover:bg-purple-400/20 disabled:opacity-50 transition-colors">
+                {activating ? "..." : "Activar"}
+              </button>
+            )}
+            {(data.isVerified || activatedCode) && (
+              <button onClick={handleResetCode} disabled={activating} className="rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-slate-500 hover:bg-white/5 disabled:opacity-50 transition-colors">
+                {activating ? "..." : "Resetear codigo"}
+              </button>
+            )}
+            {kanbanStage && onStageChange && (
+              <select value={kanbanStage} onChange={(e) => onStageChange(e.target.value as OnboardingStage)}
+                className="ml-auto rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white focus:border-primary focus:outline-none">
+                {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            )}
+          </div>
+
+          {/* Row 3: Tabs */}
+          <div className="px-5 pb-2 flex gap-1.5">
             {(["info", "menu", "owner"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)}
-                className={`rounded-xl px-4 py-1.5 text-xs font-medium transition-all ${tab === t ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
+                className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all ${tab === t ? "bg-primary text-white" : "text-slate-500 hover:text-white hover:bg-white/5"}`}>
                 {t === "info" ? "Info" : t === "menu" ? `Menu (${menuItemCount})` : "Dueno"}
               </button>
             ))}
-            <a href={`/admin/orders/${data.slug}`} target="_blank"
-              className="rounded-xl px-4 py-1.5 text-xs font-medium border border-white/10 text-slate-400 hover:bg-white/5 transition-all">
-              Pedidos
-            </a>
           </div>
         </div>
 
