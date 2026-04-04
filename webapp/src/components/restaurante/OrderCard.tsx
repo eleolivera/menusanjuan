@@ -55,7 +55,7 @@ export function OrderCard({
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   restaurantName: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const receiptRef = useRef<HTMLDivElement>(null);
   const config = STATUS_CONFIG[order.status];
   const timeSince = getTimeSince(order.createdAt);
@@ -103,11 +103,8 @@ export function OrderCard({
 
   return (
     <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden transition-all hover:border-white/10">
-      {/* Compact view */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 text-left"
-      >
+      {/* Header */}
+      <div className="px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${config.bg} ${config.text}`}>
@@ -122,30 +119,23 @@ export function OrderCard({
               ${order.total.toLocaleString("es-AR")}
             </span>
             <span className="text-xs text-slate-500">{timeSince}</span>
-            <svg
-              className={`h-4 w-4 text-slate-500 transition-transform ${expanded ? "rotate-180" : ""}`}
-              fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
           </div>
         </div>
         <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500">
-          <span>👤 {order.customerName}</span>
+          <span>{order.customerName}</span>
           <span>·</span>
           <span>{order.items.length} item{order.items.length !== 1 ? "s" : ""}</span>
           {order.whatsappSent && (
             <>
               <span>·</span>
-              <span className="text-green-500">WhatsApp ✓</span>
+              <span className="text-green-500">WhatsApp enviado</span>
             </>
           )}
         </div>
-      </button>
+      </div>
 
-      {/* Expanded: Receipt-style ticket */}
-      {expanded && (
-        <div className="border-t border-white/5 px-4 py-4 animate-fade-in">
+      {/* Receipt */}
+      <div className="border-t border-white/5 px-4 py-4">
           {/* Receipt */}
           <div
             ref={receiptRef}
@@ -301,7 +291,6 @@ export function OrderCard({
             )}
           </div>
         </div>
-      )}
     </div>
   );
 }
