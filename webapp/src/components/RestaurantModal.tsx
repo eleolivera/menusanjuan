@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { PhoneInput } from "@/components/PhoneInput";
+import { LocationPicker } from "@/components/LocationPicker";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { OptionGroupEditor } from "@/components/OptionGroupEditor";
 import { MenuEditor } from "@/components/MenuEditor";
@@ -66,6 +67,9 @@ export function RestaurantModal({
   const [cuisineType, _setCuisineType] = useState("");
   const [description, _setDescription] = useState("");
   const [isActive, _setIsActive] = useState(true);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [showMap, setShowMap] = useState(false);
   const initialData = useRef<Record<string, any>>({});
   const setName = (v: string) => { _setName(v); if (v !== initialData.current.name) setDirty(true); };
   const setPhone = (v: string) => { _setPhone(v); if (v !== initialData.current.phone) setDirty(true); };
@@ -98,6 +102,7 @@ export function RestaurantModal({
         _setName(d.name); _setPhone(d.phone); _setAddress(d.address || "");
         _setCuisineType(d.cuisineType); _setDescription(d.description || "");
         _setIsActive(d.isActive); setHours(parseHours(d.openHours));
+        setLatitude(d.latitude ?? null); setLongitude(d.longitude ?? null);
         setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
         if (d.lastPassword) setActivatedCode(d.lastPassword);
         initialData.current = { name: d.name, phone: d.phone, address: d.address || "", cuisineType: d.cuisineType, description: d.description || "", isActive: d.isActive };
@@ -136,7 +141,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
     await fetch(`/api/admin/restaurants/${restaurantId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, cuisineType, description, isActive, logoUrl, coverUrl, openHours: JSON.stringify(hours) }),
+      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, isActive, logoUrl, coverUrl, openHours: JSON.stringify(hours) }),
     });
     setSaving(false); setSaved(true); setDirty(false);
     setTimeout(() => setSaved(false), 2000);
@@ -310,7 +315,25 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
 
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Direccion</label>
-                <input value={address} onChange={(e) => setAddress(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+                <div className="flex gap-2">
+                  <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Direccion del restaurante" className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                  <button onClick={() => setShowMap(!showMap)} className={`rounded-xl border px-3 py-2.5 text-xs font-medium transition-all shrink-0 ${latitude && longitude ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400" : "border-white/10 text-slate-400 hover:bg-white/5"}`}>
+                    {latitude && longitude ? "Ubicacion OK" : "Mapa"}
+                  </button>
+                </div>
+                {latitude && longitude && !showMap && (
+                  <p className="text-[9px] text-emerald-400/60 mt-1">Coordenadas: {latitude.toFixed(5)}, {longitude.toFixed(5)}</p>
+                )}
+                {showMap && (
+                  <div className="mt-2 animate-fade-in">
+                    <LocationPicker
+                      onLocationConfirm={(addr, lat, lng) => {
+                        setAddress(addr); setLatitude(lat); setLongitude(lng);
+                        setShowMap(false); setDirty(true);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
