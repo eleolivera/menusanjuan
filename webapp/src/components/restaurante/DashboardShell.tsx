@@ -193,9 +193,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-hidden min-w-0">
         {children}
-      </div>
+      </main>
 
       {/* First-time welcome popup */}
       {showWelcome && (

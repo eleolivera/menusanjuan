@@ -6,7 +6,7 @@ export default function RestauranteLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="h-screen bg-slate-950 overflow-hidden">
       <DashboardShell>{children}</DashboardShell>
     </div>
   );

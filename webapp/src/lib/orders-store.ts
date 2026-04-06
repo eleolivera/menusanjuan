@@ -136,29 +136,49 @@ export function getDateRange(period: string): { start: Date; end: Date } {
 
 // ─── Order Number ───
 
-async function nextOrderNumber(restauranteSlug: string): Promise<string> {
-  const todayStart = getBusinessDayStart();
-  const todayEnd = getBusinessDayEnd();
-
-  const count = await prisma.order.count({
-    where: {
-      restauranteSlug,
-      createdAt: { gte: todayStart, lt: todayEnd },
-    },
-  });
-
+function getOrderNumberPrefix(): string {
   const arNow = new Date(Date.now() - 3 * 60 * 60 * 1000);
   const arHour = arNow.getUTCHours();
-  // If before 6am, use previous day's date for the label
   let labelDate = arNow;
   if (arHour < BUSINESS_DAY_END_HOUR) {
     labelDate = new Date(arNow.getTime() - 24 * 60 * 60 * 1000);
   }
   const mm = String(labelDate.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(labelDate.getUTCDate()).padStart(2, "0");
-  const seq = String(count + 1).padStart(3, "0");
+  return `ORD-${mm}${dd}-`;
+}
 
-  return `ORD-${mm}${dd}-${seq}`;
+/**
+ * Compute the next order number by querying max existing sequence for today.
+ * More robust than count() because deleted orders or gaps don't break it.
+ */
+async function nextOrderNumber(restauranteSlug: string, attempt = 0): Promise<string> {
+  const prefix = getOrderNumberPrefix();
+  const todayStart = getBusinessDayStart();
+  const todayEnd = getBusinessDayEnd();
+
+  // Find the highest existing order number for this restaurant today
+  const latest = await prisma.order.findFirst({
+    where: {
+      restauranteSlug,
+      createdAt: { gte: todayStart, lt: todayEnd },
+      orderNumber: { startsWith: prefix },
+    },
+    orderBy: { orderNumber: "desc" },
+    select: { orderNumber: true },
+  });
+
+  let nextSeq = 1;
+  if (latest?.orderNumber) {
+    const seqStr = latest.orderNumber.slice(prefix.length);
+    const seq = parseInt(seqStr, 10);
+    if (!isNaN(seq)) nextSeq = seq + 1;
+  }
+
+  // Add a small offset on retry to skip past races
+  nextSeq += attempt;
+
+  return `${prefix}${String(nextSeq).padStart(3, "0")}`;
 }
 
 // ─── Mapping ───
@@ -217,35 +237,50 @@ export async function createOrder(data: {
   source?: string | null;
   initialStatus?: OrderStatus; // For POS to skip GENERATED
 }): Promise<Order> {
-  const orderNumber = await nextOrderNumber(data.restauranteSlug);
+  // Retry up to 5 times on unique constraint violation (concurrent inserts can race)
+  const maxAttempts = 5;
+  let lastError: unknown = null;
 
-  const dbOrder = await prisma.order.create({
-    data: {
-      orderNumber,
-      restauranteSlug: data.restauranteSlug,
-      customerName: data.customerName,
-      customerPhone: data.customerPhone,
-      customerAddress: data.customerAddress || null,
-      latitude: data.latitude ?? null,
-      longitude: data.longitude ?? null,
-      items: data.items as any,
-      total: data.total,
-      notes: data.notes || null,
-      deliveryMethod: data.deliveryMethod ?? "delivery",
-      deliveryFee: data.deliveryFee ?? 0,
-      channel: data.channel ?? "ONLINE",
-      tableNumber: data.tableNumber ?? null,
-      paymentMethod: data.paymentMethod ?? null,
-      paymentStatus: data.paymentStatus ?? "UNPAID",
-      paidAt: data.paymentStatus === "PAID" ? new Date() : null,
-      cashTendered: data.cashTendered ?? null,
-      cashChange: data.cashChange ?? null,
-      source: data.source ?? "web",
-      ...(data.initialStatus ? { status: data.initialStatus as PrismaOrderStatus } : {}),
-    },
-  });
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const orderNumber = await nextOrderNumber(data.restauranteSlug, attempt);
+    try {
+      const dbOrder = await prisma.order.create({
+        data: {
+          orderNumber,
+          restauranteSlug: data.restauranteSlug,
+          customerName: data.customerName,
+          customerPhone: data.customerPhone,
+          customerAddress: data.customerAddress || null,
+          latitude: data.latitude ?? null,
+          longitude: data.longitude ?? null,
+          items: data.items as any,
+          total: data.total,
+          notes: data.notes || null,
+          deliveryMethod: data.deliveryMethod ?? "delivery",
+          deliveryFee: data.deliveryFee ?? 0,
+          channel: data.channel ?? "ONLINE",
+          tableNumber: data.tableNumber ?? null,
+          paymentMethod: data.paymentMethod ?? null,
+          paymentStatus: data.paymentStatus ?? "UNPAID",
+          paidAt: data.paymentStatus === "PAID" ? new Date() : null,
+          cashTendered: data.cashTendered ?? null,
+          cashChange: data.cashChange ?? null,
+          source: data.source ?? "web",
+          ...(data.initialStatus ? { status: data.initialStatus as PrismaOrderStatus } : {}),
+        },
+      });
+      return mapOrder(dbOrder);
+    } catch (err: any) {
+      lastError = err;
+      // Prisma unique constraint error code
+      const isUniqueViolation = err?.code === "P2002" || /unique constraint/i.test(err?.message || "");
+      if (!isUniqueViolation) throw err;
+      // Wait a tiny bit before retrying to spread out concurrent requests
+      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+    }
+  }
 
-  return mapOrder(dbOrder);
+  throw lastError || new Error("createOrder failed after retries");
 }
 
 export async function getOrdersByRestaurante(

@@ -141,7 +141,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="h-full overflow-y-auto bg-slate-950">
       <header className="sticky top-0 z-40 border-b border-white/5 glass-dark px-6 py-4">
         <div className="flex items-center justify-between max-w-3xl mx-auto">
           <div className="flex items-center gap-4">

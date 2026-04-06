@@ -79,7 +79,7 @@ export default function AnalyticsPage() {
   const maxDaily = Math.max(...data.dailyBreakdown.map((d) => d.revenue), 1);
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="h-full overflow-y-auto bg-slate-950">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-white/5 glass-dark px-6 py-4 print:hidden">
         <div className="flex items-center justify-between">
