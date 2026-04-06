@@ -58,8 +58,13 @@ export async function POST(request: NextRequest) {
   // ─── Validation ───
   if (!items?.length) return NextResponse.json({ error: "Sin items" }, { status: 400 });
   if (!channel || !VALID_CHANNELS.includes(channel)) return NextResponse.json({ error: "Canal invalido" }, { status: 400 });
-  if (!paymentMethod || !VALID_PAYMENTS.includes(paymentMethod)) return NextResponse.json({ error: "Metodo de pago invalido" }, { status: 400 });
   if (channel === "DINE_IN" && !tableNumber?.trim()) return NextResponse.json({ error: "Falta numero de mesa" }, { status: 400 });
+  // Mesa is post-pay, no payment method needed at creation. Mostrador requires it.
+  if (channel === "COUNTER") {
+    if (!paymentMethod || !VALID_PAYMENTS.includes(paymentMethod)) {
+      return NextResponse.json({ error: "Metodo de pago invalido" }, { status: 400 });
+    }
+  }
 
   // Multi-tenant safety: verify all menuItemIds belong to this restaurant
   const itemIds = items.map((it) => it.menuItemId).filter(Boolean);
@@ -84,9 +89,10 @@ export async function POST(request: NextRequest) {
   const total = computeCartTotal(items);
 
   // Cash validation: must cover total. If total is 0, cashTendered is meaningless → null.
+  // Mesa skips cash validation (post-pay) — only mostrador with cash needs it.
   let cashChange: number | null = null;
   let cashTenderedNorm: number | null = null;
-  if (paymentMethod === "cash" && total > 0) {
+  if (channel === "COUNTER" && paymentMethod === "cash" && total > 0) {
     if (cashTendered === undefined || cashTendered === null || cashTendered < 0) {
       return NextResponse.json({ error: "Falta monto recibido" }, { status: 400 });
     }
@@ -97,7 +103,10 @@ export async function POST(request: NextRequest) {
     cashChange = Math.max(0, cashTenderedNorm - total);
   }
 
-  // Pre-pay flow: paymentStatus = PAID, status = PROCESSING (in cocina)
+  // Mesa = post-pay (UNPAID, kept open for adding items, cobrar later)
+  // Mostrador = pre-pay (PAID immediately)
+  const isPrePay = channel === "COUNTER";
+
   const order = await createOrder({
     restauranteSlug: restauranteSlug!,
     customerName: customerName || (channel === "DINE_IN" ? `Mesa ${tableNumber || "?"}` : "Mostrador"),
@@ -112,10 +121,10 @@ export async function POST(request: NextRequest) {
     deliveryFee: 0,
     channel,
     tableNumber: tableNumber || null,
-    paymentMethod,
-    paymentStatus: "PAID",
-    cashTendered: cashTenderedNorm,
-    cashChange,
+    paymentMethod: isPrePay ? paymentMethod : null,
+    paymentStatus: isPrePay ? "PAID" : "UNPAID",
+    cashTendered: isPrePay ? cashTenderedNorm : null,
+    cashChange: isPrePay ? cashChange : null,
     source: source || "pos-tablet",
     initialStatus: "PROCESSING",
   });
