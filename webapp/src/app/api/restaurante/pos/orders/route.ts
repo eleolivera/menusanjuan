@@ -11,6 +11,7 @@ const VALID_PAYMENTS: PaymentMethod[] = ["cash", "card", "transfer", "mercadopag
 // POST — create POS order (pre-paid, in-house)
 // Allows: restaurant owner OR admin
 export async function POST(request: NextRequest) {
+  try {
   // Read body ONCE
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body invalido" }, { status: 400 });
@@ -131,5 +132,9 @@ export async function POST(request: NextRequest) {
     } catch {}
   }
 
-  return NextResponse.json(order);
+    return NextResponse.json(order);
+  } catch (err: any) {
+    console.error("POS order create error:", err?.message, err?.stack);
+    return NextResponse.json({ error: err?.message || "Error del servidor" }, { status: 500 });
+  }
 }
