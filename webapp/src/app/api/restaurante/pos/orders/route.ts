@@ -4,23 +4,27 @@ import { getAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { createOrder, type OrderItem, type OrderChannel, type PaymentMethod } from "@/lib/orders-store";
 
+const VALID_CHANNELS: OrderChannel[] = ["DINE_IN", "COUNTER", "ONLINE"];
+const VALID_PAYMENTS: PaymentMethod[] = ["cash", "card", "transfer", "mercadopago"];
+
 // POST — create POS order (pre-paid, in-house)
 // Allows: restaurant owner OR admin
 export async function POST(request: NextRequest) {
-  // Auth: either restaurant owner or admin
+  // Read body ONCE
+  const body = await request.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Body invalido" }, { status: 400 });
+
+  // Auth: restaurant owner first, then admin fallback
   const dealer = await getRestauranteFromSession();
   let restauranteSlug: string | null = dealer?.slug || null;
 
   if (!restauranteSlug) {
-    // Try admin auth + slug from body
     const adminSession = await getAdminSession();
     if (!adminSession) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    const peek = await request.clone().json().catch(() => ({}));
-    if (!peek.restauranteSlug) return NextResponse.json({ error: "Falta restauranteSlug" }, { status: 400 });
-    restauranteSlug = peek.restauranteSlug;
+    if (!body.restauranteSlug) return NextResponse.json({ error: "Falta restauranteSlug" }, { status: 400 });
+    restauranteSlug = body.restauranteSlug;
   }
 
-  const body = await request.json();
   const {
     items,
     channel,
@@ -49,20 +53,49 @@ export async function POST(request: NextRequest) {
     source?: string;
   };
 
+  // ─── Validation ───
   if (!items?.length) return NextResponse.json({ error: "Sin items" }, { status: 400 });
-  if (!channel) return NextResponse.json({ error: "Falta channel" }, { status: 400 });
-  if (!paymentMethod) return NextResponse.json({ error: "Falta metodo de pago" }, { status: 400 });
+  if (!channel || !VALID_CHANNELS.includes(channel)) return NextResponse.json({ error: "Canal invalido" }, { status: 400 });
+  if (!paymentMethod || !VALID_PAYMENTS.includes(paymentMethod)) return NextResponse.json({ error: "Metodo de pago invalido" }, { status: 400 });
+  if (channel === "DINE_IN" && !tableNumber?.trim()) return NextResponse.json({ error: "Falta numero de mesa" }, { status: 400 });
 
-  // Compute total respecting price overrides
-  const total = items.reduce((s, it) => {
+  // Multi-tenant safety: verify all menuItemIds belong to this restaurant
+  const itemIds = items.map((it) => it.menuItemId).filter(Boolean);
+  if (itemIds.length > 0) {
+    const validItems = await prisma.menuItem.findMany({
+      where: { id: { in: itemIds }, category: { dealer: { slug: restauranteSlug! } } },
+      select: { id: true },
+    });
+    const validIds = new Set(validItems.map((v) => v.id));
+    const invalidIds = itemIds.filter((id) => !validIds.has(id));
+    if (invalidIds.length > 0) return NextResponse.json({ error: "Items no pertenecen al restaurante" }, { status: 400 });
+  }
+
+  // Reject negative price overrides
+  for (const it of items) {
+    if (it.priceOverride !== undefined && it.priceOverride !== null && it.priceOverride < 0) {
+      return NextResponse.json({ error: "Precio override invalido" }, { status: 400 });
+    }
+  }
+
+  // Compute total respecting price overrides (rounded to whole pesos)
+  const total = Math.round(items.reduce((s, it) => {
     const linePrice = it.priceOverride !== undefined ? it.priceOverride : (it.unitPrice + (it.optionsDelta || 0));
     return s + linePrice * it.quantity;
-  }, 0);
+  }, 0));
 
-  // Cash change calculation
+  // Cash validation: must cover total
   let cashChange: number | null = null;
-  if (paymentMethod === "cash" && cashTendered !== undefined && cashTendered !== null) {
-    cashChange = Math.max(0, cashTendered - total);
+  let cashTenderedNorm: number | null = null;
+  if (paymentMethod === "cash") {
+    if (cashTendered === undefined || cashTendered === null || cashTendered < 0) {
+      return NextResponse.json({ error: "Falta monto recibido" }, { status: 400 });
+    }
+    if (total > 0 && cashTendered < total) {
+      return NextResponse.json({ error: "Monto recibido menor al total" }, { status: 400 });
+    }
+    cashTenderedNorm = Math.round(cashTendered);
+    cashChange = Math.max(0, cashTenderedNorm - total);
   }
 
   // Pre-pay flow: paymentStatus = PAID, status = PROCESSING (in cocina)
@@ -82,7 +115,7 @@ export async function POST(request: NextRequest) {
     tableNumber: tableNumber || null,
     paymentMethod,
     paymentStatus: "PAID",
-    cashTendered: cashTendered ?? null,
+    cashTendered: cashTenderedNorm,
     cashChange,
     source: source || "pos-tablet",
     initialStatus: "PROCESSING",

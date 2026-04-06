@@ -40,9 +40,12 @@ export function PosBoard({
   const [customizing, setCustomizing] = useState<MenuItemData | null>(null);
   const [overriding, setOverriding] = useState<PosCartLine | null>(null);
   const [paying, setPaying] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("COUNTER");
   const [tableNumber, setTableNumber] = useState("");
   const [showSuccess, setShowSuccess] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Load menu
   useEffect(() => {
@@ -100,7 +103,19 @@ export function PosBoard({
   }
 
   function addCustomized(item: MenuItemData, quantity: number, selectedOptions: SelectedOptions, optionsDelta: number) {
-    setCart((prev) => [...prev, { cartKey: `pos-${++cartCounter}`, item, quantity, selectedOptions, optionsDelta }]);
+    setCart((prev) => {
+      // Merge with existing line if item + options match exactly and no override
+      const optionsKey = JSON.stringify(selectedOptions);
+      const existing = prev.find((l) =>
+        l.item.id === item.id &&
+        l.priceOverride === undefined &&
+        JSON.stringify(l.selectedOptions) === optionsKey
+      );
+      if (existing) {
+        return prev.map((l) => l.cartKey === existing.cartKey ? { ...l, quantity: l.quantity + quantity } : l);
+      }
+      return [...prev, { cartKey: `pos-${++cartCounter}`, item, quantity, selectedOptions, optionsDelta }];
+    });
     setCustomizing(null);
   }
 
@@ -130,11 +145,15 @@ export function PosBoard({
   // ─── Submit ───
 
   async function submitOrder(paymentMethod: string, cashTendered?: number) {
+    if (submitting) return; // Prevent double-submit
     if (mode === "DINE_IN" && !tableNumber.trim()) {
-      alert("Falta numero de mesa");
+      setErrorMsg("Falta numero de mesa");
       return;
     }
     if (cart.length === 0) return;
+
+    setSubmitting(true);
+    setErrorMsg(null);
 
     const items = cart.map((line) => {
       const linePrice = line.priceOverride !== undefined ? line.priceOverride : (line.item.price + line.optionsDelta);
@@ -147,37 +166,43 @@ export function PosBoard({
         selectedOptions: line.selectedOptions,
         priceOverride: line.priceOverride,
         overrideNote: line.overrideNote,
-        total: linePrice * line.quantity,
+        total: Math.round(linePrice * line.quantity),
       };
     });
 
-    const res = await fetch("/api/restaurante/pos/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items,
-        channel: mode,
-        tableNumber: mode === "DINE_IN" ? tableNumber.trim() : null,
-        paymentMethod,
-        cashTendered,
-        source: "pos-tablet",
-      }),
-    });
+    try {
+      const res = await fetch("/api/restaurante/pos/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items,
+          channel: mode,
+          tableNumber: mode === "DINE_IN" ? tableNumber.trim() : null,
+          paymentMethod,
+          cashTendered,
+          source: "pos-tablet",
+        }),
+      });
 
-    if (res.ok) {
-      const order = await res.json();
-      setShowSuccess(order.orderNumber);
-      setCart([]);
-      setTableNumber("");
-      setPaying(false);
-      // Update suggestions if dine-in
-      if (mode === "DINE_IN" && tableNumber.trim()) {
-        const updated = [tableNumber.trim(), ...tableSuggestions.filter((t) => t !== tableNumber.trim())].slice(0, 30);
-        onSuggestionsUpdate(updated);
+      if (res.ok) {
+        const order = await res.json();
+        setShowSuccess(order.orderNumber);
+        setCart([]);
+        setTableNumber("");
+        setPaying(false);
+        if (mode === "DINE_IN" && tableNumber.trim()) {
+          const updated = [tableNumber.trim(), ...tableSuggestions.filter((t) => t !== tableNumber.trim())].slice(0, 30);
+          onSuggestionsUpdate(updated);
+        }
+        setTimeout(() => setShowSuccess(null), 4000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErrorMsg(data.error || "Error al crear pedido");
       }
-      setTimeout(() => setShowSuccess(null), 4000);
-    } else {
-      alert("Error al crear pedido");
+    } catch {
+      setErrorMsg("Error de conexion");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -277,8 +302,13 @@ export function PosBoard({
           </div>
         </div>
 
-        {/* Cart side */}
-        <div className="w-72 sm:w-80 shrink-0 flex flex-col bg-slate-900/30">
+        {/* Cart side — hidden on mobile, slide-over on tablet+ */}
+        <div className={`${mobileCartOpen ? "fixed inset-0 z-40 bg-slate-950 flex" : "hidden"} md:relative md:flex md:w-80 md:shrink-0 flex-col bg-slate-900/30 md:inset-auto md:z-auto md:bg-slate-900/30`}>
+          {mobileCartOpen && (
+            <button onClick={() => setMobileCartOpen(false)} className="md:hidden absolute top-3 right-3 z-10 rounded-lg bg-white/10 p-2 text-white">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
           <div className="shrink-0 px-4 py-3 border-b border-white/5">
             <h2 className="text-xs font-bold text-white">Pedido</h2>
             <p className="text-[10px] text-slate-500">{itemCount} items</p>
@@ -353,6 +383,20 @@ export function PosBoard({
         </div>
       </div>
 
+      {/* Mobile cart FAB */}
+      {!mobileCartOpen && cart.length > 0 && (
+        <button
+          onClick={() => setMobileCartOpen(true)}
+          className="md:hidden fixed bottom-4 left-4 right-4 z-30 rounded-2xl bg-gradient-to-r from-primary to-amber-500 px-5 py-4 text-white font-bold shadow-2xl shadow-primary/30 flex items-center justify-between"
+        >
+          <span className="flex items-center gap-2">
+            <span className="bg-white/20 rounded-full h-7 w-7 flex items-center justify-center text-sm">{itemCount}</span>
+            <span>Ver pedido</span>
+          </span>
+          <span>{formatARS(total)}</span>
+        </button>
+      )}
+
       {/* Customize sheet */}
       {customizing && (
         <ItemCustomizeSheet
@@ -375,9 +419,18 @@ export function PosBoard({
       {paying && (
         <PosPaymentSheet
           total={total}
+          submitting={submitting}
           onPay={(method, tendered) => submitOrder(method, tendered)}
-          onClose={() => setPaying(false)}
+          onClose={() => { if (!submitting) setPaying(false); }}
         />
+      )}
+
+      {/* Error toast */}
+      {errorMsg && (
+        <div className="fixed top-4 right-4 z-50 rounded-xl border border-red-400/30 bg-red-400/10 backdrop-blur px-4 py-3 shadow-2xl animate-fade-in flex items-center gap-3">
+          <p className="text-sm font-bold text-red-400">{errorMsg}</p>
+          <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-white">x</button>
+        </div>
       )}
 
       {/* Success toast */}

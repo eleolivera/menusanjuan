@@ -18,22 +18,32 @@ export function PosPaymentSheet({
   total,
   onPay,
   onClose,
+  submitting,
 }: {
   total: number;
   onPay: (method: string, cashTendered?: number) => void;
   onClose: () => void;
+  submitting: boolean;
 }) {
   const [method, setMethod] = useState<Method>("cash");
   const [tendered, setTendered] = useState<string>("");
-  const [submitting, setSubmitting] = useState(false);
 
-  const tenderedNum = parseFloat(tendered) || 0;
+  // Clamp to non-negative integer pesos (no cents in ARS)
+  const tenderedNum = Math.max(0, Math.floor(parseFloat(tendered) || 0));
   const change = tenderedNum - total;
-  const canPay = method !== "cash" || tenderedNum >= total;
+  // Cash requires tendered >= total (or total = 0)
+  const canPay = method !== "cash" || total === 0 || tenderedNum >= total;
 
   function handlePay() {
-    setSubmitting(true);
+    if (submitting || !canPay) return;
     onPay(method, method === "cash" ? tenderedNum : undefined);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && canPay && !submitting) {
+      e.preventDefault();
+      handlePay();
+    }
   }
 
   return (
@@ -81,8 +91,12 @@ export function PosPaymentSheet({
                 <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-2">Recibido</label>
                 <input
                   type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1"
                   value={tendered}
                   onChange={(e) => setTendered(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   placeholder="0"
                   autoFocus
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-2xl font-bold text-white text-right placeholder:text-slate-700 focus:border-primary focus:outline-none"
@@ -104,7 +118,7 @@ export function PosPaymentSheet({
               {/* Change display */}
               {tenderedNum > 0 && (
                 <div className={`rounded-xl border p-4 text-center ${change >= 0 ? "border-emerald-400/30 bg-emerald-400/10" : "border-red-400/30 bg-red-400/10"}`}>
-                  <p className="text-[10px] uppercase tracking-wider mb-1 ${change >= 0 ? 'text-emerald-400' : 'text-red-400'}">
+                  <p className={`text-[10px] uppercase tracking-wider mb-1 ${change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                     {change >= 0 ? "Vuelto" : "Falta"}
                   </p>
                   <p className={`text-3xl font-extrabold ${change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
