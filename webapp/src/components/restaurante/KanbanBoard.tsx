@@ -19,15 +19,9 @@ export function KanbanBoard({
 }) {
   const [dragOverCol, setDragOverCol] = useState<OrderStatus | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const [channelFilter, setChannelFilter] = useState<string>(() => {
-    if (typeof window === "undefined") return "ALL";
-    return localStorage.getItem("kanban-channel-filter") || "ALL";
-  });
-
-  function setFilter(f: string) {
-    setChannelFilter(f);
-    if (typeof window !== "undefined") localStorage.setItem("kanban-channel-filter", f);
-  }
+  // Default to ALL — don't persist across sessions to avoid silently hiding orders
+  const [channelFilter, setChannelFilter] = useState<string>("ALL");
+  const setFilter = setChannelFilter;
 
   const filteredOrders = channelFilter === "ALL" ? orders : orders.filter((o) => (o.channel || "ONLINE") === channelFilter);
 
@@ -109,7 +103,7 @@ export function KanbanBoard({
               {/* Cards */}
               <div className="space-y-2 overflow-y-auto flex-1" style={{ minHeight: 0 }}>
                 {colOrders.map((order) => {
-                  const items = (typeof order.items === "string" ? JSON.parse(order.items) : order.items) as any[];
+                  const items = (order.items || []) as any[];
                   const itemSummary = items.slice(0, 2).map((i: any) => `${i.quantity}x ${i.name}`).join(", ");
                   const more = items.length > 2 ? ` +${items.length - 2}` : "";
 

@@ -168,17 +168,33 @@ export function OrderCard({
 
             {/* Items */}
             <div className="space-y-1.5 mb-2">
-              {order.items.map((item, i) => (
-                <div key={i}>
-                  <div className="flex justify-between">
-                    <span className="font-semibold">{item.quantity}x {item.name}</span>
+              {order.items.map((item: any, i) => {
+                const hasOverride = item.priceOverride !== undefined && item.priceOverride !== null;
+                const unitPrice = hasOverride ? item.priceOverride : (item.unitPrice ?? 0);
+                const total = item.total ?? (unitPrice * item.quantity);
+                return (
+                  <div key={i}>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">{item.quantity}x {item.name}</span>
+                    </div>
+                    {item.selectedOptions && item.selectedOptions.length > 0 && (
+                      <div className="text-[10px] text-slate-500 pl-4">
+                        {item.selectedOptions.map((so: any) => `${so.group}: ${so.choices.map((c: any) => c.name).join(", ")}`).join(" / ")}
+                      </div>
+                    )}
+                    <div className="flex justify-between text-slate-500">
+                      <span className="pl-4">
+                        {hasOverride && <span className="line-through text-slate-400 mr-1">${(item.unitPrice ?? 0).toLocaleString("es-AR")}</span>}
+                        ${unitPrice.toLocaleString("es-AR")} c/u
+                      </span>
+                      <span className="font-semibold text-slate-700">${total.toLocaleString("es-AR")}</span>
+                    </div>
+                    {hasOverride && item.overrideNote && (
+                      <div className="text-[10px] text-amber-600 pl-4">Nota: {item.overrideNote}</div>
+                    )}
                   </div>
-                  <div className="flex justify-between text-slate-500">
-                    <span className="pl-4">${item.unitPrice.toLocaleString("es-AR")} c/u</span>
-                    <span className="font-semibold text-slate-700">${item.total.toLocaleString("es-AR")}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="border-t border-dashed border-slate-300 my-2" />
