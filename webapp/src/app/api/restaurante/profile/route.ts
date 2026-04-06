@@ -27,6 +27,7 @@ export async function GET() {
     mercadoPagoCvu: dealer.mercadoPagoCvu,
     bankInfo: dealer.bankInfo,
     isActive: dealer.isActive,
+    posEnabled: dealer.posEnabled,
     email: dealer.account.user.email,
   });
 }
@@ -42,7 +43,7 @@ export async function PATCH(request: NextRequest) {
   const {
     name, phone, address, latitude, longitude, cuisineType,
     description, logoUrl, coverUrl, openHours,
-    mercadoPagoAlias, mercadoPagoCvu, bankInfo,
+    mercadoPagoAlias, mercadoPagoCvu, bankInfo, posEnabled,
   } = body;
 
   const updated = await prisma.dealer.update({
@@ -61,6 +62,7 @@ export async function PATCH(request: NextRequest) {
       ...(mercadoPagoAlias !== undefined && { mercadoPagoAlias }),
       ...(mercadoPagoCvu !== undefined && { mercadoPagoCvu }),
       ...(bankInfo !== undefined && { bankInfo }),
+      ...(posEnabled !== undefined && { posEnabled }),
     },
   });
 

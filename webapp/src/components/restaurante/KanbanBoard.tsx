@@ -19,6 +19,17 @@ export function KanbanBoard({
 }) {
   const [dragOverCol, setDragOverCol] = useState<OrderStatus | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
+  const [channelFilter, setChannelFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "ALL";
+    return localStorage.getItem("kanban-channel-filter") || "ALL";
+  });
+
+  function setFilter(f: string) {
+    setChannelFilter(f);
+    if (typeof window !== "undefined") localStorage.setItem("kanban-channel-filter", f);
+  }
+
+  const filteredOrders = channelFilter === "ALL" ? orders : orders.filter((o) => (o.channel || "ONLINE") === channelFilter);
 
   function handleDragStart(e: React.DragEvent, orderId: string) {
     e.dataTransfer.setData("text/plain", orderId);
@@ -50,11 +61,30 @@ export function KanbanBoard({
     );
   }
 
+  const FILTER_CHIPS = [
+    { value: "ALL", label: "Todos", count: orders.length },
+    { value: "ONLINE", label: "Online", count: orders.filter((o) => (o.channel || "ONLINE") === "ONLINE").length },
+    { value: "DINE_IN", label: "Salon", count: orders.filter((o) => o.channel === "DINE_IN").length },
+    { value: "COUNTER", label: "Mostrador", count: orders.filter((o) => o.channel === "COUNTER").length },
+  ];
+
   return (
     <>
+      {/* Filter chips */}
+      <div className="shrink-0 flex gap-1.5 mb-2 overflow-x-auto">
+        {FILTER_CHIPS.map((c) => (
+          <button key={c.value} onClick={() => setFilter(c.value)}
+            className={`shrink-0 rounded-lg px-3 py-1 text-[10px] font-semibold transition-all ${
+              channelFilter === c.value ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"
+            }`}>
+            {c.label} <span className="opacity-60">({c.count})</span>
+          </button>
+        ))}
+      </div>
+
       <div className="flex gap-3 flex-1" style={{ minHeight: 0 }}>
         {COLUMNS.map((col) => {
-          const colOrders = orders.filter((o) => o.status === col.status)
+          const colOrders = filteredOrders.filter((o) => o.status === col.status)
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           const isDragOver = dragOverCol === col.status;
 
@@ -83,25 +113,31 @@ export function KanbanBoard({
                   const itemSummary = items.slice(0, 2).map((i: any) => `${i.quantity}x ${i.name}`).join(", ");
                   const more = items.length > 2 ? ` +${items.length - 2}` : "";
 
+                  const channel = order.channel || "ONLINE";
+                  const stripeColor = channel === "DINE_IN" ? "bg-cyan-400" : channel === "COUNTER" ? "bg-purple-400" : "bg-blue-400";
+                  const channelLabel = channel === "DINE_IN" ? `Mesa ${order.tableNumber || ""}` : channel === "COUNTER" ? "Mostrador" : (order.deliveryMethod === "pickup" ? "Retiro" : "Delivery");
                   return (
                     <div
                       key={order.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, order.id)}
                       onClick={() => setSelectedOrder(selectedOrder === order.id ? null : order.id)}
-                      className="rounded-xl border border-white/5 bg-slate-800/50 p-3 hover:border-primary/20 transition-all cursor-grab active:cursor-grabbing"
+                      className="rounded-xl border border-white/5 bg-slate-800/50 p-3 hover:border-primary/20 transition-all cursor-grab active:cursor-grabbing relative overflow-hidden"
                     >
-                      <div className="flex items-start justify-between mb-1">
-                        <span className="text-xs font-bold text-primary">{order.orderNumber}</span>
+                      {/* Channel stripe */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${stripeColor}`} />
+                      <div className="flex items-start justify-between mb-1 ml-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-primary">{order.orderNumber}</span>
+                          {order.paymentStatus === "PAID" && <span className="rounded bg-emerald-400/15 px-1 text-[8px] font-bold text-emerald-400">PAGADO</span>}
+                        </div>
                         <span className="text-[10px] text-slate-600">{timeAgo(order.createdAt)}</span>
                       </div>
-                      <p className="text-xs font-medium text-white truncate">{order.customerName}</p>
-                      <p className="text-[10px] text-slate-500 truncate mt-0.5">{itemSummary}{more}</p>
-                      <div className="flex items-center justify-between mt-1.5">
+                      <p className="text-xs font-medium text-white truncate ml-1">{order.customerName}</p>
+                      <p className="text-[10px] text-slate-500 truncate mt-0.5 ml-1">{itemSummary}{more}</p>
+                      <div className="flex items-center justify-between mt-1.5 ml-1">
                         <span className="text-xs font-bold text-white">{formatARS(order.total)}</span>
-                        <span className="text-[9px] text-slate-600">
-                          {order.deliveryMethod === "pickup" ? "Retiro" : "Delivery"}
-                        </span>
+                        <span className="text-[9px] text-slate-600">{channelLabel}</span>
                       </div>
                     </div>
                   );

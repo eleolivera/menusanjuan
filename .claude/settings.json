@@ -1,11 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm:*)",
-      "Bash(npx:*)",
-      "Bash(git:*)",
-      "Bash(cd:*)",
-      "Edit(/.claude/skills/sanjuan-design/**)"
+      "Bash(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Read(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "mcp__menusanjuan__*"
     ]
   },
   "enableAllProjectMcpServers": true,

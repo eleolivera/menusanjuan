@@ -8,6 +8,7 @@ const DEFAULT_NAV = [
   { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
   { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "🏪" },
   { href: "/restaurante/pedidos", label: "Pedidos", emoji: "📋" },
+  { href: "/restaurante/pos", label: "POS", emoji: "💵" },
   { href: "/restaurante/dashboard", label: "Dashboard", emoji: "📊" },
 ];
 

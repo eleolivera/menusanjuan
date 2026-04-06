@@ -5,12 +5,20 @@ import { OrderStatus as PrismaOrderStatus } from "@/generated/prisma/client";
 
 export type OrderStatus = "GENERATED" | "PAID" | "PROCESSING" | "DELIVERED" | "CANCELLED";
 
+export type OrderChannel = "ONLINE" | "DINE_IN" | "COUNTER";
+export type PaymentMethod = "cash" | "card" | "transfer" | "mercadopago";
+export type PaymentStatus = "UNPAID" | "PAID";
+
 export type OrderItem = {
   menuItemId: string;
   name: string;
   quantity: number;
   unitPrice: number;
   total: number;
+  priceOverride?: number; // POS: cashier-set price (can be 0 = free)
+  overrideNote?: string;  // Required when priceOverride is set
+  selectedOptions?: { group: string; choices: { name: string; priceDelta: number }[]; delta: number }[];
+  optionsDelta?: number;
 };
 
 export type Order = {
@@ -29,6 +37,15 @@ export type Order = {
   deliveryFee: number;
   notes: string;
   whatsappSent: boolean;
+  // POS fields
+  channel: OrderChannel;
+  tableNumber: string | null;
+  paymentMethod: PaymentMethod | null;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
+  cashTendered: number | null;
+  cashChange: number | null;
+  source: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -160,6 +177,14 @@ function mapOrder(dbOrder: any): Order {
     deliveryFee: dbOrder.deliveryFee || 0,
     notes: dbOrder.notes || "",
     whatsappSent: dbOrder.whatsappSent,
+    channel: (dbOrder.channel || "ONLINE") as OrderChannel,
+    tableNumber: dbOrder.tableNumber || null,
+    paymentMethod: dbOrder.paymentMethod || null,
+    paymentStatus: (dbOrder.paymentStatus || "UNPAID") as PaymentStatus,
+    paidAt: dbOrder.paidAt ? dbOrder.paidAt.toISOString() : null,
+    cashTendered: dbOrder.cashTendered,
+    cashChange: dbOrder.cashChange,
+    source: dbOrder.source || null,
     createdAt: dbOrder.createdAt.toISOString(),
     updatedAt: dbOrder.updatedAt.toISOString(),
   };
@@ -179,6 +204,15 @@ export async function createOrder(data: {
   notes?: string;
   deliveryMethod?: string;
   deliveryFee?: number;
+  // POS fields
+  channel?: OrderChannel;
+  tableNumber?: string | null;
+  paymentMethod?: PaymentMethod | null;
+  paymentStatus?: PaymentStatus;
+  cashTendered?: number | null;
+  cashChange?: number | null;
+  source?: string | null;
+  initialStatus?: OrderStatus; // For POS to skip GENERATED
 }): Promise<Order> {
   const orderNumber = await nextOrderNumber(data.restauranteSlug);
 
@@ -196,6 +230,15 @@ export async function createOrder(data: {
       notes: data.notes || null,
       deliveryMethod: data.deliveryMethod ?? "delivery",
       deliveryFee: data.deliveryFee ?? 0,
+      channel: data.channel ?? "ONLINE",
+      tableNumber: data.tableNumber ?? null,
+      paymentMethod: data.paymentMethod ?? null,
+      paymentStatus: data.paymentStatus ?? "UNPAID",
+      paidAt: data.paymentStatus === "PAID" ? new Date() : null,
+      cashTendered: data.cashTendered ?? null,
+      cashChange: data.cashChange ?? null,
+      source: data.source ?? "web",
+      ...(data.initialStatus ? { status: data.initialStatus as PrismaOrderStatus } : {}),
     },
   });
 

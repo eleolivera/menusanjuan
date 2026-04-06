@@ -93,6 +93,8 @@ model Dealer {
   deliveryFarRadius   Float?                   // Far zone radius in km (e.g. 7.0)
   deliveryFarPrice    Float?                   // Far zone price in ARS
   deliveryFee Float?                           // Legacy flat fee fallback
+  posEnabled  Boolean  @default(false)         // Show POS / pre-pay tablet UI
+  tableSuggestions Json?                       // Recently used table names for autocomplete
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -243,7 +245,14 @@ model Order {
   total            Float
   deliveryMethod   String      @default("delivery")  // "delivery" | "pickup"
   deliveryFee      Float       @default(0)            // Delivery fee charged in ARS
-  paymentMethod    String?                           // "mercadopago", "cash", "transfer"
+  paymentMethod    String?                           // "cash" | "card" | "transfer" | "mercadopago"
+  paymentStatus    String      @default("UNPAID")    // "UNPAID" | "PAID"
+  paidAt           DateTime?
+  cashTendered     Float?                            // For change calculation
+  cashChange       Float?
+  channel          String      @default("ONLINE")    // "ONLINE" | "DINE_IN" | "COUNTER"
+  tableNumber      String?                           // "Mesa 12" / "Barra 3" — free text
+  source           String?                           // "web" | "pos-tablet" | "pos-mobile"
   whatsappSent     Boolean     @default(false)
   notes            String?
   createdAt        DateTime    @default(now())
@@ -253,6 +262,7 @@ model Order {
 
   @@index([restauranteSlug, status])
   @@index([restauranteSlug, createdAt])
+  @@index([restauranteSlug, channel])
   @@index([orderNumber])
 }
 

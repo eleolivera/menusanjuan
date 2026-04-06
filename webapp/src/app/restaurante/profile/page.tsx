@@ -51,6 +51,7 @@ export default function ProfilePage() {
   const [mercadoPagoAlias, setMercadoPagoAlias] = useState("");
   const [mercadoPagoCvu, setMercadoPagoCvu] = useState("");
   const [bankInfo, setBankInfo] = useState("");
+  const [posEnabled, setPosEnabled] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -88,6 +89,7 @@ export default function ProfilePage() {
         setMercadoPagoAlias(d.mercadoPagoAlias || "");
         setMercadoPagoCvu(d.mercadoPagoCvu || "");
         setBankInfo(d.bankInfo || "");
+        setPosEnabled(d.posEnabled || false);
         setLoading(false);
       })
       .catch(() => router.push("/restaurante/login"));
@@ -103,7 +105,7 @@ export default function ProfilePage() {
         name, phone, address, latitude, longitude, cuisineType,
         description, logoUrl, coverUrl,
         openHours: JSON.stringify(hours),
-        mercadoPagoAlias, mercadoPagoCvu, bankInfo,
+        mercadoPagoAlias, mercadoPagoCvu, bankInfo, posEnabled,
       }),
     });
     setSaving(false);
@@ -314,6 +316,30 @@ export default function ProfilePage() {
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
             </div>
           </div>
+        </section>
+
+        {/* POS toggle */}
+        <section id="pos" className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+          <h2 className="text-sm font-bold text-white mb-4">POS — Pedidos en el local</h2>
+          <p className="text-xs text-slate-500 mb-4">Activa el POS para tomar pedidos desde una tablet o celular en mostrador y mesas. Los pedidos van directo a la cocina con el pago ya cobrado.</p>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button
+              type="button"
+              onClick={() => setPosEnabled(!posEnabled)}
+              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${posEnabled ? "bg-emerald-500" : "bg-slate-700"}`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-1 ${posEnabled ? "translate-x-6 ml-0.5" : "translate-x-1"}`} />
+            </button>
+            <div>
+              <p className="text-sm font-medium text-white">{posEnabled ? "POS habilitado" : "POS deshabilitado"}</p>
+              <p className="text-[10px] text-slate-500">{posEnabled ? "El boton POS aparece en el menu lateral" : "Activalo para tomar pedidos en el local"}</p>
+            </div>
+          </label>
+          {posEnabled && (
+            <a href="/restaurante/pos" className="mt-4 inline-flex rounded-lg bg-primary/15 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors">
+              Abrir POS →
+            </a>
+          )}
         </section>
 
         {/* Save button (bottom) */}
