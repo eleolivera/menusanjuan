@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import type { MenuCategoryData, MenuItemData } from "@/data/menus";
+import { useState, useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
+import type { MenuCategoryData, MenuItemData, OptionGroupData } from "@/data/menus";
 import { ItemCustomizeSheet, type SelectedOptions } from "@/components/ItemCustomizeSheet";
 import { PosPaymentSheet } from "./PosPaymentSheet";
 import { PosPriceOverrideSheet } from "./PosPriceOverrideSheet";
 import { formatARS, normalize } from "@/lib/admin-utils";
+import { computeCartTotal } from "@/lib/money";
 
-let cartCounter = 0;
+function isVideo(url: string) {
+  return /\.(mp4|mov|webm)/i.test(url);
+}
+
+function newCartKey(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return `pos-${crypto.randomUUID()}`;
+  return `pos-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 export type PosCartLine = {
   cartKey: string;
@@ -49,18 +58,38 @@ export function PosBoard({
 
   // Load menu
   useEffect(() => {
+    type ApiOptionChoice = { id: string; name: string; priceDelta: number; available: boolean };
+    type ApiOptionGroup = { id: string; title: string; minSelections: number; maxSelections: number; options: ApiOptionChoice[] };
+    type ApiMenuItem = { id: string; name: string; description: string | null; price: number; imageUrl: string | null; badge: string | null; available: boolean; optionGroups?: ApiOptionGroup[] };
+    type ApiCategory = { id: string; name: string; emoji: string | null; items: ApiMenuItem[] };
+
     fetch("/api/restaurante/menu")
       .then((r) => r.json())
-      .then((cats: any[]) => {
-        const mapped: MenuCategoryData[] = cats.map((c: any) => ({
-          id: c.id, name: c.name, emoji: c.emoji || "🍽️",
-          items: c.items.map((i: any) => ({
-            id: i.id, name: i.name, description: i.description || "", price: i.price,
-            imageUrl: i.imageUrl || "", badge: i.badge || undefined, available: i.available,
-            optionGroups: (i.optionGroups || []).map((g: any) => ({
-              id: g.id, title: g.title, minSelections: g.minSelections, maxSelections: g.maxSelections,
-              options: g.options.map((o: any) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available })),
-            })),
+      .then((cats: ApiCategory[]) => {
+        const mapped: MenuCategoryData[] = cats.map((c) => ({
+          id: c.id,
+          name: c.name,
+          emoji: c.emoji || "🍽️",
+          items: c.items.map((i) => ({
+            id: i.id,
+            name: i.name,
+            description: i.description || "",
+            price: i.price,
+            imageUrl: i.imageUrl || "",
+            badge: i.badge || undefined,
+            available: i.available,
+            // Filter out unavailable options + skip groups with zero remaining options
+            optionGroups: (i.optionGroups || [])
+              .map((g): OptionGroupData => ({
+                id: g.id,
+                title: g.title,
+                minSelections: g.minSelections,
+                maxSelections: g.maxSelections,
+                options: g.options
+                  .filter((o) => o.available)
+                  .map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available })),
+              }))
+              .filter((g) => g.options.length > 0),
           })),
         }));
         setCategories(mapped);
@@ -68,6 +97,20 @@ export function PosBoard({
         setLoading(false);
       });
   }, []);
+
+  // Auto-dismiss success toast after 4s, with proper cleanup
+  useEffect(() => {
+    if (!showSuccess) return;
+    const t = setTimeout(() => setShowSuccess(null), 4000);
+    return () => clearTimeout(t);
+  }, [showSuccess]);
+
+  // Auto-dismiss error toast after 6s
+  useEffect(() => {
+    if (!errorMsg) return;
+    const t = setTimeout(() => setErrorMsg(null), 6000);
+    return () => clearTimeout(t);
+  }, [errorMsg]);
 
   // Filter items by search
   const visibleItems = useMemo(() => {
@@ -79,12 +122,24 @@ export function PosBoard({
     return cat ? cat.items.filter((i) => i.available) : [];
   }, [categories, activeCat, search]);
 
-  // Cart calculations
-  const total = cart.reduce((s, line) => {
-    const linePrice = line.priceOverride !== undefined ? line.priceOverride : (line.item.price + line.optionsDelta);
-    return s + linePrice * line.quantity;
-  }, 0);
-  const itemCount = cart.reduce((s, l) => s + l.quantity, 0);
+  // Cart calculations (use shared helper for total to keep parity with server)
+  const itemCount = useMemo(() => cart.reduce((s, l) => s + l.quantity, 0), [cart]);
+
+  const total = useMemo(() => computeCartTotal(
+    cart.map((line) => ({
+      unitPrice: line.item.price,
+      priceOverride: line.priceOverride,
+      optionsDelta: line.optionsDelta,
+      quantity: line.quantity,
+    }))
+  ), [cart]);
+
+  // Subtotal without overrides — used to show discount breakdown
+  const subtotalNoOverride = useMemo(() => Math.round(cart.reduce((s, line) =>
+    s + (line.item.price + line.optionsDelta) * line.quantity, 0
+  )), [cart]);
+  const totalDiscount = subtotalNoOverride - total;
+  const hasOverrides = cart.some((l) => l.priceOverride !== undefined);
 
   // ─── Cart actions ───
 
@@ -97,7 +152,7 @@ export function PosBoard({
         if (existing) {
           return prev.map((l) => l.cartKey === existing.cartKey ? { ...l, quantity: l.quantity + 1 } : l);
         }
-        return [...prev, { cartKey: `pos-${++cartCounter}`, item, quantity: 1, selectedOptions: [], optionsDelta: 0 }];
+        return [...prev, { cartKey: newCartKey(), item, quantity: 1, selectedOptions: [], optionsDelta: 0 }];
       });
     }
   }
@@ -114,7 +169,7 @@ export function PosBoard({
       if (existing) {
         return prev.map((l) => l.cartKey === existing.cartKey ? { ...l, quantity: l.quantity + quantity } : l);
       }
-      return [...prev, { cartKey: `pos-${++cartCounter}`, item, quantity, selectedOptions, optionsDelta }];
+      return [...prev, { cartKey: newCartKey(), item, quantity, selectedOptions, optionsDelta }];
     });
     setCustomizing(null);
   }
@@ -194,7 +249,6 @@ export function PosBoard({
           const updated = [tableNumber.trim(), ...tableSuggestions.filter((t) => t !== tableNumber.trim())].slice(0, 30);
           onSuggestionsUpdate(updated);
         }
-        setTimeout(() => setShowSuccess(null), 4000);
       } else {
         const data = await res.json().catch(() => ({}));
         setErrorMsg(data.error || "Error al crear pedido");
@@ -275,7 +329,19 @@ export function PosBoard({
           <div className="flex-1 overflow-y-auto p-3" style={{ minHeight: 0 }}>
             {visibleItems.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-xs text-slate-600">Sin items disponibles</p>
+                {search.trim() ? (
+                  <>
+                    <p className="text-xs text-slate-500 mb-2">Sin resultados para "{search}"</p>
+                    <button onClick={() => setSearch("")} className="text-[10px] text-primary hover:underline">Limpiar busqueda</button>
+                  </>
+                ) : categories.length === 0 ? (
+                  <>
+                    <p className="text-xs text-slate-500 mb-2">Tu menu esta vacio</p>
+                    <a href="/restaurante/menu" className="text-[10px] text-primary hover:underline">Agregar items al menu</a>
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-600">Sin items disponibles en esta categoria</p>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -286,8 +352,12 @@ export function PosBoard({
                     className="rounded-xl border border-white/5 bg-slate-900/50 p-2.5 text-left hover:border-primary/30 hover:bg-slate-900 active:scale-95 transition-all"
                   >
                     {item.imageUrl && (
-                      <div className="aspect-square w-full rounded-lg overflow-hidden mb-2 bg-white/5">
-                        <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                      <div className="relative aspect-square w-full rounded-lg overflow-hidden mb-2 bg-white/5">
+                        {isVideo(item.imageUrl) ? (
+                          <video src={item.imageUrl} className="w-full h-full object-cover" autoPlay loop muted playsInline />
+                        ) : (
+                          <Image src={item.imageUrl} alt={item.name} fill sizes="(max-width: 640px) 50vw, 200px" className="object-cover" />
+                        )}
                       </div>
                     )}
                     <p className="text-xs font-semibold text-white line-clamp-2 leading-tight mb-1">{item.name}</p>
@@ -363,6 +433,18 @@ export function PosBoard({
 
           {/* Footer */}
           <div className="shrink-0 border-t border-white/5 p-3 space-y-2">
+            {hasOverrides && (
+              <>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-500">Subtotal</span>
+                  <span className="text-slate-400 line-through">{formatARS(subtotalNoOverride)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-amber-400">Modificaciones</span>
+                  <span className="text-amber-400">-{formatARS(totalDiscount)}</span>
+                </div>
+              </>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-400">Total</span>
               <span className="text-lg font-bold text-white">{formatARS(total)}</span>

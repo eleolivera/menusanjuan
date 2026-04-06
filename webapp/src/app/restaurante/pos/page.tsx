@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PosBoard } from "@/components/restaurante/pos/PosBoard";
 
 export default function PosPage() {
@@ -44,9 +45,9 @@ export default function PosPage() {
           <p className="text-sm text-slate-400 mb-6">
             Activa el POS desde tu perfil para empezar a tomar pedidos en el local. Funciona en tablet o celular, ideal para mostrador o mesas.
           </p>
-          <a href="/restaurante/profile#pos" className="inline-flex rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all">
+          <Link href="/restaurante/profile#pos" className="inline-flex rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all">
             Habilitar POS
-          </a>
+          </Link>
         </div>
       </div>
     );

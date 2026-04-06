@@ -3,6 +3,7 @@ import { getRestauranteFromSession } from "@/lib/restaurante-auth";
 import { getAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { createOrder, type OrderItem, type OrderChannel, type PaymentMethod } from "@/lib/orders-store";
+import { computeCartTotal } from "@/lib/money";
 
 const VALID_CHANNELS: OrderChannel[] = ["DINE_IN", "COUNTER", "ONLINE"];
 const VALID_PAYMENTS: PaymentMethod[] = ["cash", "card", "transfer", "mercadopago"];
@@ -78,20 +79,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Compute total respecting price overrides (rounded to whole pesos)
-  const total = Math.round(items.reduce((s, it) => {
-    const linePrice = it.priceOverride !== undefined ? it.priceOverride : (it.unitPrice + (it.optionsDelta || 0));
-    return s + linePrice * it.quantity;
-  }, 0));
+  // Compute total via shared helper (rounded to whole pesos)
+  const total = computeCartTotal(items);
 
-  // Cash validation: must cover total
+  // Cash validation: must cover total. If total is 0, cashTendered is meaningless → null.
   let cashChange: number | null = null;
   let cashTenderedNorm: number | null = null;
-  if (paymentMethod === "cash") {
+  if (paymentMethod === "cash" && total > 0) {
     if (cashTendered === undefined || cashTendered === null || cashTendered < 0) {
       return NextResponse.json({ error: "Falta monto recibido" }, { status: 400 });
     }
-    if (total > 0 && cashTendered < total) {
+    if (cashTendered < total) {
       return NextResponse.json({ error: "Monto recibido menor al total" }, { status: 400 });
     }
     cashTenderedNorm = Math.round(cashTendered);
@@ -121,13 +119,15 @@ export async function POST(request: NextRequest) {
     initialStatus: "PROCESSING",
   });
 
-  // Save table to suggestions for autocomplete
+  // Save table to suggestions for autocomplete (atomic via transaction)
   if (tableNumber && channel === "DINE_IN") {
     try {
-      const existingDealer = await prisma.dealer.findUnique({ where: { slug: restauranteSlug! }, select: { tableSuggestions: true } });
-      const current = ((existingDealer?.tableSuggestions as string[]) || []).filter((t) => t !== tableNumber);
-      const updated = [tableNumber, ...current].slice(0, 30);
-      await prisma.dealer.update({ where: { slug: restauranteSlug! }, data: { tableSuggestions: updated } });
+      await prisma.$transaction(async (tx) => {
+        const existing = await tx.dealer.findUnique({ where: { slug: restauranteSlug! }, select: { tableSuggestions: true } });
+        const current = ((existing?.tableSuggestions as string[]) || []).filter((t) => t !== tableNumber);
+        const updated = [tableNumber, ...current].slice(0, 30);
+        await tx.dealer.update({ where: { slug: restauranteSlug! }, data: { tableSuggestions: updated } });
+      });
     } catch {}
   }
 

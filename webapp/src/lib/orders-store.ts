@@ -21,6 +21,9 @@ export type OrderItem = {
   optionsDelta?: number;
 };
 
+// Re-export money helpers from lib/money.ts (pure, no DB deps — usable in client components)
+export { lineUnitPrice, lineTotal, computeCartTotal } from "./money";
+
 export type Order = {
   id: string;
   orderNumber: string;
