@@ -52,6 +52,8 @@ export default function ProfilePage() {
   const [mercadoPagoCvu, setMercadoPagoCvu] = useState("");
   const [bankInfo, setBankInfo] = useState("");
   const [posEnabled, setPosEnabled] = useState(false);
+  const [posSaving, setPosSaving] = useState(false);
+  const [posSaved, setPosSaved] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +96,16 @@ export default function ProfilePage() {
       })
       .catch(() => router.push("/restaurante/login"));
   }, [router]);
+
+  // Scroll to #pos section if URL hash is set
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window !== "undefined" && window.location.hash === "#pos") {
+      setTimeout(() => {
+        document.getElementById("pos")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [loading]);
 
   async function handleSave() {
     setSaving(true);
@@ -319,24 +331,70 @@ export default function ProfilePage() {
         </section>
 
         {/* POS toggle */}
-        <section id="pos" className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
-          <h2 className="text-sm font-bold text-white mb-4">POS — Pedidos en el local</h2>
-          <p className="text-xs text-slate-500 mb-4">Activa el POS para tomar pedidos desde una tablet o celular en mostrador y mesas. Los pedidos van directo a la cocina con el pago ya cobrado.</p>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <button
-              type="button"
-              onClick={() => setPosEnabled(!posEnabled)}
-              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${posEnabled ? "bg-emerald-500" : "bg-slate-700"}`}
-            >
-              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-1 ${posEnabled ? "translate-x-6 ml-0.5" : "translate-x-1"}`} />
-            </button>
-            <div>
-              <p className="text-sm font-medium text-white">{posEnabled ? "POS habilitado" : "POS deshabilitado"}</p>
-              <p className="text-[10px] text-slate-500">{posEnabled ? "El boton POS aparece en el menu lateral" : "Activalo para tomar pedidos en el local"}</p>
+        <section id="pos" className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 scroll-mt-6">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-lg">$</div>
+            <div className="flex-1">
+              <h2 className="text-sm font-bold text-white">POS — Pedidos en el local</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Toma pedidos desde tu tablet o celular para mesas y mostrador. Los pedidos van directo a la cocina con el pago ya cobrado.</p>
             </div>
-          </label>
+          </div>
+
+          {/* What it does */}
+          <div className="rounded-xl bg-slate-950/50 border border-white/5 p-3 mb-4 space-y-2">
+            <div className="flex items-start gap-2 text-[11px] text-slate-300">
+              <span className="text-emerald-400">✓</span>
+              <span>Cobra en efectivo, tarjeta, transferencia o Mercado Pago</span>
+            </div>
+            <div className="flex items-start gap-2 text-[11px] text-slate-300">
+              <span className="text-emerald-400">✓</span>
+              <span>Calculadora de vuelto automatica para efectivo</span>
+            </div>
+            <div className="flex items-start gap-2 text-[11px] text-slate-300">
+              <span className="text-emerald-400">✓</span>
+              <span>Pedidos por mesa o mostrador, todo en el mismo Kanban de cocina</span>
+            </div>
+            <div className="flex items-start gap-2 text-[11px] text-slate-300">
+              <span className="text-emerald-400">✓</span>
+              <span>Modifica precios o regala items con notas (cortesia, promo, etc.)</span>
+            </div>
+          </div>
+
+          {/* Toggle (instant save) */}
+          <button
+            type="button"
+            onClick={async () => {
+              const next = !posEnabled;
+              setPosEnabled(next);
+              setPosSaving(true);
+              const res = await fetch("/api/restaurante/profile", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ posEnabled: next }),
+              });
+              if (!res.ok) setPosEnabled(!next); // revert on failure
+              else setPosSaved(true);
+              setPosSaving(false);
+              setTimeout(() => setPosSaved(false), 2000);
+            }}
+            disabled={posSaving}
+            className={`w-full flex items-center gap-3 rounded-xl border p-4 transition-all ${
+              posEnabled ? "border-emerald-400/30 bg-emerald-400/5" : "border-white/10 bg-white/[0.02] hover:bg-white/5"
+            } disabled:opacity-50`}
+          >
+            <div className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-in-out ${posEnabled ? "bg-emerald-500" : "bg-slate-700"}`}>
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-1 ${posEnabled ? "translate-x-6 ml-0.5" : "translate-x-1"}`} />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-bold text-white">{posEnabled ? "POS habilitado" : "Habilitar POS"}</p>
+              <p className="text-[10px] text-slate-500">
+                {posSaving ? "Guardando..." : posSaved ? "Guardado ✓" : posEnabled ? "Aparece en el menu lateral" : "Click para activar"}
+              </p>
+            </div>
+          </button>
+
           {posEnabled && (
-            <a href="/restaurante/pos" className="mt-4 inline-flex rounded-lg bg-primary/15 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors">
+            <a href="/restaurante/pos" className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all">
               Abrir POS →
             </a>
           )}
