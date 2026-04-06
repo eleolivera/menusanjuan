@@ -13,6 +13,7 @@ type Restaurant = {
   isActive: boolean; isVerified: boolean; claimedAt: string | null;
   ownerEmail: string; ownerName: string; isPlaceholder: boolean;
   openHours: string | null;
+  posEnabled: boolean;
   categories: { id: string; name: string; emoji: string | null; items: { id: string; name: string; description: string | null; price: number; imageUrl: string | null; badge: string | null; available: boolean }[] }[];
   orderCount: number;
   lastPassword: string | null;
@@ -70,6 +71,8 @@ export function RestaurantModal({
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [showMap, setShowMap] = useState(false);
+  const [posEnabled, _setPosEnabled] = useState(false);
+  const setPosEnabled = (v: boolean) => { _setPosEnabled(v); if (v !== initialData.current.posEnabled) setDirty(true); };
   const initialData = useRef<Record<string, any>>({});
   const setName = (v: string) => { _setName(v); if (v !== initialData.current.name) setDirty(true); };
   const setPhone = (v: string) => { _setPhone(v); if (v !== initialData.current.phone) setDirty(true); };
@@ -102,10 +105,11 @@ export function RestaurantModal({
         _setName(d.name); _setPhone(d.phone); _setAddress(d.address || "");
         _setCuisineType(d.cuisineType); _setDescription(d.description || "");
         _setIsActive(d.isActive); setHours(parseHours(d.openHours));
+        _setPosEnabled(d.posEnabled || false);
         setLatitude(d.latitude ?? null); setLongitude(d.longitude ?? null);
         setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
         if (d.lastPassword) setActivatedCode(d.lastPassword);
-        initialData.current = { name: d.name, phone: d.phone, address: d.address || "", cuisineType: d.cuisineType, description: d.description || "", isActive: d.isActive };
+        initialData.current = { name: d.name, phone: d.phone, address: d.address || "", cuisineType: d.cuisineType, description: d.description || "", isActive: d.isActive, posEnabled: d.posEnabled || false };
         setDirty(false);
         setLoading(false);
       });
@@ -141,7 +145,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
     await fetch(`/api/admin/restaurants/${restaurantId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, isActive, logoUrl, coverUrl, openHours: JSON.stringify(hours) }),
+      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, isActive, posEnabled, logoUrl, coverUrl, openHours: JSON.stringify(hours) }),
     });
     setSaving(false); setSaved(true); setDirty(false);
     setTimeout(() => setSaved(false), 2000);
@@ -373,11 +377,20 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-6 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary" />
-                  <span className="text-xs text-slate-400">Activo</span>
+                  <span className="text-xs text-slate-400">Activo en marketplace</span>
                 </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={posEnabled} onChange={(e) => setPosEnabled(e.target.checked)} className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary" />
+                  <span className="text-xs text-slate-400">POS habilitado (pedidos en local)</span>
+                </label>
+                {posEnabled && (
+                  <a href={`/restaurante/pos`} target="_blank" className="text-[10px] text-primary hover:underline">
+                    Abrir POS →
+                  </a>
+                )}
               </div>
 
             </div>

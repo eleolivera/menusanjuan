@@ -49,7 +49,7 @@ export async function PATCH(
   const {
     name, slug, phone, address, city, latitude, longitude,
     cuisineType, description, logoUrl, coverUrl,
-    isActive, openHours, mercadoPagoAlias, mercadoPagoCvu, bankInfo,
+    isActive, posEnabled, openHours, mercadoPagoAlias, mercadoPagoCvu, bankInfo,
     sourceProfileId, sourceSite, rating, deliveryFee,
     deliveryEnabled, deliveryCloseRadius, deliveryClosePrice, deliveryFarRadius, deliveryFarPrice,
   } = body;
@@ -69,6 +69,7 @@ export async function PATCH(
       ...(logoUrl !== undefined && { logoUrl }),
       ...(coverUrl !== undefined && { coverUrl }),
       ...(isActive !== undefined && { isActive }),
+      ...(posEnabled !== undefined && { posEnabled }),
       ...(openHours !== undefined && { openHours }),
       ...(mercadoPagoAlias !== undefined && { mercadoPagoAlias }),
       ...(mercadoPagoCvu !== undefined && { mercadoPagoCvu }),
