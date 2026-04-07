@@ -49,12 +49,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return NextResponse.json({ error: "Items no pertenecen al restaurante" }, { status: 400 });
       }
 
-      const merged = [...((existing.items as unknown) as OrderItem[]), ...newItems];
+      // Stamp new items with current timestamp for batched kitchen ticket
+      const now = new Date().toISOString();
+      const stampedNew = newItems.map((it) => ({ ...it, addedAt: now }));
+
+      const merged = [...((existing.items as unknown) as OrderItem[]), ...stampedNew];
       const newTotal = computeCartTotal(merged);
 
       const updated = await prisma.order.update({
         where: { id },
-        data: { items: merged as any, total: newTotal },
+        data: { items: merged as any, total: newTotal, updatedAt: new Date() },
       });
       return NextResponse.json(updated);
     }
@@ -77,6 +81,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         cashChange = Math.max(0, cashTenderedNorm - existing.total);
       }
 
+      // Mesa cobrada → final status DELIVERED (the food was eaten before paying)
       const updated = await prisma.order.update({
         where: { id },
         data: {
@@ -85,6 +90,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           paymentMethod,
           cashTendered: cashTenderedNorm,
           cashChange,
+          status: "DELIVERED",
         },
       });
       return NextResponse.json(updated);

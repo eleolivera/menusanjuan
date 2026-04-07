@@ -226,14 +226,26 @@ export function PosBoard({
   function startNewTable() {
     setActiveOrderId(null);
     setTableNumber("");
+    // Don't clear cart — preserves items if user is converting from Mostrador
     setExistingItems([]);
-    setCart([]);
     setView("new-table");
   }
 
   function confirmNewTable() {
     if (!tableNumber.trim()) return;
+    // Check duplicate before entering ordering
+    const existing = openTables.find((t) => t.tableNumber === tableNumber.trim());
+    if (existing) {
+      setErrorMsg(`Mesa ${tableNumber} ya esta abierta. Tocala para agregarle items.`);
+      return;
+    }
     setView("ordering");
+  }
+
+  /** Convert current Mostrador cart into a new Mesa */
+  function convertToMesa() {
+    setMode("DINE_IN");
+    startNewTable();
   }
 
   // ─── Submit ───
@@ -310,6 +322,12 @@ export function PosBoard({
         const updated = [tableNumber.trim(), ...tableSuggestions.filter((t) => t !== tableNumber.trim())].slice(0, 30);
         onSuggestionsUpdate(updated);
         backToTables();
+      } else if (res.status === 409) {
+        // Duplicate mesa — offer to open the existing one
+        const d = await res.json().catch(() => ({}));
+        setErrorMsg(d.error || "Mesa duplicada");
+        // Refetch open tables so the existing one shows up
+        fetchOpenTables();
       } else {
         const d = await res.json().catch(() => ({}));
         setErrorMsg(d.error || "Error al crear mesa");
@@ -637,13 +655,23 @@ export function PosBoard({
               </div>
 
               {mode === "COUNTER" ? (
-                <button
-                  onClick={() => setPaying(true)}
-                  disabled={cart.length === 0}
-                  className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg disabled:opacity-30 transition-all"
-                >
-                  Cobrar {formatARS(grandTotal)}
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setPaying(true)}
+                    disabled={cart.length === 0}
+                    className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg disabled:opacity-30 transition-all"
+                  >
+                    Cobrar {formatARS(grandTotal)}
+                  </button>
+                  {cart.length > 0 && (
+                    <button
+                      onClick={convertToMesa}
+                      className="w-full rounded-xl border border-cyan-400/30 bg-cyan-400/5 py-2.5 text-[11px] font-semibold text-cyan-400 hover:bg-cyan-400/10 transition-all"
+                    >
+                      Convertir a mesa →
+                    </button>
+                  )}
+                </div>
               ) : activeOrderId ? (
                 <div className="space-y-2">
                   <button

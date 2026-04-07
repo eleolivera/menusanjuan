@@ -166,35 +166,61 @@ export function OrderCard({
 
             <div className="border-t border-dashed border-slate-300 my-2" />
 
-            {/* Items */}
+            {/* Items — grouped by addedAt batch (mesa updates show as separate tickets) */}
             <div className="space-y-1.5 mb-2">
-              {order.items.map((item: any, i) => {
-                const hasOverride = item.priceOverride !== undefined && item.priceOverride !== null;
-                const unitPrice = hasOverride ? item.priceOverride : (item.unitPrice ?? 0);
-                const total = item.total ?? (unitPrice * item.quantity);
-                return (
-                  <div key={i}>
-                    <div className="flex justify-between">
-                      <span className="font-semibold">{item.quantity}x {item.name}</span>
+              {(() => {
+                // Group items by addedAt timestamp (batches added together)
+                const batches: Record<string, any[]> = {};
+                const order_keys: string[] = [];
+                order.items.forEach((it: any) => {
+                  const key = it.addedAt || "initial";
+                  if (!batches[key]) { batches[key] = []; order_keys.push(key); }
+                  batches[key].push(it);
+                });
+
+                return order_keys.map((batchKey, batchIdx) => {
+                  const batchItems = batches[batchKey];
+                  const isUpdate = batchIdx > 0;
+                  return (
+                    <div key={batchKey}>
+                      {isUpdate && (
+                        <div className="my-2 flex items-center gap-2 text-[9px] text-amber-600 font-bold uppercase tracking-wider">
+                          <div className="flex-1 border-t border-dashed border-amber-300" />
+                          <span>+ Agregado {batchKey !== "initial" ? new Date(batchKey).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                          <div className="flex-1 border-t border-dashed border-amber-300" />
+                        </div>
+                      )}
+                      {batchItems.map((item: any, i: number) => {
+                        const hasOverride = item.priceOverride !== undefined && item.priceOverride !== null;
+                        const unitPrice = hasOverride ? item.priceOverride : (item.unitPrice ?? 0);
+                        const total = item.total ?? (unitPrice * item.quantity);
+                        return (
+                          <div key={`${batchKey}-${i}`}>
+                            <div className="flex justify-between">
+                              <span className="font-semibold">{item.quantity}x {item.name}</span>
+                            </div>
+                            {item.selectedOptions && item.selectedOptions.length > 0 && (
+                              <div className="text-[10px] text-slate-500 pl-4">
+                                {item.selectedOptions.map((so: any) => `${so.group}: ${so.choices.map((c: any) => c.name).join(", ")}`).join(" / ")}
+                              </div>
+                            )}
+                            <div className="flex justify-between text-slate-500">
+                              <span className="pl-4">
+                                {hasOverride && <span className="line-through text-slate-400 mr-1">${(item.unitPrice ?? 0).toLocaleString("es-AR")}</span>}
+                                ${unitPrice.toLocaleString("es-AR")} c/u
+                              </span>
+                              <span className="font-semibold text-slate-700">${total.toLocaleString("es-AR")}</span>
+                            </div>
+                            {hasOverride && item.overrideNote && (
+                              <div className="text-[10px] text-amber-600 pl-4">Nota: {item.overrideNote}</div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                    {item.selectedOptions && item.selectedOptions.length > 0 && (
-                      <div className="text-[10px] text-slate-500 pl-4">
-                        {item.selectedOptions.map((so: any) => `${so.group}: ${so.choices.map((c: any) => c.name).join(", ")}`).join(" / ")}
-                      </div>
-                    )}
-                    <div className="flex justify-between text-slate-500">
-                      <span className="pl-4">
-                        {hasOverride && <span className="line-through text-slate-400 mr-1">${(item.unitPrice ?? 0).toLocaleString("es-AR")}</span>}
-                        ${unitPrice.toLocaleString("es-AR")} c/u
-                      </span>
-                      <span className="font-semibold text-slate-700">${total.toLocaleString("es-AR")}</span>
-                    </div>
-                    {hasOverride && item.overrideNote && (
-                      <div className="text-[10px] text-amber-600 pl-4">Nota: {item.overrideNote}</div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
 
             <div className="border-t border-dashed border-slate-300 my-2" />

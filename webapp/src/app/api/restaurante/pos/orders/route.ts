@@ -85,8 +85,32 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // For mesa: check no other open mesa has the same table number
+  if (channel === "DINE_IN") {
+    const existingTable = await prisma.order.findFirst({
+      where: {
+        restauranteSlug: restauranteSlug!,
+        channel: "DINE_IN",
+        paymentStatus: "UNPAID",
+        status: { notIn: ["CANCELLED", "DELIVERED"] },
+        tableNumber: tableNumber!.trim(),
+      },
+      select: { id: true, orderNumber: true },
+    });
+    if (existingTable) {
+      return NextResponse.json({
+        error: `Mesa ${tableNumber} ya esta abierta (${existingTable.orderNumber}). Agrega items a la mesa existente.`,
+        existingOrderId: existingTable.id,
+      }, { status: 409 });
+    }
+  }
+
+  // Stamp items with addedAt for batched kitchen tickets
+  const now = new Date().toISOString();
+  const stampedItems = items.map((it) => ({ ...it, addedAt: now }));
+
   // Compute total via shared helper (rounded to whole pesos)
-  const total = computeCartTotal(items);
+  const total = computeCartTotal(stampedItems);
 
   // Cash validation: must cover total. If total is 0, cashTendered is meaningless → null.
   // Mesa skips cash validation (post-pay) — only mostrador with cash needs it.
@@ -114,7 +138,7 @@ export async function POST(request: NextRequest) {
     customerAddress: customerAddress || "",
     latitude: latitude ?? null,
     longitude: longitude ?? null,
-    items,
+    items: stampedItems,
     total,
     notes,
     deliveryMethod: channel === "DINE_IN" ? "dine-in" : "pickup",

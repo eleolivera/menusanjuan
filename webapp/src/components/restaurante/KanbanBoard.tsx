@@ -110,6 +110,14 @@ export function KanbanBoard({
                   const channel = order.channel || "ONLINE";
                   const stripeColor = channel === "DINE_IN" ? "bg-cyan-400" : channel === "COUNTER" ? "bg-purple-400" : "bg-blue-400";
                   const channelLabel = channel === "DINE_IN" ? `Mesa ${order.tableNumber || ""}` : channel === "COUNTER" ? "Mostrador" : (order.deliveryMethod === "pickup" ? "Retiro" : "Delivery");
+                  // Detect items added after the order was created (mesa updates)
+                  const createdMs = new Date(order.createdAt).getTime();
+                  const hasUpdates = items.some((it: any) => it.addedAt && new Date(it.addedAt).getTime() > createdMs + 5000);
+                  const lastUpdate = hasUpdates ? items.reduce((max: number, it: any) => {
+                    if (!it.addedAt) return max;
+                    const t = new Date(it.addedAt).getTime();
+                    return t > max ? t : max;
+                  }, 0) : 0;
                   return (
                     <div
                       key={order.id}
@@ -121,11 +129,14 @@ export function KanbanBoard({
                       {/* Channel stripe */}
                       <div className={`absolute left-0 top-0 bottom-0 w-1 ${stripeColor}`} />
                       <div className="flex items-start justify-between mb-1 ml-1">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-bold text-primary">{order.orderNumber}</span>
                           {order.paymentStatus === "PAID" && <span className="rounded bg-emerald-400/15 px-1 text-[8px] font-bold text-emerald-400">PAGADO</span>}
+                          {hasUpdates && <span className="rounded bg-amber-400/15 px-1 text-[8px] font-bold text-amber-400 animate-pulse">ACTUALIZADO</span>}
                         </div>
-                        <span className="text-[10px] text-slate-600">{timeAgo(order.createdAt)}</span>
+                        <span className="text-[10px] text-slate-600">
+                          {hasUpdates ? `+${timeAgo(new Date(lastUpdate).toISOString())}` : timeAgo(order.createdAt)}
+                        </span>
                       </div>
                       <p className="text-xs font-medium text-white truncate ml-1">{order.customerName}</p>
                       <p className="text-[10px] text-slate-500 truncate mt-0.5 ml-1">{itemSummary}{more}</p>
