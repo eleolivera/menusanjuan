@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession, createSession } from "@/lib/restaurante-auth";
+import { getAdminSession } from "@/lib/admin-auth";
 import crypto from "crypto";
 
 const CLAIM_SECRET = process.env.CLAIM_SECRET || "menusj-claim-2024";
@@ -16,6 +17,14 @@ function generateClaimCode(dealerId: string): string {
 
 // POST — submit or verify a claim
 export async function POST(request: NextRequest) {
+  // Admins cannot submit or verify claims — the claim system is for business owners.
+  if (await getAdminSession()) {
+    return NextResponse.json(
+      { error: "Los admins no pueden reclamar restaurantes. Cerrá sesión de admin primero." },
+      { status: 403 }
+    );
+  }
+
   const body = await request.json();
   const { action } = body;
 
@@ -28,6 +37,19 @@ export async function POST(request: NextRequest) {
 
     const { dealerId } = body;
     if (!dealerId) return NextResponse.json({ error: "Falta dealerId" }, { status: 400 });
+
+    // If the restaurant has been pre-assigned by admin, it's no longer claimable.
+    const dealer = await prisma.dealer.findUnique({
+      where: { id: dealerId },
+      select: { pendingOwnerEmail: true },
+    });
+    if (!dealer) return NextResponse.json({ error: "Restaurante no encontrado" }, { status: 404 });
+    if (dealer.pendingOwnerEmail) {
+      return NextResponse.json(
+        { error: "Este restaurante ya fue asignado a un dueño" },
+        { status: 409 }
+      );
+    }
 
     // Check for existing pending claim by this user
     const existing = await prisma.claimRequest.findFirst({

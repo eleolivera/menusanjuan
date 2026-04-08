@@ -52,6 +52,11 @@ export type SessionData = {
 
 export async function getSession(): Promise<SessionData | null> {
   const cookieStore = await cookies();
+  // Hard boundary: if an admin session is present, the user session is ignored.
+  // Admins must never be treated as a restaurant owner or a customer — they use
+  // the admin panel. This prevents an admin from accidentally claiming,
+  // registering, or acting as a restaurant via UI drift between tabs/devices.
+  if (cookieStore.get("menusj_admin")?.value) return null;
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
 

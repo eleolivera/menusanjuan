@@ -5,6 +5,7 @@ import type { DeliveryConfig } from "./delivery";
 export type RestaurantWithDealerId = Restaurant & {
   dealerId: string | null;
   isVerified: boolean;
+  hasPendingOwner: boolean;
   ownerUserId: string | null;
   deliveryConfig: DeliveryConfig;
 };
@@ -38,6 +39,7 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
     priceRange: "$$",
     isOpen: true,
     isVerified: dealer.isVerified,
+    hasPendingOwner: !!dealer.pendingOwnerEmail,
     ownerUserId: dealer.account.userId,
     deliveryConfig: {
       deliveryEnabled: dealer.deliveryEnabled,

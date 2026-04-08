@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, getSession, createRestauranteSession } from "@/lib/restaurante-auth";
+import { getAdminSession } from "@/lib/admin-auth";
 
 // POST — claim an unclaimed restaurant
 export async function POST(request: NextRequest) {
+  // Admins cannot claim restaurants.
+  if (await getAdminSession()) {
+    return NextResponse.json(
+      { error: "Los admins no pueden reclamar restaurantes. Cerrá sesión de admin primero." },
+      { status: 403 }
+    );
+  }
+
   const body = await request.json();
   const { email, password, dealerId } = body;
 
@@ -24,6 +33,15 @@ export async function POST(request: NextRequest) {
   // Verify it's unclaimed (placeholder email)
   if (!dealer.account.user.email.endsWith("@menusanjuan.com")) {
     return NextResponse.json({ error: "Este restaurante ya tiene dueño" }, { status: 409 });
+  }
+
+  // If admin has already pre-assigned this dealer to a pending owner email,
+  // it's no longer openly claimable.
+  if (dealer.pendingOwnerEmail) {
+    return NextResponse.json(
+      { error: "Este restaurante ya fue asignado a un dueño" },
+      { status: 409 }
+    );
   }
 
   // Check if already logged in

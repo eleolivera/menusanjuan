@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 // GET — list unclaimed restaurants (placeholder @menusanjuan.com accounts)
 export async function GET() {
   const dealers = await prisma.dealer.findMany({
-    where: { isActive: true },
+    // Dealers that an admin has already pre-assigned (pendingOwnerEmail set)
+    // are NOT openly claimable anymore — only the named owner can take them
+    // on registration.
+    where: { isActive: true, pendingOwnerEmail: null },
     include: {
       account: {
         include: { user: true },

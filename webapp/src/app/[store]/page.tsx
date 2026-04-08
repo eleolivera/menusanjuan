@@ -159,8 +159,8 @@ export default async function StorePage({
         </div>
       </div>
 
-      {/* Claim Banner — only for unclaimed/unverified restaurants */}
-      {restaurant.dealerId && !restaurant.isVerified && (
+      {/* Claim Banner — only for unclaimed/unverified restaurants with no pre-assigned owner */}
+      {restaurant.dealerId && !restaurant.isVerified && !restaurant.hasPendingOwner && (
         <ClaimBanner
           dealerId={restaurant.dealerId}
           restaurantName={restaurant.name}

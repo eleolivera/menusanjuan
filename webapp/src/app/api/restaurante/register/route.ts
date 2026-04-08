@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession, getSession, hashPassword } from "@/lib/restaurante-auth";
+import { getAdminSession } from "@/lib/admin-auth";
 
 function generateSlug(name: string): string {
   return name
@@ -15,6 +16,13 @@ function generateSlug(name: string): string {
 
 export async function POST(request: NextRequest) {
   try {
+    // Admins cannot register restaurants — they already have the admin panel.
+    if (await getAdminSession()) {
+      return NextResponse.json(
+        { error: "Los admins no pueden registrar restaurantes. Cerrá sesión de admin primero." },
+        { status: 403 }
+      );
+    }
     const body = await request.json();
     const { email, password, restaurantName, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl } = body;
 
