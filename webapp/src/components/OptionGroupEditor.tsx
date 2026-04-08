@@ -273,7 +273,15 @@ function GroupForm({
           <label className="text-[10px] text-slate-400 block mb-1">Lista de opciones</label>
           <select
             value={presetId}
-            onChange={(e) => setPresetId(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              // Warn once if switching from custom → preset with unsaved inline options
+              const hasInline = !presetId && options.some((o) => o.name.trim());
+              if (next && hasInline) {
+                if (!confirm("Se reemplazaran las opciones personalizadas por la lista reusable. Seguir?")) return;
+              }
+              setPresetId(next);
+            }}
             className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none"
           >
             <option value="" className="bg-slate-900">— Opciones personalizadas —</option>

@@ -19,8 +19,19 @@ export async function PATCH(request: NextRequest) {
   });
   if (!choice) return NextResponse.json({ error: "Opcion no encontrada" }, { status: 404 });
 
+  // Owner session: must own the preset
   if (dealer && choice.preset.dealerId !== dealer.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+  // Admin session: require ?slug= and verify it matches the preset's dealer
+  if (!dealer && adminSession) {
+    const { searchParams } = new URL(request.url);
+    const slug = searchParams.get("slug");
+    if (!slug) return NextResponse.json({ error: "Falta slug" }, { status: 400 });
+    const target = await prisma.dealer.findUnique({ where: { slug }, select: { id: true } });
+    if (!target || target.id !== choice.preset.dealerId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
   }
 
   const updated = await prisma.optionPresetChoice.update({
