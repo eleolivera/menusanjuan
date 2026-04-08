@@ -39,21 +39,25 @@ export async function getMenuBySlug(slug: string): Promise<MenuCategoryData[]> {
       badge: item.badge || undefined,
       rating: item.rating || undefined,
       available: item.available,
-      optionGroups: item.optionGroups.map((g) => {
-        // If group references a preset, resolve options from the preset
-        // Otherwise use the inline options attached to this group
-        const resolvedOptions = g.preset
-          ? g.preset.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }))
-          : g.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }));
+      optionGroups: item.optionGroups
+        .map((g) => {
+          // If group references a preset, resolve options from the preset
+          // Otherwise use the inline options attached to this group
+          const resolvedOptions = g.preset
+            ? g.preset.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }))
+            : g.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }));
 
-        return {
-          id: g.id,
-          title: g.title,
-          minSelections: g.minSelections,
-          maxSelections: g.maxSelections,
-          options: resolvedOptions,
-        };
-      }),
+          return {
+            id: g.id,
+            title: g.title,
+            minSelections: g.minSelections,
+            maxSelections: g.maxSelections,
+            options: resolvedOptions,
+          };
+        })
+        // Filter out orphaned groups (e.g. preset deleted, inline empty) so the
+        // customer isn't forced into a required-but-empty selection on checkout
+        .filter((g) => g.options.length > 0),
     })),
   }));
 }

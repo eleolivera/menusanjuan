@@ -49,6 +49,19 @@ export async function POST(
   }
 
   if (body.type === "option-group") {
+    // Multi-tenant safety: if a preset is linked, it must belong to THIS dealer
+    if (body.presetId) {
+      const preset = await prisma.optionPreset.findFirst({
+        where: { id: body.presetId, dealerId },
+      });
+      if (!preset) return NextResponse.json({ error: "Preset no encontrado" }, { status: 404 });
+    }
+    // And the target item must belong to this dealer
+    const item = await prisma.menuItem.findFirst({
+      where: { id: body.menuItemId, category: { dealerId } },
+    });
+    if (!item) return NextResponse.json({ error: "Item no encontrado" }, { status: 404 });
+
     const maxSort = await prisma.optionGroup.aggregate({
       where: { menuItemId: body.menuItemId },
       _max: { sortOrder: true },
@@ -65,6 +78,7 @@ export async function POST(
           create: (body.options || []).map((o: any, i: number) => ({
             name: o.name,
             priceDelta: o.priceDelta ?? 0,
+            available: o.available ?? true,
             sortOrder: i,
           })),
         },
@@ -83,6 +97,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   if (!(await getAdminSession())) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const { id: dealerId } = await params;
   const body = await request.json();
 
   if (body.type === "category" && body.categoryId) {
@@ -114,6 +129,18 @@ export async function PATCH(
   }
 
   if (body.type === "option-group" && body.id) {
+    // Verify the group belongs to this dealer (prevent cross-tenant edits)
+    const group = await prisma.optionGroup.findFirst({
+      where: { id: body.id, menuItem: { category: { dealerId } } },
+    });
+    if (!group) return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
+    // And if switching to a preset, the preset must belong to this dealer
+    if (body.presetId) {
+      const preset = await prisma.optionPreset.findFirst({
+        where: { id: body.presetId, dealerId },
+      });
+      if (!preset) return NextResponse.json({ error: "Preset no encontrado" }, { status: 404 });
+    }
     const updateData: any = {};
     if (body.title !== undefined) updateData.title = body.title;
     if (body.minSelections !== undefined) updateData.minSelections = body.minSelections;

@@ -39,9 +39,10 @@ export async function POST(request: NextRequest) {
       presetId: presetId || null,
       // Only create inline options if no preset is linked
       options: presetId ? undefined : {
-        create: (options || []).map((o: { name: string; priceDelta?: number }, i: number) => ({
+        create: (options || []).map((o: { name: string; priceDelta?: number; available?: boolean }, i: number) => ({
           name: o.name,
           priceDelta: o.priceDelta ?? 0,
+          available: o.available ?? true,
           sortOrder: i,
         })),
       },
