@@ -13,6 +13,16 @@ export async function POST(
 
   if (!email?.includes("@")) return NextResponse.json({ error: "Email inválido" }, { status: 400 });
 
+  // Never allow assigning a restaurant to an admin user or to another restaurant's
+  // placeholder address — that silently steals/merges accounts.
+  const normalizedEmail = email.trim().toLowerCase();
+  if (normalizedEmail.endsWith("@menusanjuan.com")) {
+    return NextResponse.json(
+      { error: "No podés asignar un email del sistema (@menusanjuan.com) como dueño" },
+      { status: 400 }
+    );
+  }
+
   const dealer = await prisma.dealer.findUnique({
     where: { id: dealerId },
     include: { account: true },
@@ -20,7 +30,14 @@ export async function POST(
   if (!dealer) return NextResponse.json({ error: "Restaurante no encontrado" }, { status: 404 });
 
   // Find user by email
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+  if (user?.role === "ADMIN") {
+    return NextResponse.json(
+      { error: "Ese usuario es admin del sistema — no puede ser dueño de un restaurante" },
+      { status: 400 }
+    );
+  }
 
   if (user) {
     // User exists — re-link the account to this user
@@ -58,7 +75,7 @@ export async function POST(
     // User doesn't exist yet — save email for auto-link when they register
     await prisma.dealer.update({
       where: { id: dealerId },
-      data: { pendingOwnerEmail: email },
+      data: { pendingOwnerEmail: normalizedEmail },
     });
 
     return NextResponse.json({
