@@ -13,7 +13,12 @@ export async function getMenuBySlug(slug: string): Promise<MenuCategoryData[]> {
         include: {
           optionGroups: {
             orderBy: { sortOrder: "asc" },
-            include: { options: { orderBy: { sortOrder: "asc" } } },
+            include: {
+              options: { orderBy: { sortOrder: "asc" } },
+              preset: {
+                include: { options: { orderBy: { sortOrder: "asc" } } },
+              },
+            },
           },
         },
       },
@@ -34,18 +39,21 @@ export async function getMenuBySlug(slug: string): Promise<MenuCategoryData[]> {
       badge: item.badge || undefined,
       rating: item.rating || undefined,
       available: item.available,
-      optionGroups: item.optionGroups.map((g) => ({
-        id: g.id,
-        title: g.title,
-        minSelections: g.minSelections,
-        maxSelections: g.maxSelections,
-        options: g.options.map((o) => ({
-          id: o.id,
-          name: o.name,
-          priceDelta: o.priceDelta,
-          available: o.available,
-        })),
-      })),
+      optionGroups: item.optionGroups.map((g) => {
+        // If group references a preset, resolve options from the preset
+        // Otherwise use the inline options attached to this group
+        const resolvedOptions = g.preset
+          ? g.preset.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }))
+          : g.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }));
+
+        return {
+          id: g.id,
+          title: g.title,
+          minSelections: g.minSelections,
+          maxSelections: g.maxSelections,
+          options: resolvedOptions,
+        };
+      }),
     })),
   }));
 }

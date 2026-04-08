@@ -11,6 +11,7 @@ export type OptionGroupData = {
   minSelections: number;
   maxSelections: number;
   options: OptionChoiceData[];
+  presetId?: string | null; // If set, options come from a shared preset
 };
 
 export type MenuItemData = {

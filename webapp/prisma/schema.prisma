@@ -103,6 +103,7 @@ model Dealer {
   orders        Order[]
   claimRequests ClaimRequest[]
   dealerCuisines DealerCuisineType[]
+  optionPresets OptionPreset[]
   onboardingCard OnboardingCard?
 
   @@index([slug])
@@ -208,11 +209,14 @@ model OptionGroup {
   minSelections Int      @default(0)           // 0 = optional, 1+ = required
   maxSelections Int      @default(1)           // 1 = single-select, N = multi-select
   sortOrder     Int      @default(0)
+  presetId      String?                        // If set, options come from the shared preset
 
   menuItem MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   options  OptionChoice[]
+  preset   OptionPreset?  @relation(fields: [presetId], references: [id], onDelete: SetNull)
 
   @@index([menuItemId, sortOrder])
+  @@index([presetId])
 }
 
 model OptionChoice {
@@ -226,6 +230,35 @@ model OptionChoice {
   optionGroup OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
 
   @@index([optionGroupId, sortOrder])
+}
+
+// Reusable option lists — edit once, used in many menu items
+model OptionPreset {
+  id        String   @id @default(cuid())
+  dealerId  String
+  name      String                          // "Gustos", "Extras", "Agregados"
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dealer  Dealer               @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  options OptionPresetChoice[]
+  usedIn  OptionGroup[]
+
+  @@index([dealerId, sortOrder])
+}
+
+model OptionPresetChoice {
+  id         String  @id @default(cuid())
+  presetId   String
+  name       String                         // "Dulce de leche"
+  priceDelta Float   @default(0)
+  available  Boolean @default(true)         // Toggle sin stock once, propagates everywhere
+  sortOrder  Int     @default(0)
+
+  preset OptionPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@index([presetId, sortOrder])
 }
 
 // ─── Orders ───

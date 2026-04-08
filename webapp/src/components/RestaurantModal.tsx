@@ -6,6 +6,7 @@ import { LocationPicker } from "@/components/LocationPicker";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { OptionGroupEditor } from "@/components/OptionGroupEditor";
 import { MenuEditor } from "@/components/MenuEditor";
+import { PresetManager } from "@/components/PresetManager";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -56,7 +57,7 @@ export function RestaurantModal({
 }) {
   const [data, setData] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"info" | "menu" | "owner">("info");
+  const [tab, setTab] = useState<"info" | "menu" | "listas" | "owner">("info");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -273,10 +274,10 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
 
           {/* Row 3: Tabs */}
           <div className="px-5 pb-2 flex gap-1.5">
-            {(["info", "menu", "owner"] as const).map((t) => (
+            {(["info", "menu", "listas", "owner"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)}
                 className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all ${tab === t ? "bg-primary text-white" : "text-slate-500 hover:text-white hover:bg-white/5"}`}>
-                {t === "info" ? "Info" : t === "menu" ? `Menu (${menuItemCount})` : "Dueno"}
+                {t === "info" ? "Info" : t === "menu" ? `Menu (${menuItemCount})` : t === "listas" ? "Listas" : "Dueno"}
               </button>
             ))}
           </div>
@@ -398,9 +399,13 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
 
           {/* ─── Menu tab ─── */}
           {tab === "menu" && (
-            <MenuEditor categories={data.categories} onRefresh={fetchData} apiBase={`/api/admin/restaurants/${restaurantId}/menu`} useAdminApi />
+            <MenuEditor categories={data.categories} onRefresh={fetchData} apiBase={`/api/admin/restaurants/${restaurantId}/menu`} useAdminApi dealerSlug={data.slug} />
           )}
 
+          {/* ─── Listas tab ─── */}
+          {tab === "listas" && (
+            <PresetManager dealerSlug={data.slug} />
+          )}
 
           {/* ─── Owner tab ─── */}
           {tab === "owner" && (

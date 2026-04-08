@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   const dealer = await getRestauranteFromSession();
   if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const { menuItemId, title, minSelections, maxSelections, options } = await request.json();
+  const { menuItemId, title, minSelections, maxSelections, options, presetId } = await request.json();
   if (!menuItemId || !title) return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
 
   // Verify item belongs to this dealer
@@ -15,6 +15,14 @@ export async function POST(request: NextRequest) {
     where: { id: menuItemId, category: { dealerId: dealer.id } },
   });
   if (!item) return NextResponse.json({ error: "Item no encontrado" }, { status: 404 });
+
+  // Verify preset belongs to this dealer if provided
+  if (presetId) {
+    const preset = await prisma.optionPreset.findFirst({
+      where: { id: presetId, dealerId: dealer.id },
+    });
+    if (!preset) return NextResponse.json({ error: "Preset no encontrado" }, { status: 404 });
+  }
 
   const maxSort = await prisma.optionGroup.aggregate({
     where: { menuItemId },
@@ -28,7 +36,9 @@ export async function POST(request: NextRequest) {
       minSelections: minSelections ?? 0,
       maxSelections: maxSelections ?? 1,
       sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
-      options: {
+      presetId: presetId || null,
+      // Only create inline options if no preset is linked
+      options: presetId ? undefined : {
         create: (options || []).map((o: { name: string; priceDelta?: number }, i: number) => ({
           name: o.name,
           priceDelta: o.priceDelta ?? 0,
@@ -47,7 +57,7 @@ export async function PATCH(request: NextRequest) {
   const dealer = await getRestauranteFromSession();
   if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const { id, title, minSelections, maxSelections, options } = await request.json();
+  const { id, title, minSelections, maxSelections, options, presetId } = await request.json();
   if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
 
   // Verify ownership
@@ -56,18 +66,27 @@ export async function PATCH(request: NextRequest) {
   });
   if (!group) return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
 
+  // Verify preset belongs to this dealer if provided
+  if (presetId) {
+    const preset = await prisma.optionPreset.findFirst({
+      where: { id: presetId, dealerId: dealer.id },
+    });
+    if (!preset) return NextResponse.json({ error: "Preset no encontrado" }, { status: 404 });
+  }
+
   // Update group fields
-  const updated = await prisma.optionGroup.update({
+  await prisma.optionGroup.update({
     where: { id },
     data: {
       ...(title !== undefined && { title }),
       ...(minSelections !== undefined && { minSelections }),
       ...(maxSelections !== undefined && { maxSelections }),
+      ...(presetId !== undefined && { presetId: presetId || null }),
     },
   });
 
-  // Replace options if provided
-  if (options) {
+  // Replace options if provided AND no preset is linked
+  if (options && !presetId) {
     await prisma.optionChoice.deleteMany({ where: { optionGroupId: id } });
     await prisma.optionChoice.createMany({
       data: options.map((o: { name: string; priceDelta?: number; available?: boolean }, i: number) => ({
@@ -78,6 +97,11 @@ export async function PATCH(request: NextRequest) {
         sortOrder: i,
       })),
     });
+  }
+
+  // If switching TO a preset, clear inline options
+  if (presetId) {
+    await prisma.optionChoice.deleteMany({ where: { optionGroupId: id } });
   }
 
   const result = await prisma.optionGroup.findUnique({

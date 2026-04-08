@@ -61,13 +61,17 @@ export function OrderCard({
   const timeSince = getTimeSince(order.createdAt);
 
   const cleanPhone = order.customerPhone.replace(/[^0-9]/g, "");
-  const whatsappUrl = `https://wa.me/${cleanPhone}`;
+  const hasPhone = cleanPhone.length >= 8;
+  const whatsappUrl = hasPhone ? `https://wa.me/${cleanPhone}` : null;
   const mapsUrl =
     order.latitude && order.longitude
       ? `https://www.google.com/maps?q=${order.latitude},${order.longitude}`
       : order.customerAddress
         ? `https://www.google.com/maps/search/${encodeURIComponent(order.customerAddress)}`
         : null;
+  // QRs only make sense for online delivery orders (not POS dine-in/mostrador)
+  const isPos = order.channel === "DINE_IN" || order.channel === "COUNTER";
+  const showQrs = !isPos && (whatsappUrl || mapsUrl);
 
   function handlePrint() {
     if (!receiptRef.current) return;
@@ -259,21 +263,25 @@ export function OrderCard({
               )}
             </div>
 
-            <div className="border-t border-dashed border-slate-300 my-2" />
-
-            {/* QR Codes */}
-            <div className="flex justify-around items-start pt-2">
-              <div className="text-center">
-                <QRCodeSVG value={whatsappUrl} size={70} level="M" />
-                <div className="text-[9px] text-slate-500 mt-1 font-semibold">WhatsApp</div>
-              </div>
-              {mapsUrl && (
-                <div className="text-center">
-                  <QRCodeSVG value={mapsUrl} size={70} level="M" />
-                  <div className="text-[9px] text-slate-500 mt-1 font-semibold">Ubicación</div>
+            {showQrs && (
+              <>
+                <div className="border-t border-dashed border-slate-300 my-2" />
+                <div className="flex justify-around items-start pt-2">
+                  {whatsappUrl && (
+                    <div className="text-center">
+                      <QRCodeSVG value={whatsappUrl} size={70} level="M" />
+                      <div className="text-[9px] text-slate-500 mt-1 font-semibold">WhatsApp</div>
+                    </div>
+                  )}
+                  {mapsUrl && (
+                    <div className="text-center">
+                      <QRCodeSVG value={mapsUrl} size={70} level="M" />
+                      <div className="text-[9px] text-slate-500 mt-1 font-semibold">Ubicacion</div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
 
             {/* Footer */}
             <div className="text-center mt-3 pt-2 border-t border-dashed border-slate-300">
@@ -293,14 +301,16 @@ export function OrderCard({
               </svg>
               Imprimir
             </button>
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-lg bg-[#25D366]/15 px-3 py-2 text-xs font-semibold text-[#25D366] hover:bg-[#25D366]/25 transition-colors"
-            >
-              WhatsApp
-            </a>
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-lg bg-[#25D366]/15 px-3 py-2 text-xs font-semibold text-[#25D366] hover:bg-[#25D366]/25 transition-colors"
+              >
+                WhatsApp
+              </a>
+            )}
             {mapsUrl && (
               <a
                 href={mapsUrl}

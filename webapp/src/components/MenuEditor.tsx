@@ -7,7 +7,7 @@ import { formatARS } from "@/lib/admin-utils";
 // ─── Types ───
 
 type OptionChoice = { id: string; name: string; priceDelta: number; available: boolean };
-type OptionGroup = { id: string; title: string; minSelections: number; maxSelections: number; options: OptionChoice[] };
+type OptionGroup = { id: string; title: string; minSelections: number; maxSelections: number; options: OptionChoice[]; presetId?: string | null };
 type MenuItem = {
   id: string; name: string; description: string | null; price: number;
   imageUrl: string | null; badge: string | null; available: boolean; sortOrder?: number;
@@ -21,11 +21,12 @@ type MenuEditorProps = {
   apiBase: string; // "/api/restaurante/menu" or "/api/admin/restaurants/{id}/menu"
   useAdminApi?: boolean; // admin uses { type: "category" | "item" | "option-group" } pattern
   uploadEndpoint?: string; // "/api/upload" — pass null to disable file upload
+  dealerSlug?: string; // Needed for admin context so preset API can find the dealer
 };
 
 // ─── Main Component ───
 
-export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, uploadEndpoint = "/api/upload" }: MenuEditorProps) {
+export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, uploadEndpoint = "/api/upload", dealerSlug }: MenuEditorProps) {
   // Category form
   const [addingCat, setAddingCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -271,10 +272,11 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
               {/* Option groups */}
               <OptionGroupEditor
                 menuItemId={editingItem.id}
-                groups={(editingItem.optionGroups || []).map((g) => ({ id: g.id, title: g.title, minSelections: g.minSelections, maxSelections: g.maxSelections, options: g.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available })) }))}
+                groups={(editingItem.optionGroups || []).map((g) => ({ id: g.id, title: g.title, minSelections: g.minSelections, maxSelections: g.maxSelections, presetId: g.presetId, options: g.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available })) }))}
                 onUpdate={onRefresh}
                 apiBase={optionGroupApiBase}
                 useAdminApi={useAdminApi}
+                dealerSlug={dealerSlug}
               />
             </div>
 

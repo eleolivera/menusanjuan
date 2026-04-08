@@ -9,11 +9,39 @@ export async function GET() {
 
   const categories = await prisma.menuCategory.findMany({
     where: { dealerId: dealer.id },
-    include: { items: { orderBy: { sortOrder: "asc" }, include: { optionGroups: { orderBy: { sortOrder: "asc" }, include: { options: { orderBy: { sortOrder: "asc" } } } } } } },
+    include: {
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          optionGroups: {
+            orderBy: { sortOrder: "asc" },
+            include: {
+              options: { orderBy: { sortOrder: "asc" } },
+              preset: { include: { options: { orderBy: { sortOrder: "asc" } } } },
+            },
+          },
+        },
+      },
+    },
     orderBy: { sortOrder: "asc" },
   });
 
-  return NextResponse.json(categories);
+  // Resolve preset options into the options array for frontend consumers
+  const normalized = categories.map((cat) => ({
+    ...cat,
+    items: cat.items.map((item) => ({
+      ...item,
+      optionGroups: item.optionGroups.map((g) => ({
+        ...g,
+        // When presetId is set, use the preset's options (resolved)
+        options: g.preset
+          ? g.preset.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }))
+          : g.options,
+      })),
+    })),
+  }));
+
+  return NextResponse.json(normalized);
 }
 
 // POST — create a new category

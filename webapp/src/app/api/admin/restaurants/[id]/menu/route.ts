@@ -60,7 +60,8 @@ export async function POST(
         minSelections: body.minSelections ?? 0,
         maxSelections: body.maxSelections ?? 1,
         sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
-        options: {
+        presetId: body.presetId || null,
+        options: body.presetId ? undefined : {
           create: (body.options || []).map((o: any, i: number) => ({
             name: o.name,
             priceDelta: o.priceDelta ?? 0,
@@ -117,14 +118,20 @@ export async function PATCH(
     if (body.title !== undefined) updateData.title = body.title;
     if (body.minSelections !== undefined) updateData.minSelections = body.minSelections;
     if (body.maxSelections !== undefined) updateData.maxSelections = body.maxSelections;
+    if (body.presetId !== undefined) updateData.presetId = body.presetId || null;
     await prisma.optionGroup.update({ where: { id: body.id }, data: updateData });
-    if (body.options) {
+    // Only apply inline options if no preset is linked
+    if (body.options && !body.presetId) {
       await prisma.optionChoice.deleteMany({ where: { optionGroupId: body.id } });
       await prisma.optionChoice.createMany({
         data: body.options.map((o: any, i: number) => ({
           optionGroupId: body.id, name: o.name, priceDelta: o.priceDelta ?? 0, available: o.available ?? true, sortOrder: i,
         })),
       });
+    }
+    // If switching to preset, wipe inline options
+    if (body.presetId) {
+      await prisma.optionChoice.deleteMany({ where: { optionGroupId: body.id } });
     }
     const result = await prisma.optionGroup.findUnique({ where: { id: body.id }, include: { options: { orderBy: { sortOrder: "asc" } } } });
     return NextResponse.json(result);

@@ -14,7 +14,7 @@ export async function GET(
     where: { id },
     include: {
       account: { include: { user: { select: { id: true, email: true, name: true, phone: true } } } },
-      categories: { include: { items: { orderBy: { sortOrder: "asc" }, include: { optionGroups: { orderBy: { sortOrder: "asc" }, include: { options: { orderBy: { sortOrder: "asc" } } } } } } }, orderBy: { sortOrder: "asc" } },
+      categories: { include: { items: { orderBy: { sortOrder: "asc" }, include: { optionGroups: { orderBy: { sortOrder: "asc" }, include: { options: { orderBy: { sortOrder: "asc" } }, preset: { include: { options: { orderBy: { sortOrder: "asc" } } } } } } } } }, orderBy: { sortOrder: "asc" } },
       claimRequests: {
         include: { user: { select: { email: true, name: true } } },
         orderBy: { requestedAt: "desc" },
@@ -26,8 +26,23 @@ export async function GET(
 
   if (!dealer) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
+  // Resolve preset options into each group's options array
+  const normalizedCategories = dealer.categories.map((cat) => ({
+    ...cat,
+    items: cat.items.map((item) => ({
+      ...item,
+      optionGroups: item.optionGroups.map((g: any) => ({
+        ...g,
+        options: g.preset
+          ? g.preset.options.map((o: any) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }))
+          : g.options,
+      })),
+    })),
+  }));
+
   return NextResponse.json({
     ...dealer,
+    categories: normalizedCategories,
     ownerEmail: dealer.account.user.email,
     ownerName: dealer.account.user.name,
     ownerId: dealer.account.user.id,
