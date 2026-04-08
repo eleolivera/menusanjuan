@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/restaurante-auth";
+import { getAdminSession } from "@/lib/admin-auth";
 
 // POST — create a user account (no restaurant). Auto-links pending restaurants.
 export async function POST(request: NextRequest) {
+  // Admins cannot create a user account from this path.
+  if (await getAdminSession()) {
+    return NextResponse.json(
+      { error: "Cerrá sesión de admin primero." },
+      { status: 403 }
+    );
+  }
+
   const { email, password, name } = await request.json();
 
   if (!email?.includes("@") || !password || password.length < 6) {

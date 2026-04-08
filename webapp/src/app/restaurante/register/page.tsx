@@ -58,9 +58,17 @@ function RegisterPage() {
   const [slug, setSlug] = useState("");
   const [resultName, setResultName] = useState("");
 
-  // Init: check session + load unclaimed
+  // Init: check session + load unclaimed (and auto-clear admin cookie if present)
   useEffect(() => {
-    Promise.all([
+    (async () => {
+      const adminRes = await fetch("/api/admin/session").catch(() => null);
+      if (adminRes?.ok) {
+        const adminData = await adminRes.json().catch(() => null);
+        if (adminData?.authenticated) {
+          await fetch("/api/admin/session", { method: "DELETE" });
+        }
+      }
+      Promise.all([
       fetch("/api/restaurante/session").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/restaurante/unclaimed").then((r) => r.json()).catch(() => []),
     ]).then(([session, unclaimedData]) => {
@@ -82,6 +90,7 @@ function RegisterPage() {
       }
       setInitLoading(false);
     });
+    })();
   }, []);
 
   const filteredUnclaimed = unclaimed.filter((r) =>
@@ -156,7 +165,8 @@ function RegisterPage() {
     }
   }
 
-  // Claim flow
+  // Claim flow — creates a ClaimRequest (not ownership) and routes the user
+  // to the waiting-for-code screen.
   async function doClaim() {
     if (!selectedClaim) return;
     setLoading(true);
@@ -171,12 +181,10 @@ function RegisterPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error); setLoading(false); return; }
 
-      setSlug(data.slug);
-      setResultName(data.name);
-      setStep(4);
+      // Redirect to the waiting page — they'll sit there until admin issues a code
+      router.push(`/restaurante/esperando-codigo?claimId=${data.claimId}`);
     } catch {
       setError("Error de conexión");
-    } finally {
       setLoading(false);
     }
   }

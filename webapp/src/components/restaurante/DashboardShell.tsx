@@ -17,7 +17,14 @@ const USAGE_THRESHOLD = 15; // Total clicks before sorting kicks in
 const WELCOME_KEY = "msj_welcome_seen";
 
 // Pages that should NOT show the sidebar
-const AUTH_PATHS = ["/restaurante/login", "/restaurante/register", "/restaurante/reset-password", "/restaurante/setup"];
+const AUTH_PATHS = [
+  "/restaurante/login",
+  "/restaurante/register",
+  "/restaurante/reset-password",
+  "/restaurante/setup",
+  "/restaurante/esperando-codigo",
+  "/restaurante/agregar",
+];
 
 function getUsage(): Record<string, number> {
   try { return JSON.parse(localStorage.getItem(USAGE_KEY) || "{}"); } catch { return {}; }
@@ -38,6 +45,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [navVersion, setNavVersion] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [restaurants, setRestaurants] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [pendingClaims, setPendingClaims] = useState<Array<{ id: string; status: string; dealer: { id: string; name: string; slug: string } }>>([]);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
@@ -73,13 +83,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           router.push("/restaurante/setup");
           return;
         }
-        if (data.authenticated && data.slug) {
+        if (data.authenticated) {
+          setRestaurants(data.restaurants || []);
+          setPendingClaims(data.pendingClaims || []);
+
+          // No owned restaurants at all
+          if (!data.slug) {
+            if ((data.pendingClaims || []).length > 0) {
+              // User only has pending claims — always route to waiting page
+              router.push("/restaurante/esperando-codigo");
+              return;
+            }
+            // Nothing at all — send to add-restaurant flow
+            router.push("/restaurante/agregar");
+            return;
+          }
+
           setSlug(data.slug);
           setRestaurantName(data.name || data.slug);
           setAuthed(true);
           if (!localStorage.getItem(WELCOME_KEY)) setShowWelcome(true);
-        } else if (data.authenticated && !data.slug) {
-          router.push("/restaurante/register");
         } else {
           setAuthed(false);
           router.push("/restaurante/login");
@@ -115,18 +138,101 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           collapsed ? "w-16" : "w-64"
         }`}
       >
-        {/* Brand + toggle */}
-        <div className="flex items-center border-b border-white/5 px-3 py-4 gap-3">
+        {/* Brand + restaurant switcher */}
+        <div className="relative border-b border-white/5">
           <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-base shadow-md shadow-primary/25 hover:scale-105 transition-transform"
+            onClick={() => setSwitcherOpen((v) => !v)}
+            className="flex w-full items-center px-3 py-4 gap-3 hover:bg-white/5 transition-colors"
           >
-            {restaurantName.charAt(0)}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-base shadow-md shadow-primary/25">
+              {restaurantName.charAt(0)}
+            </div>
+            {!collapsed && (
+              <>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-sm font-bold text-white truncate">{restaurantName}</div>
+                  <div className="text-[10px] text-slate-500">
+                    {restaurants.length + pendingClaims.length > 1
+                      ? `${restaurants.length + pendingClaims.length} restaurantes · Cambiar`
+                      : "Panel de Control"}
+                  </div>
+                </div>
+                <svg className={`h-4 w-4 text-slate-500 transition-transform ${switcherOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </>
+            )}
           </button>
-          {!collapsed && (
-            <div className="flex-1 min-w-0 animate-fade-in">
-              <div className="text-sm font-bold text-white truncate">{restaurantName}</div>
-              <div className="text-[10px] text-slate-500">Panel de Control</div>
+
+          {/* Dropdown panel */}
+          {switcherOpen && !collapsed && (
+            <div className="absolute left-2 right-2 top-full z-50 mt-1 rounded-xl border border-white/10 bg-slate-900 shadow-xl overflow-hidden">
+              {restaurants.length > 0 && (
+                <div className="p-1">
+                  <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase">Tuyos</div>
+                  {restaurants.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={async () => {
+                        setSwitcherOpen(false);
+                        if (r.slug === slug) return;
+                        await fetch("/api/restaurante/session", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ slug: r.slug }),
+                        });
+                        window.location.href = "/restaurante";
+                      }}
+                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors ${
+                        r.slug === slug ? "bg-primary/10 text-primary-light" : "text-slate-300 hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-primary to-amber-500 text-white text-[10px] font-bold">
+                        {r.name.charAt(0)}
+                      </span>
+                      <span className="flex-1 truncate">{r.name}</span>
+                      {r.slug === slug && <span className="text-[9px] text-primary">activo</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {pendingClaims.length > 0 && (
+                <div className="border-t border-white/5 p-1">
+                  <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase">Pendientes</div>
+                  {pendingClaims.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setSwitcherOpen(false);
+                        router.push(`/restaurante/esperando-codigo?claimId=${c.id}`);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs text-slate-400 hover:bg-white/5 transition-colors"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400/10 text-amber-400 text-xs">
+                        ⏳
+                      </span>
+                      <span className="flex-1 truncate">{c.dealer.name}</span>
+                      <span className="text-[9px] text-amber-400 shrink-0">esperando código</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="border-t border-white/5 p-1">
+                <button
+                  onClick={() => {
+                    setSwitcherOpen(false);
+                    router.push("/restaurante/agregar");
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs text-primary hover:bg-primary/5 transition-colors"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-base leading-none">
+                    +
+                  </span>
+                  <span className="font-medium">Agregar restaurante</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

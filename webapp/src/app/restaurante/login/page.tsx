@@ -11,23 +11,34 @@ export default function RestauranteLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [adminCleared, setAdminCleared] = useState(false);
 
-  // Redirect if already logged in
+  // Redirect if already logged in + auto-clear admin session if present
   useEffect(() => {
-    fetch("/api/restaurante/session")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.authenticated) {
-          if (data.slug) {
-            router.replace("/restaurante/profile");
-          } else {
-            router.replace("/restaurante/register");
-          }
-        } else {
-          setChecking(false);
+    (async () => {
+      // If admin is logged in, destroy the admin cookie first. Admins must not
+      // be able to log in as business owners — they don't own restaurants.
+      const adminRes = await fetch("/api/admin/session").catch(() => null);
+      if (adminRes?.ok) {
+        const adminData = await adminRes.json().catch(() => null);
+        if (adminData?.authenticated) {
+          await fetch("/api/admin/session", { method: "DELETE" });
+          setAdminCleared(true);
         }
-      })
-      .catch(() => setChecking(false));
+      }
+
+      const res = await fetch("/api/restaurante/session").catch(() => null);
+      const data = res?.ok ? await res.json().catch(() => null) : null;
+      if (data?.authenticated) {
+        if (data.slug) {
+          router.replace("/restaurante/profile");
+          return;
+        }
+        router.replace("/restaurante/register");
+        return;
+      }
+      setChecking(false);
+    })();
   }, [router]);
 
   if (checking) {
@@ -85,6 +96,11 @@ export default function RestauranteLoginPage() {
           </p>
         </div>
 
+        {adminCleared && (
+          <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            Cerramos tu sesión de admin. Para operar como dueño, iniciá sesión con un usuario de restaurante.
+          </div>
+        )}
         <form
           onSubmit={handleLogin}
           className="rounded-2xl border border-border/50 bg-surface p-6 shadow-sm"
