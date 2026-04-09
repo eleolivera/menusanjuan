@@ -24,12 +24,26 @@ export function Header() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/restaurante/session")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
+    (async () => {
+      // Never treat an admin as a restaurant-side user in the public header.
+      // If the admin cookie is present, skip fetching the owner session entirely.
+      try {
+        const a = await fetch("/api/admin/session");
+        if (a.ok) {
+          const ad = await a.json().catch(() => null);
+          if (ad?.authenticated) {
+            setSession(null);
+            return;
+          }
+        }
+      } catch {}
+      try {
+        const r = await fetch("/api/restaurante/session");
+        if (!r.ok) return;
+        const data = await r.json();
         if (data?.authenticated) setSession(data);
-      })
-      .catch(() => {});
+      } catch {}
+    })();
   }, []);
 
   useEffect(() => {
