@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { cookies } from "next/headers";
+import { cookieDomain } from "./cookie-domain";
 
 const COOKIE_NAME = "menusj_admin";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
@@ -7,21 +8,22 @@ const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
 export async function createAdminSession(userId: string) {
   const token = Buffer.from(JSON.stringify({ userId, role: "ADMIN", ts: Date.now() })).toString("base64");
   const cookieStore = await cookies();
+  const domain = await cookieDomain();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    domain,
     maxAge: COOKIE_MAX_AGE,
   });
   // Clear user session when logging in as admin.
-  // IMPORTANT: cookieStore.delete(name) does not emit path="/" and the browser
-  // may refuse to drop a cookie originally set at root. Use explicit reset.
   cookieStore.set("menusj_session", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    domain,
     maxAge: 0,
   });
   return token;
@@ -50,13 +52,13 @@ export async function verifyAdminSession(): Promise<{ userId: string } | null> {
   try {
     const user = await prisma.user.findUnique({ where: { id: session.userId } });
     if (!user || user.role !== "ADMIN") {
-      // Invalid — clear the cookie (explicit path)
       const cookieStore = await cookies();
       cookieStore.set(COOKIE_NAME, "", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
+        domain: await cookieDomain(),
         maxAge: 0,
       });
       return null;
@@ -84,6 +86,18 @@ export async function loginAdmin(email: string, password: string): Promise<boole
 
 export async function destroyAdminSession() {
   const cookieStore = await cookies();
+  const domain = await cookieDomain();
+  // Delete on the apex domain (covers admin./www./menusanjuan.com)
+  cookieStore.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    domain,
+    maxAge: 0,
+  });
+  // Also delete host-only variants in case an old cookie was set without a
+  // domain before this fix was deployed.
   cookieStore.set(COOKIE_NAME, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
+import { cookieDomain } from "./cookie-domain";
 import crypto from "crypto";
 
 const COOKIE_NAME = "menusj_session";
@@ -21,23 +22,22 @@ export function verifyPassword(password: string, stored: string): boolean {
 export async function createSession(userId: string, activeSlug?: string) {
   const token = Buffer.from(JSON.stringify({ userId, activeSlug: activeSlug || null, ts: Date.now() })).toString("base64");
   const cookieStore = await cookies();
+  const domain = await cookieDomain();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    domain,
     maxAge: COOKIE_MAX_AGE,
   });
   // Clear admin session when logging in as a regular user.
-  // IMPORTANT: use set-with-maxAge-0 instead of delete(), because
-  // cookieStore.delete(name) does NOT send an explicit path and the browser
-  // may refuse to drop a cookie originally set at path "/". Both cookies need
-  // to be mutually exclusive for auth boundary to hold.
   cookieStore.set("menusj_admin", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    domain,
     maxAge: 0,
   });
   return token;
@@ -171,8 +171,17 @@ export async function switchActiveRestaurant(slug: string) {
 
 export async function destroyRestauranteSession() {
   const cookieStore = await cookies();
-  // Explicit path + maxAge 0 — cookieStore.delete() does not emit path="/"
-  // and can silently fail to remove a root-scoped cookie.
+  const domain = await cookieDomain();
+  // Apex domain — wipes cookie across admin./www./menusanjuan.com
+  cookieStore.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    domain,
+    maxAge: 0,
+  });
+  // Also wipe any host-only cookies set before this fix was deployed.
   cookieStore.set(COOKIE_NAME, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
