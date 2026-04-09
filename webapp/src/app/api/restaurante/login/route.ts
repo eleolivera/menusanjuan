@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loginWithEmail } from "@/lib/restaurante-auth";
-import { getAdminSession } from "@/lib/admin-auth";
+import { getAdminSession, destroyAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    // Admins cannot log in as a restaurant owner — they already have the admin
-    // panel. This prevents the "admin types in an owner email and takes over"
-    // confusion.
+    // If an admin cookie is present, nuke it up front — same call the Salir
+    // button in /admin uses. This guarantees the admin session is really
+    // gone before we set the business session, regardless of cookie path
+    // quirks on any particular browser.
     if (await getAdminSession()) {
-      return NextResponse.json(
-        { error: "Cerrá sesión de admin primero para operar como dueño." },
-        { status: 403 }
-      );
+      await destroyAdminSession();
     }
 
     const body = await request.json();

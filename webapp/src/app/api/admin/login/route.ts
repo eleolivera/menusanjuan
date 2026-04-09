@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loginAdmin } from "@/lib/admin-auth";
+import { destroyRestauranteSession } from "@/lib/restaurante-auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,6 +8,9 @@ export async function POST(request: NextRequest) {
     if (!email || !password) {
       return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
     }
+
+    // Nuke any business session up front — symmetric to restaurante/login.
+    await destroyRestauranteSession();
 
     const success = await loginAdmin(email, password);
     if (!success) {
