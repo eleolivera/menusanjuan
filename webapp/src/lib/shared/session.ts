@@ -73,6 +73,12 @@ export async function deleteSession(config: SessionConfig) {
   const token = cookieStore.get(config.cookieName)?.value;
   if (token) {
     await config.prisma.session.deleteMany({ where: { sessionToken: token } });
-    cookieStore.delete(config.cookieName);
+    cookieStore.set(config.cookieName, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
   }
 }

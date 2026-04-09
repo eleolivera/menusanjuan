@@ -14,8 +14,16 @@ export async function createAdminSession(userId: string) {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
   });
-  // Clear user session when logging in as admin
-  cookieStore.delete("menusj_session");
+  // Clear user session when logging in as admin.
+  // IMPORTANT: cookieStore.delete(name) does not emit path="/" and the browser
+  // may refuse to drop a cookie originally set at root. Use explicit reset.
+  cookieStore.set("menusj_session", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
   return token;
 }
 
@@ -42,9 +50,15 @@ export async function verifyAdminSession(): Promise<{ userId: string } | null> {
   try {
     const user = await prisma.user.findUnique({ where: { id: session.userId } });
     if (!user || user.role !== "ADMIN") {
-      // Invalid — clear the cookie
+      // Invalid — clear the cookie (explicit path)
       const cookieStore = await cookies();
-      cookieStore.delete(COOKIE_NAME);
+      cookieStore.set(COOKIE_NAME, "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
+      });
       return null;
     }
     return { userId: user.id };
@@ -70,5 +84,11 @@ export async function loginAdmin(email: string, password: string): Promise<boole
 
 export async function destroyAdminSession() {
   const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
+  cookieStore.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 }

@@ -28,8 +28,18 @@ export async function createSession(userId: string, activeSlug?: string) {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
   });
-  // Clear admin session when logging in as a regular user
-  cookieStore.delete("menusj_admin");
+  // Clear admin session when logging in as a regular user.
+  // IMPORTANT: use set-with-maxAge-0 instead of delete(), because
+  // cookieStore.delete(name) does NOT send an explicit path and the browser
+  // may refuse to drop a cookie originally set at path "/". Both cookies need
+  // to be mutually exclusive for auth boundary to hold.
+  cookieStore.set("menusj_admin", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
   return token;
 }
 
@@ -161,7 +171,15 @@ export async function switchActiveRestaurant(slug: string) {
 
 export async function destroyRestauranteSession() {
   const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
+  // Explicit path + maxAge 0 — cookieStore.delete() does not emit path="/"
+  // and can silently fail to remove a root-scoped cookie.
+  cookieStore.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 // Login with email + password

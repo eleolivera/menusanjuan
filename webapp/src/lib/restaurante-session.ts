@@ -58,6 +58,12 @@ export async function destroySession() {
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (token) {
     await prisma.session.deleteMany({ where: { token } });
-    cookieStore.delete(COOKIE_NAME);
+    cookieStore.set(COOKIE_NAME, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
   }
 }
