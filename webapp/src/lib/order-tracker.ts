@@ -51,6 +51,26 @@ export function getLatestOrderRef(slug: string): OrderRef | null {
   return refs[0] || null;
 }
 
+/** Get all order refs across all restaurants. */
+export function getAllOrderRefs(): (OrderRef & { slug: string })[] {
+  if (typeof window === "undefined") return [];
+  const all: (OrderRef & { slug: string })[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("msj_orders_")) continue;
+      const slug = key.slice("msj_orders_".length);
+      const refs = getOrderRefs(slug);
+      for (const ref of refs) {
+        all.push({ ...ref, slug });
+      }
+    }
+  } catch {}
+  // Sort by most recent first
+  all.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime());
+  return all;
+}
+
 export function removeOrderRef(slug: string, orderId: string): void {
   if (typeof window === "undefined") return;
   const refs = getOrderRefs(slug).filter((r) => r.orderId !== orderId);

@@ -82,6 +82,7 @@ export function Header() {
             <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Inicio</Link>
             <Link href="/#restaurantes" scroll={false} onClick={() => { if (window.location.pathname === "/") { document.getElementById("restaurantes")?.scrollIntoView({ behavior: "smooth" }); } }} className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</Link>
             <Link href="/#como-funciona" scroll={false} onClick={() => { if (window.location.pathname === "/") { document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" }); } }} className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</Link>
+            <Link href="/mis-pedidos" className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Mis Pedidos</Link>
           </nav>
 
           {/* "Soy Restaurante" — visible when user has no restaurants */}
@@ -227,6 +228,7 @@ export function Header() {
             <Link href="/" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Inicio</Link>
             <Link href="/#restaurantes" onClick={() => { setMobileOpen(false); if (window.location.pathname === "/") { setTimeout(() => document.getElementById("restaurantes")?.scrollIntoView({ behavior: "smooth" }), 100); } }} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</Link>
             <Link href="/#como-funciona" onClick={() => { setMobileOpen(false); if (window.location.pathname === "/") { setTimeout(() => document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" }), 100); } }} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</Link>
+            <Link href="/mis-pedidos" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Mis Pedidos</Link>
             {!hasRestas && (
               <Link href={session ? "/restaurante/register" : "/para-restaurantes"} onClick={() => setMobileOpen(false)}
                 className="mt-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-md shadow-primary/25 transition-all">
