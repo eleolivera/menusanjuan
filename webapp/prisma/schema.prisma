@@ -27,6 +27,22 @@ model User {
   accounts      Account[]
   sessions      Session[]
   claimRequests ClaimRequest[]
+  oauthAccounts OAuthAccount[]
+}
+
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String   // "google"
+  providerAccountId String   // Google sub (unique ID)
+  email             String?  // Email from provider at time of link
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider, email])
 }
 
 enum UserRole {
