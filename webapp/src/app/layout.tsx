@@ -16,7 +16,11 @@ export const metadata: Metadata = {
   },
   description:
     "Todos los menús de San Juan en un solo lugar. Elegí, pedí por WhatsApp y listo.",
-  icons: { icon: "/favicon.svg" },
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.json",
   metadataBase: new URL("https://menusanjuan.com"),
   openGraph: {
     type: "website",
