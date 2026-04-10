@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/restaurante-auth";
 import { createAdminSession } from "@/lib/admin-auth";
+import { cookieDomain } from "@/lib/cookie-domain";
 
 type GoogleUserInfo = {
   sub: string;
@@ -73,8 +74,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/restaurante/login?error=google_csrf", request.url));
   }
 
-  // Clear the state cookie
-  cookieStore.set("menusj_oauth_state", "", { path: "/", maxAge: 0 });
+  // Clear the state cookie on apex domain
+  const domain = await cookieDomain();
+  cookieStore.set("menusj_oauth_state", "", { path: "/", domain, maxAge: 0 });
 
   try {
     const callbackUrl = process.env.GOOGLE_REDIRECT_URI || `${request.nextUrl.origin}/api/auth/google/callback`;
