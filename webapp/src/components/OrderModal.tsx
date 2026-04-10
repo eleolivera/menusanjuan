@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { MenuItemData } from "@/data/menus";
 import type { SelectedOptions } from "./ItemCustomizeSheet";
 import { LocationPicker } from "./LocationPicker";
 import { PhoneInput } from "./PhoneInput";
 import { formatForWhatsApp } from "@/lib/phone";
 import { type DeliveryConfig, calculateDeliveryFee, type DeliveryZoneResult } from "@/lib/delivery";
+import { OrderStatusStepper } from "./OrderStatusStepper";
+import { saveOrderRef } from "@/lib/order-tracker";
 
 type CartItem = {
   item: MenuItemData;
@@ -26,6 +28,8 @@ export function OrderModal({
   onClose,
   onRemove,
   onAdd,
+  onOrderSent,
+  trackingOrder,
 }: {
   items: CartItem[];
   total: number;
@@ -36,8 +40,12 @@ export function OrderModal({
   onClose: () => void;
   onRemove: (cartKey: string) => void;
   onAdd: (cartKey: string) => void;
+  onOrderSent?: (orderId: string, token: string, orderNumber: string) => void;
+  trackingOrder?: { orderId: string; token: string; orderNumber: string } | null;
 }) {
-  const [step, setStep] = useState<"cart" | "method" | "info" | "confirm" | "sent">("cart");
+  const [step, setStep] = useState<"cart" | "method" | "info" | "confirm" | "tracking">(
+    trackingOrder ? "tracking" : "cart"
+  );
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -46,7 +54,35 @@ export function OrderModal({
   const [longitude, setLongitude] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
-  const [orderId, setOrderId] = useState("");
+  const [orderId, setOrderId] = useState(trackingOrder?.orderId || "");
+  const [orderToken, setOrderToken] = useState(trackingOrder?.token || "");
+  const [trackingStatus, setTrackingStatus] = useState<string>("GENERATED");
+  const [trackingData, setTrackingData] = useState<any>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Poll for order status when in tracking mode
+  useEffect(() => {
+    const oid = trackingOrder?.orderId || orderId;
+    const tok = trackingOrder?.token || orderToken;
+    if (step !== "tracking" || !oid || !tok) return;
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/orders/track?id=${oid}&token=${tok}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTrackingStatus(data.status);
+          setTrackingData(data);
+          if (data.status === "DELIVERED" || data.status === "CANCELLED") {
+            if (pollRef.current) clearInterval(pollRef.current);
+          }
+        }
+      } catch {}
+    }
+    poll();
+    pollRef.current = setInterval(poll, 15000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [step, orderId, orderToken, trackingOrder]);
 
   // Delivery
   const [deliveryMethod, setDeliveryMethod] = useState<"delivery" | "pickup">("delivery");
@@ -166,6 +202,13 @@ _Pedido realizado desde MenuSanJuan_`;
       const order = await res.json();
       setOrderNumber(order.orderNumber);
       setOrderId(order.id);
+      setOrderToken(order.customerAccessToken || "");
+
+      // Save to localStorage for persistent tracking
+      if (order.customerAccessToken) {
+        saveOrderRef(restauranteSlug, order.id, order.customerAccessToken, order.orderNumber);
+        onOrderSent?.(order.id, order.customerAccessToken, order.orderNumber);
+      }
 
       const cleanPhone = formatForWhatsApp(restaurantPhone) || restaurantPhone.replace(/[^0-9]/g, "");
       const message = buildWhatsAppMessage(order.orderNumber);
@@ -177,7 +220,7 @@ _Pedido realizado desde MenuSanJuan_`;
         body: JSON.stringify({ whatsappSent: true }),
       });
 
-      setStep("sent");
+      setStep("tracking");
     } catch (err) {
       console.error(err);
       alert("Error al crear el pedido. Intentá de nuevo.");
@@ -198,7 +241,7 @@ _Pedido realizado desde MenuSanJuan_`;
             {step === "method" && "Método de Entrega"}
             {step === "info" && "Tus Datos"}
             {step === "confirm" && "Confirmar Pedido"}
-            {step === "sent" && "Pedido Enviado"}
+            {step === "tracking" && "Seguimiento"}
           </h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover transition-colors">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -507,20 +550,62 @@ _Pedido realizado desde MenuSanJuan_`;
             </>
           )}
 
-          {/* Step 4: Sent */}
-          {step === "sent" && (
-            <div className="text-center py-4">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-3xl">✅</div>
-              <h3 className="text-xl font-bold text-text mb-1">Pedido Enviado</h3>
-              <div className="inline-block rounded-lg bg-primary/10 px-3 py-1.5 mb-3">
-                <span className="text-lg font-extrabold text-primary tracking-tight">{orderNumber}</span>
+          {/* Step 4: Tracking */}
+          {step === "tracking" && (
+            <div className="py-2">
+              <div className="text-center mb-5">
+                <div className="inline-block rounded-lg bg-primary/10 px-4 py-2 mb-2">
+                  <span className="text-lg font-extrabold text-primary tracking-tight">{trackingOrder?.orderNumber || orderNumber}</span>
+                </div>
+                <p className="text-xs text-text-muted">
+                  {trackingData?.restaurantName || restaurantName}
+                </p>
               </div>
-              <p className="text-sm text-text-secondary leading-relaxed mb-6">
-                Tu pedido fue registrado y enviado por WhatsApp a <strong>{restaurantName}</strong>.
-              </p>
-              <button onClick={onClose} className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all">
-                Cerrar
-              </button>
+
+              <div className="mb-6">
+                <OrderStatusStepper status={trackingStatus as any} />
+              </div>
+
+              {/* Order summary if we have tracking data */}
+              {trackingData && (
+                <div className="rounded-xl border border-border/50 bg-surface-alt p-4 mb-4">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Tu pedido</div>
+                  {(trackingData.items as any[])?.map((item: any, i: number) => (
+                    <div key={i} className="flex justify-between text-sm py-0.5">
+                      <span className="text-text-secondary">{item.quantity}x {item.name}</span>
+                      <span className="font-medium text-text">${item.total?.toLocaleString("es-AR")}</span>
+                    </div>
+                  ))}
+                  <div className="mt-2 border-t border-border/50 pt-2 flex justify-between">
+                    <span className="font-bold text-text">Total</span>
+                    <span className="font-extrabold text-text">${trackingData.total?.toLocaleString("es-AR")}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {/* Re-send WhatsApp */}
+                <button
+                  onClick={() => {
+                    const phone = trackingData?.restaurantPhone || restaurantPhone;
+                    const cleanPhone = formatForWhatsApp(phone) || phone.replace(/[^0-9]/g, "");
+                    const msg = encodeURIComponent(`Hola! Consulto por mi pedido ${trackingOrder?.orderNumber || orderNumber} en ${trackingData?.restaurantName || restaurantName}`);
+                    window.open(`https://wa.me/${cleanPhone}?text=${msg}`, "_blank");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-sm hover:shadow-md transition-all"
+                >
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+                  Contactar por WhatsApp
+                </button>
+
+                {/* Close / new order */}
+                <button
+                  onClick={onClose}
+                  className="w-full rounded-xl border border-border px-5 py-3 text-sm font-semibold text-text hover:bg-surface-hover transition-colors"
+                >
+                  {trackingStatus === "DELIVERED" || trackingStatus === "CANCELLED" ? "Cerrar" : "Seguir viendo el menú"}
+                </button>
+              </div>
             </div>
           )}
         </div>

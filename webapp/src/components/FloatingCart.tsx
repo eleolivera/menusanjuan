@@ -4,11 +4,31 @@ export function FloatingCart({
   itemCount,
   total,
   onClick,
+  pendingOrderNumber,
+  onViewOrder,
 }: {
   itemCount: number;
   total: number;
   onClick: () => void;
+  pendingOrderNumber?: string | null;
+  onViewOrder?: () => void;
 }) {
+  // Show "Ver mi pedido" when there's a pending order and cart is empty
+  if (itemCount === 0 && pendingOrderNumber && onViewOrder) {
+    return (
+      <button
+        onClick={onViewOrder}
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-5 py-3.5 text-white shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:-translate-y-0.5 transition-all animate-scale-in"
+      >
+        <span className="text-lg">📋</span>
+        <div className="text-left">
+          <div className="text-xs font-medium opacity-80">Tu pedido</div>
+          <div className="text-sm font-bold tracking-tight">{pendingOrderNumber}</div>
+        </div>
+      </button>
+    );
+  }
+
   if (itemCount === 0) return null;
 
   return (

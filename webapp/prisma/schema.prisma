@@ -313,6 +313,7 @@ model Order {
   source           String?                           // "web" | "pos-tablet" | "pos-mobile"
   whatsappSent     Boolean     @default(false)
   notes            String?
+  customerAccessToken String?                     // 12-char token for anonymous order tracking
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -322,6 +323,7 @@ model Order {
   @@index([restauranteSlug, createdAt])
   @@index([restauranteSlug, channel])
   @@index([orderNumber])
+  @@index([customerAccessToken])
 }
 
 // ─── Onboarding Kanban ───

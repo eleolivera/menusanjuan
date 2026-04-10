@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { MenuCategoryData, MenuItemData } from "@/data/menus";
 import type { Restaurant } from "@/data/restaurants";
 import type { DeliveryConfig } from "@/lib/delivery";
@@ -9,6 +9,8 @@ import { MenuItemCard } from "./MenuItemCard";
 import { FloatingCart } from "./FloatingCart";
 import { OrderModal } from "./OrderModal";
 import { ItemCustomizeSheet, type SelectedOptions } from "./ItemCustomizeSheet";
+import { OrderStatusBanner } from "./OrderStatusBanner";
+import { getLatestOrderRef, type OrderRef } from "@/lib/order-tracker";
 
 export type CartEntry = {
   cartKey: string;
@@ -33,6 +35,14 @@ export function StoreMenu({
   const [activeCategory, setActiveCategory] = useState(categories[0]?.id || "");
   const [showModal, setShowModal] = useState(false);
   const [customizingItem, setCustomizingItem] = useState<MenuItemData | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<OrderRef | null>(null);
+  const [trackingMode, setTrackingMode] = useState(false);
+
+  // Check localStorage for pending orders on mount
+  useEffect(() => {
+    const ref = getLatestOrderRef(restaurant.slug);
+    if (ref) setPendingOrder(ref);
+  }, [restaurant.slug]);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const addItem = useCallback((item: MenuItemData) => {
@@ -121,6 +131,19 @@ export function StoreMenu({
         onSelect={scrollToCategory}
       />
 
+      {/* Pending order banner */}
+      {pendingOrder && (
+        <div className="mx-auto max-w-7xl px-4 pt-4">
+          <OrderStatusBanner
+            orderId={pendingOrder.orderId}
+            token={pendingOrder.token}
+            orderNumber={pendingOrder.orderNumber}
+            onTap={() => { setTrackingMode(true); setShowModal(true); }}
+            onDismiss={() => setPendingOrder(null)}
+          />
+        </div>
+      )}
+
       <div className="mx-auto max-w-7xl px-4 py-6">
         {categories.length === 0 && (
           <div className="py-16 text-center">
@@ -160,7 +183,9 @@ export function StoreMenu({
       <FloatingCart
         itemCount={totalItems}
         total={totalPrice}
-        onClick={() => setShowModal(true)}
+        onClick={() => { setTrackingMode(false); setShowModal(true); }}
+        pendingOrderNumber={pendingOrder?.orderNumber}
+        onViewOrder={() => { setTrackingMode(true); setShowModal(true); }}
       />
 
       {showModal && (
@@ -171,9 +196,13 @@ export function StoreMenu({
           restaurantPhone={restaurant.phone}
           restauranteSlug={restaurant.slug}
           deliveryConfig={deliveryConfig}
-          onClose={() => setShowModal(false)}
+          onClose={() => { setShowModal(false); setTrackingMode(false); }}
           onRemove={decrementEntry}
           onAdd={incrementEntry}
+          onOrderSent={(id, token, num) => {
+            setPendingOrder({ orderId: id, token, orderNumber: num, placedAt: new Date().toISOString() });
+          }}
+          trackingOrder={trackingMode && pendingOrder ? { orderId: pendingOrder.orderId, token: pendingOrder.token, orderNumber: pendingOrder.orderNumber } : null}
         />
       )}
 

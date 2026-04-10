@@ -2,6 +2,11 @@
 
 import { prisma } from "./prisma";
 import { OrderStatus as PrismaOrderStatus } from "@/generated/prisma/client";
+import crypto from "crypto";
+
+function generateAccessToken(): string {
+  return crypto.randomBytes(6).toString("hex"); // 12 chars
+}
 
 export type OrderStatus = "GENERATED" | "PAID" | "PROCESSING" | "DELIVERED" | "CANCELLED";
 
@@ -40,6 +45,7 @@ export type Order = {
   deliveryFee: number;
   notes: string;
   whatsappSent: boolean;
+  customerAccessToken: string | null;
   // POS fields
   channel: OrderChannel;
   tableNumber: string | null;
@@ -200,6 +206,7 @@ function mapOrder(dbOrder: any): Order {
     deliveryFee: dbOrder.deliveryFee || 0,
     notes: dbOrder.notes || "",
     whatsappSent: dbOrder.whatsappSent,
+    customerAccessToken: dbOrder.customerAccessToken || null,
     channel: (dbOrder.channel || "ONLINE") as OrderChannel,
     tableNumber: dbOrder.tableNumber || null,
     paymentMethod: dbOrder.paymentMethod || null,
@@ -244,9 +251,11 @@ export async function createOrder(data: {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const orderNumber = await nextOrderNumber(data.restauranteSlug, attempt);
     try {
+      const accessToken = generateAccessToken();
       const dbOrder = await prisma.order.create({
         data: {
           orderNumber,
+          customerAccessToken: accessToken,
           restauranteSlug: data.restauranteSlug,
           customerName: data.customerName,
           customerPhone: data.customerPhone,
