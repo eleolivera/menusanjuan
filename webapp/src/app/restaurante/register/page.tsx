@@ -380,6 +380,13 @@ function RegisterPage() {
                   </button>
                 )}
               </div>
+
+              <p className="text-center text-xs text-text-muted pt-1">
+                ¿Solo querés pedir comida?{" "}
+                <a href="/#restaurantes" className="font-medium text-primary hover:underline">
+                  Ver restaurantes
+                </a>
+              </p>
             </div>
           )}
 
