@@ -165,10 +165,10 @@ export default function AdminPage() {
 
   // Still checking session or redirecting to Google
   if (checking || googleLoading) return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
       <div className="text-center animate-fade-in">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-xl shadow-lg shadow-primary/25">M</div>
-        {googleLoading && <p className="text-xs text-slate-500 mt-2">Conectando con Google...</p>}
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-xl shadow-lg shadow-primary/25">M</div>
+        {googleLoading && <p className="text-xs text-slate-500 mt-3">Conectando con Google...</p>}
       </div>
     </div>
   );

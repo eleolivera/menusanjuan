@@ -65,12 +65,12 @@ function LoginInner() {
 
   if (checking || googleLoading) {
     return (
-      <div className="mesh-gradient flex flex-1 items-center justify-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
         <div className="text-center animate-fade-in">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-xl shadow-md shadow-primary/25">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-xl shadow-md shadow-primary/25">
             M
           </div>
-          {googleLoading && <p className="text-sm text-text-secondary mt-2">Conectando con Google...</p>}
+          {googleLoading && <p className="text-sm text-text-secondary mt-3">Conectando con Google...</p>}
         </div>
       </div>
     );
