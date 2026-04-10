@@ -34,6 +34,7 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
   type AdminTab = "onboarding" | "claims" | "users" | "settings";
   const validTabs: AdminTab[] = ["onboarding", "claims", "users", "settings"];
   const tabAliases: Record<string, AdminTab> = { tablero: "onboarding", reclamos: "claims", usuarios: "users", configuracion: "settings" };
@@ -162,8 +163,15 @@ export default function AdminPage() {
     fetch("/api/admin/users").then(r => r.json()).then(setUsers);
   }
 
-  // Still checking session
-  if (checking) return <div className="min-h-screen bg-slate-950" />;
+  // Still checking session or redirecting to Google
+  if (checking || googleLoading) return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="text-center animate-fade-in">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-xl shadow-lg shadow-primary/25">M</div>
+        {googleLoading && <p className="text-xs text-slate-500 mt-2">Conectando con Google...</p>}
+      </div>
+    </div>
+  );
 
   // Not authed — show login form
   if (!authed) {
@@ -177,7 +185,7 @@ export default function AdminPage() {
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-3">
             <button
               type="button"
-              onClick={() => { window.location.href = "/api/auth/google?redirect=/admin"; }}
+              onClick={() => { setGoogleLoading(true); window.location.href = "/api/auth/google?redirect=/admin"; }}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 transition-all"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
