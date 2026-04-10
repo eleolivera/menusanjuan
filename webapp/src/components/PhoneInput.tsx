@@ -20,6 +20,7 @@ const COUNTRIES = [
 export function PhoneInput({
   value,
   onChange,
+  onBlur,
   label = "Teléfono",
   placeholder = "264 555 1234",
   required = false,
@@ -27,6 +28,7 @@ export function PhoneInput({
 }: {
   value: string;
   onChange: (phone: string) => void;
+  onBlur?: () => void;
   label?: string;
   placeholder?: string;
   required?: boolean;
@@ -136,6 +138,7 @@ export function PhoneInput({
           type="tel"
           value={localNumber}
           onChange={(e) => handleChange(e.target.value)}
+          onBlur={onBlur}
           placeholder={placeholder}
           className={`flex-1 ${inputClass}`}
         />

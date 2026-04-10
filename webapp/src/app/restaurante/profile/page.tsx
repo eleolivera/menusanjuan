@@ -7,6 +7,8 @@ import { LocationPicker } from "@/components/LocationPicker";
 import { PhoneInput } from "@/components/PhoneInput";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { PresetManager } from "@/components/PresetManager";
+import { useSmartSave } from "@/hooks/useSmartSave";
+import { SaveIndicator } from "@/components/SaveIndicator";
 
 const DAYS = [
   { key: "lun", label: "Lunes" },
@@ -34,29 +36,55 @@ function parseHours(json: string | null): HoursMap {
 export default function ProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [cuisineType, setCuisineType] = useState("");
-  const [description, setDescription] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
-  const [coverUrl, setCoverUrl] = useState("");
-  const [hours, setHours] = useState<HoursMap>(parseHours(null));
-  const [mercadoPagoAlias, setMercadoPagoAlias] = useState("");
-  const [mercadoPagoCvu, setMercadoPagoCvu] = useState("");
-  const [bankInfo, setBankInfo] = useState("");
-  const [posEnabled, setPosEnabled] = useState(false);
-  const [posSaving, setPosSaving] = useState(false);
-  const [posSaved, setPosSaved] = useState(false);
   const [hasPassword, setHasPassword] = useState(true);
   const [hasGoogle, setHasGoogle] = useState(false);
+  const [originalData, setOriginalData] = useState<Record<string, any>>({
+    name: "", phone: "", address: "", latitude: null, longitude: null,
+    cuisineType: "", description: "", logoUrl: "", coverUrl: "",
+    openHours: JSON.stringify(parseHours(null)),
+    mercadoPagoAlias: "", mercadoPagoCvu: "", bankInfo: "", posEnabled: false,
+  });
+
+  const FIELD_CONFIG = {
+    name: { tier: "autosave" as const },
+    phone: { tier: "autosave" as const },
+    address: { tier: "autosave" as const },
+    latitude: { tier: "autosave" as const },
+    longitude: { tier: "autosave" as const },
+    cuisineType: { tier: "instant" as const },
+    description: { tier: "autosave" as const },
+    logoUrl: { tier: "instant" as const },
+    coverUrl: { tier: "instant" as const },
+    openHours: { tier: "autosave" as const },
+    mercadoPagoAlias: { tier: "autosave" as const },
+    mercadoPagoCvu: { tier: "autosave" as const },
+    bankInfo: { tier: "autosave" as const },
+    posEnabled: { tier: "instant" as const },
+  };
+
+  const { values, setValue, flushField, statuses } = useSmartSave(
+    originalData,
+    FIELD_CONFIG,
+    { endpoint: "/api/restaurante/profile", debounceMs: 1500 },
+  );
+
+  // Convenience accessors
+  const name = values.name as string;
+  const phone = values.phone as string;
+  const address = values.address as string;
+  const latitude = values.latitude as number | null;
+  const longitude = values.longitude as number | null;
+  const cuisineType = values.cuisineType as string;
+  const description = values.description as string;
+  const logoUrl = values.logoUrl as string;
+  const coverUrl = values.coverUrl as string;
+  const hours = parseHours(values.openHours as string);
+  const mercadoPagoAlias = values.mercadoPagoAlias as string;
+  const mercadoPagoCvu = values.mercadoPagoCvu as string;
+  const bankInfo = values.bankInfo as string;
+  const posEnabled = values.posEnabled as boolean;
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -79,24 +107,26 @@ export default function ProfilePage() {
         return r.json();
       })
       .then((d) => {
-        setName(d.name || "");
         setSlug(d.slug || "");
         setEmail(d.email || "");
-        setPhone(d.phone || "");
-        setAddress(d.address || "");
-        setLatitude(d.latitude);
-        setLongitude(d.longitude);
-        setCuisineType(d.cuisineType || "");
-        setDescription(d.description || "");
-        setLogoUrl(d.logoUrl || "");
-        setCoverUrl(d.coverUrl || "");
-        setHours(parseHours(d.openHours));
-        setMercadoPagoAlias(d.mercadoPagoAlias || "");
-        setMercadoPagoCvu(d.mercadoPagoCvu || "");
-        setBankInfo(d.bankInfo || "");
-        setPosEnabled(d.posEnabled || false);
         setHasPassword(d.hasPassword ?? true);
         setHasGoogle(d.hasGoogle ?? false);
+        setOriginalData({
+          name: d.name || "",
+          phone: d.phone || "",
+          address: d.address || "",
+          latitude: d.latitude,
+          longitude: d.longitude,
+          cuisineType: d.cuisineType || "",
+          description: d.description || "",
+          logoUrl: d.logoUrl || "",
+          coverUrl: d.coverUrl || "",
+          openHours: d.openHours || JSON.stringify(parseHours(null)),
+          mercadoPagoAlias: d.mercadoPagoAlias || "",
+          mercadoPagoCvu: d.mercadoPagoCvu || "",
+          bankInfo: d.bankInfo || "",
+          posEnabled: d.posEnabled || false,
+        });
         setLoading(false);
       })
       .catch(() => router.push("/restaurante/login"));
@@ -112,29 +142,13 @@ export default function ProfilePage() {
     }
   }, [loading]);
 
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
-    await fetch("/api/restaurante/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name, phone, address, latitude, longitude, cuisineType,
-        description, logoUrl, coverUrl,
-        openHours: JSON.stringify(hours),
-        mercadoPagoAlias, mercadoPagoCvu, bankInfo, posEnabled,
-      }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  function updateHours(day: string, field: string, value: string | boolean) {
+    const updated = { ...hours, [day]: { ...hours[day], [field]: value } };
+    setValue("openHours", JSON.stringify(updated));
   }
 
-  function updateHours(day: string, field: string, value: string | boolean) {
-    setHours((prev) => ({
-      ...prev,
-      [day]: { ...prev[day], [field]: value },
-    }));
+  function handleImageUploadDone(field: "logoUrl" | "coverUrl", url: string) {
+    setValue(field, url);
   }
 
   if (loading) {
@@ -164,16 +178,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {saved && (
-              <span className="text-xs font-medium text-emerald-400 animate-fade-in">Guardado</span>
-            )}
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-2 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
-            >
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
+            <span className="text-[10px] text-slate-500">Guardado automático</span>
           </div>
         </div>
       </header>
@@ -204,7 +209,7 @@ export default function ProfilePage() {
                 Cambiar portada
               </div>
             </div>
-            <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "cover", setCoverUrl); e.target.value = ""; }} />
+            <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "cover", (url) => handleImageUploadDone("coverUrl", url)); e.target.value = ""; }} />
           </div>
 
           {/* Logo — overlapping the cover, click to change */}
@@ -224,7 +229,7 @@ export default function ProfilePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
                   </svg>
                 </div>
-                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "logo", setLogoUrl); e.target.value = ""; }} />
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "logo", (url) => handleImageUploadDone("logoUrl", url)); e.target.value = ""; }} />
               </div>
               <div className="pb-1">
                 <div className="text-lg font-bold text-white">{name || "Tu Restaurante"}</div>
@@ -242,8 +247,10 @@ export default function ProfilePage() {
           <h2 className="text-sm font-bold text-white mb-4">Información Básica</h2>
           <div className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Nombre del restaurante</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+              <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                Nombre del restaurante <SaveIndicator status={statuses.name} />
+              </label>
+              <input type="text" value={name} onChange={(e) => setValue("name", e.target.value)} onBlur={() => flushField("name")}
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
             </div>
             <div>
@@ -252,15 +259,20 @@ export default function ProfilePage() {
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-500 transition-colors" />
             </div>
             <div>
-              <PhoneInput value={phone} onChange={setPhone} label="WhatsApp del Restaurante" placeholder="264 555 1234" required darkMode />
+              <PhoneInput value={phone} onChange={(v) => setValue("phone", v)} onBlur={() => flushField("phone")} label="WhatsApp del Restaurante" placeholder="264 555 1234" required darkMode />
+              <SaveIndicator status={statuses.phone} />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Tipo de cocina</label>
-              <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setCuisineType(vals[vals.length - 1] || "")} darkMode />
+              <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                Tipo de cocina <SaveIndicator status={statuses.cuisineType} />
+              </label>
+              <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setValue("cuisineType", vals[vals.length - 1] || "")} darkMode />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Descripción</label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Contá qué hace especial a tu restaurante..."
+              <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                Descripción <SaveIndicator status={statuses.description} />
+              </label>
+              <textarea value={description} onChange={(e) => setValue("description", e.target.value)} onBlur={() => flushField("description")} rows={3} placeholder="Contá qué hace especial a tu restaurante..."
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
             </div>
           </div>
@@ -270,9 +282,9 @@ export default function ProfilePage() {
         <LocationSection
           address={address}
           onConfirm={(addr, lat, lng) => {
-            setAddress(addr);
-            setLatitude(lat);
-            setLongitude(lng);
+            setValue("address", addr);
+            setValue("latitude", lat);
+            setValue("longitude", lng);
           }}
         />
 
@@ -318,18 +330,24 @@ export default function ProfilePage() {
           <h2 className="text-sm font-bold text-white mb-4">Métodos de Pago</h2>
           <div className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Alias de Mercado Pago</label>
-              <input type="text" value={mercadoPagoAlias} onChange={(e) => setMercadoPagoAlias(e.target.value)} placeholder="MI.ALIAS.MP"
+              <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                Alias de Mercado Pago <SaveIndicator status={statuses.mercadoPagoAlias} />
+              </label>
+              <input type="text" value={mercadoPagoAlias} onChange={(e) => setValue("mercadoPagoAlias", e.target.value)} onBlur={() => flushField("mercadoPagoAlias")} placeholder="MI.ALIAS.MP"
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">CVU</label>
-              <input type="text" value={mercadoPagoCvu} onChange={(e) => setMercadoPagoCvu(e.target.value)} placeholder="0000003100..."
+              <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                CVU <SaveIndicator status={statuses.mercadoPagoCvu} />
+              </label>
+              <input type="text" value={mercadoPagoCvu} onChange={(e) => setValue("mercadoPagoCvu", e.target.value)} onBlur={() => flushField("mercadoPagoCvu")} placeholder="0000003100..."
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Info bancaria (transferencia)</label>
-              <textarea value={bankInfo} onChange={(e) => setBankInfo(e.target.value)} rows={2} placeholder="Banco, CBU, titular..."
+              <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                Info bancaria (transferencia) <SaveIndicator status={statuses.bankInfo} />
+              </label>
+              <textarea value={bankInfo} onChange={(e) => setValue("bankInfo", e.target.value)} onBlur={() => flushField("bankInfo")} rows={2} placeholder="Banco, CBU, titular..."
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
             </div>
           </div>
@@ -376,24 +394,11 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Toggle (instant save) */}
+          {/* Toggle (instant save via useSmartSave) */}
           <button
             type="button"
-            onClick={async () => {
-              const next = !posEnabled;
-              setPosEnabled(next);
-              setPosSaving(true);
-              const res = await fetch("/api/restaurante/profile", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ posEnabled: next }),
-              });
-              if (!res.ok) setPosEnabled(!next); // revert on failure
-              else setPosSaved(true);
-              setPosSaving(false);
-              setTimeout(() => setPosSaved(false), 2000);
-            }}
-            disabled={posSaving}
+            onClick={() => setValue("posEnabled", !posEnabled)}
+            disabled={statuses.posEnabled === "saving"}
             className={`w-full flex items-center gap-3 rounded-xl border p-4 transition-all ${
               posEnabled ? "border-emerald-400/30 bg-emerald-400/5" : "border-white/10 bg-white/[0.02] hover:bg-white/5"
             } disabled:opacity-50`}
@@ -404,7 +409,7 @@ export default function ProfilePage() {
             <div className="flex-1 text-left">
               <p className="text-sm font-bold text-white">{posEnabled ? "POS habilitado" : "Habilitar POS"}</p>
               <p className="text-[10px] text-slate-500">
-                {posSaving ? "Guardando..." : posSaved ? "Guardado ✓" : posEnabled ? "Aparece en el menu lateral" : "Click para activar"}
+                {statuses.posEnabled === "saving" ? "Guardando..." : statuses.posEnabled === "saved" ? "Guardado ✓" : posEnabled ? "Aparece en el menu lateral" : "Click para activar"}
               </p>
             </div>
           </button>
@@ -419,16 +424,8 @@ export default function ProfilePage() {
         {/* Security section */}
         <SecuritySection email={email} hasPassword={hasPassword} hasGoogle={hasGoogle} onPasswordSet={() => setHasPassword(true)} />
 
-        {/* Save button (bottom) */}
-        <div className="flex justify-end pb-8">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-8 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
-          >
-            {saving ? "Guardando..." : "Guardar Cambios"}
-          </button>
-        </div>
+        {/* Bottom spacer */}
+        <div className="pb-8" />
       </div>
     </div>
   );
