@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
       userId = existingOAuth.userId;
       if (existingOAuth.user.role === "ADMIN") {
         await createAdminSession(userId);
-        return NextResponse.redirect(new URL("/admin", request.url));
+        return NextResponse.redirect(new URL("https://admin.menusanjuan.com"));
       }
       activeSlug = existingOAuth.user.accounts[0]?.dealer?.slug;
     } else {
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
             },
           });
           await createAdminSession(existingUser.id);
-          return NextResponse.redirect(new URL("/admin", request.url));
+          return NextResponse.redirect(new URL("https://admin.menusanjuan.com"));
         }
         // Link Google account to existing business/user
         await prisma.oAuthAccount.create({

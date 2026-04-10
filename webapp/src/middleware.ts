@@ -15,6 +15,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // Block /admin on non-admin hosts → redirect to admin subdomain
+  if (pathname.startsWith("/admin") && !hostname.startsWith("admin.")) {
+    return NextResponse.redirect(new URL(`https://admin.menusanjuan.com${pathname === "/admin" ? "" : pathname.slice(6)}`));
+  }
+
   return NextResponse.next();
 }
 
