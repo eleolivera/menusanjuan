@@ -28,9 +28,10 @@ function RegisterPage() {
   // Steps:
   // 1 = pick from list or "create new"
   // 2 = account (name, email, password)
+  // 2.5 = email verification code
   // 3 = restaurant details (new only: name, phone, cuisine)
   // 4 = done
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<number>(1);
   const [mode, setMode] = useState<"new" | "claim" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +54,11 @@ function RegisterPage() {
   const [restaurantName, setRestaurantName] = useState("");
   const [phone, setPhone] = useState("");
   const [cuisineType, setCuisineType] = useState("");
+
+  // Verification
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
 
   // Result
   const [slug, setSlug] = useState("");
@@ -150,6 +156,13 @@ function RegisterPage() {
 
       setIsLoggedIn(true);
 
+      // If registration returned needsVerification, go to verify step
+      if (data.needsVerification) {
+        setLoading(false);
+        setStep(2.5 as any);
+        return;
+      }
+
       // If claiming, do it now
       if (mode === "claim" && selectedClaim) {
         await doClaim();
@@ -186,6 +199,48 @@ function RegisterPage() {
     } catch {
       setError("Error de conexión");
       setLoading(false);
+    }
+  }
+
+  // Verify email code
+  async function handleVerifyCode() {
+    if (verifyCode.length !== 6) { setError("Ingresá el código de 6 dígitos"); return; }
+    setVerifying(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: verifyCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Código incorrecto"); setVerifying(false); return; }
+
+      // Verified — continue flow
+      if (mode === "claim" && selectedClaim) {
+        await doClaim();
+        return;
+      }
+      setVerifying(false);
+      setStep(3);
+    } catch {
+      setError("Error de conexión");
+      setVerifying(false);
+    }
+  }
+
+  async function handleResendCode() {
+    setResending(true);
+    setError("");
+    try {
+      await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setResending(false);
+    } catch {
+      setResending(false);
     }
   }
 
@@ -230,10 +285,10 @@ function RegisterPage() {
             M
           </div>
           <h1 className="text-2xl font-extrabold text-text tracking-tight">
-            {step === 1 ? "Registrar mi Restaurante" : step === 2 ? "Creá tu Cuenta" : step === 3 ? "Datos del Restaurante" : "¡Listo!"}
+            {step === 1 ? "Registrar mi Restaurante" : step === 2 ? "Creá tu Cuenta" : step === 2.5 ? "Verificá tu Email" : step === 3 ? "Datos del Restaurante" : "¡Listo!"}
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {step === 1 ? "¿Tu restaurante ya está en MenuSanJuan?" : step === 2 ? "Tus datos para iniciar sesión" : step === 3 ? "Info básica — podés completar después" : ""}
+            {step === 1 ? "¿Tu restaurante ya está en MenuSanJuan?" : step === 2 ? "Tus datos para iniciar sesión" : step === 2.5 ? "Revisá tu bandeja de entrada" : step === 3 ? "Info básica — podés completar después" : ""}
           </p>
         </div>
 
@@ -395,6 +450,44 @@ function RegisterPage() {
                   placeholder="Repetí la contraseña"
                   className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
               </div>
+            </div>
+          )}
+
+          {/* Step 2.5: Email verification */}
+          {step === 2.5 && (
+            <div className="space-y-4 text-center">
+              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-2xl">
+                📧
+              </div>
+              <p className="text-sm text-text-secondary">
+                Enviamos un código de 6 dígitos a <strong className="text-text">{email}</strong>
+              </p>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={verifyCode}
+                onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                className="mx-auto block w-48 rounded-xl border border-border bg-white px-4 py-4 text-center text-2xl font-bold tracking-[0.3em] text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleVerifyCode}
+                disabled={verifyCode.length !== 6 || verifying}
+                className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
+              >
+                {verifying ? "Verificando..." : "Verificar"}
+              </button>
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={resending}
+                className="text-xs text-text-muted hover:text-primary transition-colors"
+              >
+                {resending ? "Enviando..." : "¿No llegó? Reenviar código"}
+              </button>
             </div>
           )}
 

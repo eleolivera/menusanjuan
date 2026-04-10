@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/restaurante-auth";
+import { createAdminSession } from "@/lib/admin-auth";
 
 type GoogleUserInfo = {
   sub: string;
@@ -98,7 +99,8 @@ export async function GET(request: NextRequest) {
       // Already linked — just log in
       userId = existingOAuth.userId;
       if (existingOAuth.user.role === "ADMIN") {
-        return NextResponse.redirect(new URL("/restaurante/login?error=google_admin", request.url));
+        await createAdminSession(userId);
+        return NextResponse.redirect(new URL("/admin", request.url));
       }
       activeSlug = existingOAuth.user.accounts[0]?.dealer?.slug;
     } else {
@@ -110,9 +112,19 @@ export async function GET(request: NextRequest) {
 
       if (existingUser) {
         if (existingUser.role === "ADMIN") {
-          return NextResponse.redirect(new URL("/restaurante/login?error=google_admin", request.url));
+          // Link Google to existing admin, create admin session
+          await prisma.oAuthAccount.create({
+            data: {
+              userId: existingUser.id,
+              provider: "google",
+              providerAccountId: googleUser.sub,
+              email: googleUser.email,
+            },
+          });
+          await createAdminSession(existingUser.id);
+          return NextResponse.redirect(new URL("/admin", request.url));
         }
-        // Link Google account to existing user
+        // Link Google account to existing business/user
         await prisma.oAuthAccount.create({
           data: {
             userId: existingUser.id,

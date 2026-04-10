@@ -55,6 +55,8 @@ export default function ProfilePage() {
   const [posEnabled, setPosEnabled] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
   const [posSaved, setPosSaved] = useState(false);
+  const [hasPassword, setHasPassword] = useState(true);
+  const [hasGoogle, setHasGoogle] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +95,8 @@ export default function ProfilePage() {
         setMercadoPagoCvu(d.mercadoPagoCvu || "");
         setBankInfo(d.bankInfo || "");
         setPosEnabled(d.posEnabled || false);
+        setHasPassword(d.hasPassword ?? true);
+        setHasGoogle(d.hasGoogle ?? false);
         setLoading(false);
       })
       .catch(() => router.push("/restaurante/login"));
@@ -412,6 +416,9 @@ export default function ProfilePage() {
           )}
         </section>
 
+        {/* Security section */}
+        <SecuritySection email={email} hasPassword={hasPassword} hasGoogle={hasGoogle} onPasswordSet={() => setHasPassword(true)} />
+
         {/* Save button (bottom) */}
         <div className="flex justify-end pb-8">
           <button
@@ -427,7 +434,123 @@ export default function ProfilePage() {
   );
 }
 
-// Separate component to manage email + password changes
+function SecuritySection({ email, hasPassword, hasGoogle, onPasswordSet }: { email: string; hasPassword: boolean; hasGoogle: boolean; onPasswordSet: () => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState(false);
+
+  async function handleSetPassword() {
+    if (newPw.length < 6) { setPwError("Mínimo 6 caracteres"); return; }
+    if (newPw !== confirmPw) { setPwError("Las contraseñas no coinciden"); return; }
+    setPwSaving(true);
+    setPwError("");
+    try {
+      const res = await fetch("/api/restaurante/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "change_password", currentPassword: currentPw || undefined, newPassword: newPw }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPwError(data.error); return; }
+      setPwSuccess(true);
+      onPasswordSet();
+      setShowForm(false);
+      setCurrentPw(""); setNewPw(""); setConfirmPw("");
+      setTimeout(() => setPwSuccess(false), 3000);
+    } catch {
+      setPwError("Error de conexión");
+    } finally {
+      setPwSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+      <h2 className="text-sm font-bold text-white mb-4">Seguridad</h2>
+
+      <div className="space-y-3">
+        {/* Email */}
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-slate-500 w-16">Email</span>
+          <span className="text-slate-300">{email}</span>
+        </div>
+
+        {/* Google status */}
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-slate-500 w-16">Google</span>
+          {hasGoogle ? (
+            <span className="inline-flex items-center gap-1.5 text-emerald-400 text-xs font-medium">
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" /></svg>
+              Vinculado
+            </span>
+          ) : (
+            <button
+              onClick={() => { window.location.href = "/api/auth/google?redirect=/restaurante/profile"; }}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Vincular cuenta de Google
+            </button>
+          )}
+        </div>
+
+        {/* Password status */}
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-slate-500 w-16">Clave</span>
+          {hasPassword ? (
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-xs">••••••••</span>
+              <button onClick={() => setShowForm(!showForm)} className="text-xs font-medium text-primary hover:underline">
+                Cambiar
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowForm(!showForm)} className="text-xs font-medium text-amber-400 hover:underline">
+              Crear contraseña
+            </button>
+          )}
+          {pwSuccess && <span className="text-xs text-emerald-400">Guardada ✓</span>}
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="mt-4 space-y-3 animate-fade-in">
+          {hasPassword && (
+            <input
+              type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)}
+              placeholder="Contraseña actual"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+            />
+          )}
+          <input
+            type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
+            placeholder={hasPassword ? "Nueva contraseña" : "Crear contraseña (mín. 6)"}
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+          />
+          <input
+            type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
+            placeholder="Confirmar contraseña"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+          />
+          {pwError && <p className="text-xs text-red-400">{pwError}</p>}
+          <div className="flex gap-2">
+            <button onClick={() => { setShowForm(false); setPwError(""); }} className="rounded-xl border border-white/10 px-4 py-2 text-xs text-slate-400 hover:bg-white/5 transition-colors">
+              Cancelar
+            </button>
+            <button onClick={handleSetPassword} disabled={pwSaving}
+              className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50">
+              {pwSaving ? "Guardando..." : hasPassword ? "Cambiar" : "Crear contraseña"}
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function LocationSection({ address, onConfirm }: { address: string; onConfirm: (addr: string, lat: number, lng: number) => void }) {
   const [editing, setEditing] = useState(false);
 

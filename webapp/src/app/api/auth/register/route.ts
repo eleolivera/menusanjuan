@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/restaurante-auth";
 import { getAdminSession } from "@/lib/admin-auth";
+import { sendEmail, verificationEmailHtml } from "@/lib/email";
 
 // POST — create a user account (no restaurant). Auto-links pending restaurants.
 export async function POST(request: NextRequest) {
@@ -71,10 +72,23 @@ export async function POST(request: NextRequest) {
 
   await createSession(result.user.id, result.linkedSlug || undefined);
 
+  // Send verification email (non-blocking)
+  const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+  await prisma.user.update({
+    where: { id: result.user.id },
+    data: { verifyCode },
+  });
+  sendEmail({
+    to: email,
+    subject: "Tu código de verificación — MenuSanJuan",
+    html: verificationEmailHtml(name || email.split("@")[0], verifyCode),
+  }).catch(() => {}); // Fire and forget
+
   return NextResponse.json({
     success: true,
     userId: result.user.id,
     linkedRestaurants: result.linkedCount,
     slug: result.linkedSlug,
+    needsVerification: true,
   }, { status: 201 });
 }

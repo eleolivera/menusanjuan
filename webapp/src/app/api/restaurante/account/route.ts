@@ -44,9 +44,10 @@ export async function PATCH(request: NextRequest) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
 
-    // Allow skipping current password check for placeholder accounts
+    // Skip current password check for placeholder accounts and OAuth-only users (no password set)
     const isPlaceholder = user.email.endsWith("@menusanjuan.com");
-    if (!isPlaceholder && currentPassword) {
+    const isOAuthOnly = !user.password || !user.password.includes(":");
+    if (!isPlaceholder && !isOAuthOnly && currentPassword) {
       if (!verifyPassword(currentPassword, user.password)) {
         return NextResponse.json({ error: "Contraseña actual incorrecta" }, { status: 401 });
       }

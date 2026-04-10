@@ -9,6 +9,12 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  const user = dealer.account.user;
+  const hasPassword = !!user.password && user.password.includes(":");
+  const googleLinked = await prisma.oAuthAccount.count({
+    where: { userId: user.id, provider: "google" },
+  });
+
   return NextResponse.json({
     id: dealer.id,
     name: dealer.name,
@@ -28,7 +34,9 @@ export async function GET() {
     bankInfo: dealer.bankInfo,
     isActive: dealer.isActive,
     posEnabled: dealer.posEnabled,
-    email: dealer.account.user.email,
+    email: user.email,
+    hasPassword,
+    hasGoogle: googleLinked > 0,
   });
 }
 
