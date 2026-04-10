@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/restaurante-auth";
 import { createAdminSession } from "@/lib/admin-auth";
 import { cookieDomain } from "@/lib/cookie-domain";
+import { authLimiter, getClientIp } from "@/lib/rate-limit";
 
 type GoogleUserInfo = {
   sub: string;
@@ -42,6 +43,12 @@ async function getUserInfo(accessToken: string): Promise<GoogleUserInfo> {
 
 // GET /api/auth/google/callback — handle Google's redirect
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  const limit = authLimiter(ip);
+  if (!limit.allowed) {
+    return NextResponse.redirect(new URL("/restaurante/login?error=google_rate_limit", request.url));
+  }
+
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   const state = searchParams.get("state");

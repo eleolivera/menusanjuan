@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loginAdmin } from "@/lib/admin-auth";
 import { destroyRestauranteSession } from "@/lib/restaurante-auth";
+import { authLimiter, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const limit = authLimiter(ip);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Esperá un momento." },
+        { status: 429 }
+      );
+    }
+
     const { email, password } = await request.json();
     if (!email || !password) {
       return NextResponse.json({ error: "Faltan datos" }, { status: 400 });

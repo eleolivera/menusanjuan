@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { loginWithEmail } from "@/lib/restaurante-auth";
 import { getAdminSession, destroyAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { authLimiter, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const limit = authLimiter(ip);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Esperá un momento." },
+        { status: 429 }
+      );
+    }
+
     // If an admin cookie is present, nuke it up front — same call the Salir
     // button in /admin uses. This guarantees the admin session is really
     // gone before we set the business session, regardless of cookie path

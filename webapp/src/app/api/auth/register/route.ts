@@ -3,9 +3,19 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/restaurante-auth";
 import { getAdminSession } from "@/lib/admin-auth";
 import { sendEmail, verificationEmailHtml } from "@/lib/email";
+import { authLimiter, getClientIp } from "@/lib/rate-limit";
 
 // POST — create a user account (no restaurant). Auto-links pending restaurants.
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const limit = authLimiter(ip);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiados intentos. Esperá un momento." },
+      { status: 429 }
+    );
+  }
+
   // Admins cannot create a user account from this path.
   if (await getAdminSession()) {
     return NextResponse.json(
