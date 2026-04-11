@@ -27,6 +27,7 @@ export async function GET() {
       itemCount: d.categories.reduce((s, c) => s + c._count.items, 0),
       priceRange: "$$",
       isOpen: true,
+      deliveryTimeMin: d.deliveryTimeMin ?? null,
     }));
 
     return NextResponse.json(restaurants);

@@ -118,6 +118,7 @@ model Dealer {
   deliveryFarRadius   Float?                   // Far zone radius in km (e.g. 7.0)
   deliveryFarPrice    Float?                   // Far zone price in ARS
   deliveryFee Float?                           // Legacy flat fee fallback
+  deliveryTimeMin Int?                          // Estimated delivery time in minutes
   posEnabled  Boolean  @default(false)         // Show POS / pre-pay tablet UI
   tableSuggestions Json?                       // Recently used table names for autocomplete
   createdAt   DateTime @default(now())

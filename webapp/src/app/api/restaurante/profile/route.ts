@@ -34,6 +34,12 @@ export async function GET() {
     bankInfo: dealer.bankInfo,
     isActive: dealer.isActive,
     posEnabled: dealer.posEnabled,
+    deliveryEnabled: dealer.deliveryEnabled,
+    deliveryCloseRadius: dealer.deliveryCloseRadius,
+    deliveryClosePrice: dealer.deliveryClosePrice,
+    deliveryFarRadius: dealer.deliveryFarRadius,
+    deliveryFarPrice: dealer.deliveryFarPrice,
+    deliveryTimeMin: dealer.deliveryTimeMin,
     email: user.email,
     hasPassword,
     hasGoogle: googleLinked > 0,
@@ -52,6 +58,8 @@ export async function PATCH(request: NextRequest) {
     name, phone, address, latitude, longitude, cuisineType,
     description, logoUrl, coverUrl, openHours,
     mercadoPagoAlias, mercadoPagoCvu, bankInfo, posEnabled,
+    isActive, deliveryEnabled, deliveryCloseRadius, deliveryClosePrice,
+    deliveryFarRadius, deliveryFarPrice, deliveryTimeMin,
   } = body;
 
   const updated = await prisma.dealer.update({
@@ -71,6 +79,13 @@ export async function PATCH(request: NextRequest) {
       ...(mercadoPagoCvu !== undefined && { mercadoPagoCvu }),
       ...(bankInfo !== undefined && { bankInfo }),
       ...(posEnabled !== undefined && { posEnabled }),
+      ...(isActive !== undefined && { isActive }),
+      ...(deliveryEnabled !== undefined && { deliveryEnabled }),
+      ...(deliveryCloseRadius !== undefined && { deliveryCloseRadius: deliveryCloseRadius !== null ? Number(deliveryCloseRadius) : null }),
+      ...(deliveryClosePrice !== undefined && { deliveryClosePrice: deliveryClosePrice !== null ? Number(deliveryClosePrice) : null }),
+      ...(deliveryFarRadius !== undefined && { deliveryFarRadius: deliveryFarRadius !== null ? Number(deliveryFarRadius) : null }),
+      ...(deliveryFarPrice !== undefined && { deliveryFarPrice: deliveryFarPrice !== null ? Number(deliveryFarPrice) : null }),
+      ...(deliveryTimeMin !== undefined && { deliveryTimeMin: deliveryTimeMin !== null ? Number(deliveryTimeMin) : null }),
     },
   });
 

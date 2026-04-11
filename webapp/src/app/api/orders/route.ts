@@ -7,6 +7,7 @@ import {
   getBusinessDayEnd,
   getAllOrders,
 } from "@/lib/orders-store";
+import { notifyRestaurantOfNewOrder } from "@/lib/order-notification";
 
 // POST — create a new order
 export async function POST(request: NextRequest) {
@@ -32,6 +33,9 @@ export async function POST(request: NextRequest) {
       deliveryMethod: deliveryMethod || "delivery",
       deliveryFee: deliveryFee || 0,
     });
+
+    // Fire-and-forget email notification to restaurant owner
+    notifyRestaurantOfNewOrder(order).catch(() => {});
 
     return NextResponse.json(order, { status: 201 });
   } catch (err) {

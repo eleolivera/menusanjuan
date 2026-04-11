@@ -13,6 +13,7 @@ export type Restaurant = {
   itemCount: number;
   priceRange: string;
   isOpen: boolean;
+  deliveryTimeMin: number | null;
 };
 
 export const CUISINE_TYPES = [
@@ -44,6 +45,7 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 24,
     priceRange: "$$$",
     isOpen: true,
+    deliveryTimeMin: null,
   },
   {
     id: "2",
@@ -60,6 +62,7 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 18,
     priceRange: "$$$$",
     isOpen: true,
+    deliveryTimeMin: null,
   },
   {
     id: "3",
@@ -76,6 +79,7 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 32,
     priceRange: "$$$",
     isOpen: true,
+    deliveryTimeMin: null,
   },
   {
     id: "4",
@@ -92,6 +96,7 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 28,
     priceRange: "$$",
     isOpen: false,
+    deliveryTimeMin: null,
   },
   {
     id: "5",
@@ -108,6 +113,7 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 40,
     priceRange: "$$$$",
     isOpen: true,
+    deliveryTimeMin: null,
   },
   {
     id: "6",
@@ -124,6 +130,7 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 15,
     priceRange: "$$",
     isOpen: true,
+    deliveryTimeMin: null,
   },
   {
     id: "7",
@@ -140,6 +147,7 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 22,
     priceRange: "$$$",
     isOpen: true,
+    deliveryTimeMin: null,
   },
   {
     id: "8",
@@ -156,6 +164,7 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 35,
     priceRange: "$$",
     isOpen: true,
+    deliveryTimeMin: null,
   },
   {
     id: "9",
@@ -172,5 +181,6 @@ export const DEMO_RESTAURANTS: Restaurant[] = [
     itemCount: 20,
     priceRange: "$$$",
     isOpen: true,
+    deliveryTimeMin: null,
   },
 ];

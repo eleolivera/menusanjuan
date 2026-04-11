@@ -24,6 +24,7 @@ const AUTH_PATHS = [
   "/restaurante/setup",
   "/restaurante/esperando-codigo",
   "/restaurante/agregar",
+  "/restaurante/bienvenida",
 ];
 
 function getUsage(): Record<string, number> {

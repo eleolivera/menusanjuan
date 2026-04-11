@@ -38,6 +38,7 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
     itemCount,
     priceRange: "$$",
     isOpen: true,
+    deliveryTimeMin: dealer.deliveryTimeMin ?? null,
     isVerified: dealer.isVerified,
     hasPendingOwner: !!dealer.pendingOwnerEmail,
     ownerUserId: dealer.account.userId,
