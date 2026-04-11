@@ -35,6 +35,14 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
   // Item add form
   const [addingItemCat, setAddingItemCat] = useState<string | null>(null);
 
+  // Category inline editing
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatName, setEditCatName] = useState("");
+  const [editCatEmoji, setEditCatEmoji] = useState("");
+
+  // Toggle feedback
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
   // Edit modal
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [form, setForm] = useState({ name: "", description: "", price: "", imageUrl: "", badge: "" });
@@ -100,11 +108,24 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
   }
 
   async function toggleAvailability(item: MenuItem) {
+    setTogglingId(item.id);
     if (useAdminApi) {
       await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", itemId: item.id, available: !item.available }) });
     } else {
       await fetch("/api/restaurante/menu/items", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id, available: !item.available }) });
     }
+    onRefresh();
+    setTimeout(() => setTogglingId(null), 1500);
+  }
+
+  async function updateCategory(catId: string) {
+    if (!editCatName.trim()) return;
+    if (useAdminApi) {
+      await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "category", categoryId: catId, name: editCatName.trim(), emoji: editCatEmoji || null }) });
+    } else {
+      await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: catId, name: editCatName.trim(), emoji: editCatEmoji || null }) });
+    }
+    setEditingCatId(null);
     onRefresh();
   }
 
@@ -175,15 +196,27 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
         <div key={cat.id} className="rounded-xl border border-white/5 bg-slate-900/30 overflow-hidden">
           {/* Category header */}
           <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-base">{cat.emoji || "🍽️"}</span>
-              <span className="text-sm font-semibold text-white">{cat.name}</span>
-              <span className="text-[10px] text-slate-600">{cat.items.length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => startAdd(cat.id)} className="text-[10px] text-primary hover:underline">+ Item</button>
-              <button onClick={() => deleteCategory(cat.id, cat.name)} className="text-[10px] text-slate-600 hover:text-red-400 transition-colors">Eliminar</button>
-            </div>
+            {editingCatId === cat.id ? (
+              <div className="flex items-center gap-2 flex-1">
+                <input value={editCatEmoji} onChange={(e) => setEditCatEmoji(e.target.value)} placeholder="🍽️" className="w-10 rounded-md border border-white/10 bg-white/5 px-1 py-1 text-center text-sm text-white focus:border-primary focus:outline-none" />
+                <input value={editCatName} onChange={(e) => setEditCatName(e.target.value)} autoFocus onKeyDown={(e) => e.key === "Enter" && updateCategory(cat.id)} className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-white focus:border-primary focus:outline-none" />
+                <button onClick={() => updateCategory(cat.id)} className="text-[10px] text-primary hover:underline">Guardar</button>
+                <button onClick={() => setEditingCatId(null)} className="text-[10px] text-slate-500 hover:text-white">Cancelar</button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatEmoji(cat.emoji || ""); }}>
+                  <span className="text-base">{cat.emoji || "🍽️"}</span>
+                  <span className="text-sm font-semibold text-white">{cat.name}</span>
+                  <span className="text-[10px] text-slate-600">{cat.items.length}</span>
+                  <svg className="h-3 w-3 text-slate-600 opacity-0 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" /></svg>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => startAdd(cat.id)} className="text-[10px] text-primary hover:underline">+ Item</button>
+                  <button onClick={() => deleteCategory(cat.id, cat.name)} className="text-[10px] text-slate-600 hover:text-red-400 transition-colors">Eliminar</button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Items */}
@@ -210,7 +243,7 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
                 </div>
                 <span className="text-sm font-bold text-primary shrink-0">{formatARS(item.price)}</span>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => toggleAvailability(item)} className={`rounded-lg p-1.5 transition-colors ${item.available ? "text-emerald-400 hover:bg-emerald-400/10" : "text-slate-600 hover:bg-white/5"}`} title={item.available ? "Ocultar" : "Mostrar"}>
+                  <button onClick={() => toggleAvailability(item)} className={`rounded-lg p-1.5 transition-colors ${togglingId === item.id ? "text-amber-400 animate-pulse" : item.available ? "text-emerald-400 hover:bg-emerald-400/10" : "text-slate-600 hover:bg-white/5"}`} title={item.available ? "Ocultar" : "Mostrar"}>
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d={item.available ? "M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z" : "M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"} /></svg>
                   </button>
                   <button onClick={() => deleteItem(item.id)} className="rounded-lg p-1.5 text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors" title="Eliminar">
