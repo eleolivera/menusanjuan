@@ -21,7 +21,9 @@ type Props = {
 
 export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/api/restaurante/menu/items/option-groups", useAdminApi, dealerSlug }: Props) {
   const [adding, setAdding] = useState(false);
+  const [pickingPreset, setPickingPreset] = useState(false); // Show preset quick-pick
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null); // Inline preset editor
   const [saving, setSaving] = useState(false);
   const [presets, setPresets] = useState<Preset[]>([]);
 
@@ -127,13 +129,53 @@ export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/ap
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold text-slate-400">Opciones / Personalizacion</h4>
-        {!adding && (
-          <button type="button" onClick={() => setAdding(true)} className="text-[10px] text-primary hover:underline">
+        <h4 className="text-xs font-bold text-slate-400">Opciones / Personalización</h4>
+        {!adding && !pickingPreset && (
+          <button type="button" onClick={() => {
+            if (presets.length > 0) {
+              setPickingPreset(true);
+            } else {
+              setAdding(true);
+            }
+          }} className="text-[10px] text-primary hover:underline">
             + Agregar grupo
           </button>
         )}
       </div>
+
+      {/* Preset quick-pick */}
+      {pickingPreset && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2 animate-fade-in">
+          <p className="text-xs text-slate-300">¿Usar una lista existente o crear opciones nuevas?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {presets.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setPickingPreset(false);
+                  setAdding(true);
+                  setNewTitle(p.name);
+                  setNewPresetId(p.id);
+                  setNewMin(1);
+                  setNewMax(p.options.length);
+                }}
+                className="rounded-lg bg-cyan-400/10 border border-cyan-400/20 px-3 py-2 text-xs font-medium text-cyan-300 hover:bg-cyan-400/20 transition-colors"
+              >
+                ⟲ {p.name} ({p.options.length})
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={() => { setPickingPreset(false); setAdding(true); }} className="text-[10px] text-primary hover:underline">
+              Opciones personalizadas
+            </button>
+            <button type="button" onClick={() => setPickingPreset(false)} className="text-[10px] text-slate-500 hover:text-white">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Existing groups */}
       {groups.map((g) => {
@@ -181,6 +223,29 @@ export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/ap
                     </span>
                   ))}
                 </div>
+
+                {/* Inline preset editor */}
+                {linkedPreset && editingPresetId === linkedPreset.id && (
+                  <InlinePresetEditor
+                    preset={linkedPreset}
+                    dealerSlug={dealerSlug}
+                    useAdminApi={useAdminApi}
+                    onDone={() => {
+                      setEditingPresetId(null);
+                      // Refresh presets
+                      const url = useAdminApi && dealerSlug
+                        ? `/api/restaurante/option-presets?slug=${dealerSlug}`
+                        : "/api/restaurante/option-presets";
+                      fetch(url).then((r) => r.ok ? r.json() : []).then(setPresets).catch(() => {});
+                      onUpdate();
+                    }}
+                  />
+                )}
+                {linkedPreset && editingPresetId !== linkedPreset.id && (
+                  <button type="button" onClick={() => setEditingPresetId(linkedPreset.id)} className="mt-2 text-[10px] text-cyan-400 hover:underline">
+                    Editar lista "{linkedPreset.name}"
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -293,7 +358,7 @@ function GroupForm({
           </select>
           {linkedPreset && (
             <div className="mt-2 rounded-lg bg-cyan-400/5 border border-cyan-400/20 p-2">
-              <p className="text-[10px] text-cyan-400 mb-1">Usando lista reusable. Editala en Ajustes → Listas reusables para que cambie en todos los items.</p>
+              <p className="text-[10px] text-cyan-400 mb-1">Lista compartida — los cambios se aplican a todos los items que la usan.</p>
               <div className="flex flex-wrap gap-1">
                 {linkedPreset.options.slice(0, 8).map((o) => (
                   <span key={o.id} className="text-[9px] bg-white/5 text-slate-400 px-1.5 py-0.5 rounded">
@@ -338,6 +403,94 @@ function GroupForm({
           {saving ? "Guardando..." : saveLabel}
         </button>
         <button type="button" onClick={onCancel} className="text-xs text-slate-500 hover:text-white transition-colors">Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Inline preset editor — edit a shared list right inside the option group ───
+
+function InlinePresetEditor({ preset, dealerSlug, useAdminApi, onDone }: {
+  preset: Preset;
+  dealerSlug?: string;
+  useAdminApi?: boolean;
+  onDone: () => void;
+}) {
+  const [options, setOptions] = useState(preset.options.map((o) => ({ ...o })));
+  const [saving, setSaving] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPrice, setNewPrice] = useState(0);
+
+  const qs = dealerSlug ? `&slug=${dealerSlug}` : "";
+
+  async function toggleAvailability(choiceId: string, available: boolean) {
+    // Optimistic update
+    setOptions((prev) => prev.map((o) => o.id === choiceId ? { ...o, available } : o));
+    await fetch(`/api/restaurante/option-presets/choice`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: choiceId, available, ...(dealerSlug ? { slug: dealerSlug } : {}) }),
+    });
+  }
+
+  async function addChoice() {
+    if (!newName.trim()) return;
+    setSaving(true);
+    const res = await fetch(`/api/restaurante/option-presets/choice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ presetId: preset.id, name: newName.trim(), priceDelta: newPrice, ...(dealerSlug ? { slug: dealerSlug } : {}) }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setOptions((prev) => [...prev, { id: data.id, name: newName.trim(), priceDelta: newPrice, available: true }]);
+      setNewName("");
+      setNewPrice(0);
+    }
+    setSaving(false);
+  }
+
+  async function removeChoice(choiceId: string) {
+    setOptions((prev) => prev.filter((o) => o.id !== choiceId));
+    await fetch(`/api/restaurante/option-presets/choice?id=${choiceId}${qs}`, { method: "DELETE" });
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 space-y-2 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-cyan-300">Editando: {preset.name}</span>
+        <button type="button" onClick={onDone} className="text-[10px] text-slate-500 hover:text-white">Cerrar</button>
+      </div>
+      <p className="text-[10px] text-slate-400">Los cambios se aplican a todos los items que usan esta lista.</p>
+
+      <div className="space-y-1">
+        {options.map((o) => (
+          <div key={o.id} className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => toggleAvailability(o.id!, !o.available)}
+              className={`h-5 w-5 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                o.available ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-400" : "border-white/10 bg-white/5 text-slate-600"
+              }`}
+            >
+              {o.available && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>}
+            </button>
+            <span className={`flex-1 text-xs ${o.available ? "text-white" : "text-slate-600 line-through"}`}>{o.name}</span>
+            {o.priceDelta > 0 && <span className="text-[10px] text-primary">+${o.priceDelta.toLocaleString("es-AR")}</span>}
+            <button type="button" onClick={() => removeChoice(o.id!)} className="text-slate-700 hover:text-red-400 text-[10px] transition-colors">✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* Add new option to the preset */}
+      <div className="flex gap-2 pt-1">
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nueva opción" onKeyDown={(e) => e.key === "Enter" && addChoice()}
+          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+        <input type="number" min={0} value={newPrice} onChange={(e) => setNewPrice(Number(e.target.value))} placeholder="+$"
+          className="w-16 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white text-right focus:border-primary focus:outline-none" />
+        <button type="button" onClick={addChoice} disabled={!newName.trim() || saving} className="rounded-lg bg-primary px-3 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">
+          {saving ? "..." : "+"}
+        </button>
       </div>
     </div>
   );
