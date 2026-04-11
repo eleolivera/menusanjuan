@@ -141,29 +141,73 @@ export default function ParaRestaurantes() {
         </div>
       </section>
 
-      {/* Tablet/Phone showcase */}
-      <section className="py-20">
-        <div className="mx-auto max-w-5xl px-4">
+      {/* Visual showcase — real screenshots */}
+      <section className="py-20 overflow-hidden">
+        <div className="mx-auto max-w-6xl px-4">
           <div className="text-center mb-14">
-            <h2 className="text-3xl font-extrabold text-text tracking-tight">Funciona en todo</h2>
-            <p className="mt-3 text-text-secondary">Celular, tablet o computadora — el mismo sistema, en cualquier pantalla</p>
+            <h2 className="text-3xl font-extrabold text-text tracking-tight">Mirá cómo se ve</h2>
+            <p className="mt-3 text-text-secondary">Así ven tus clientes tu restaurante — y así gestionás tus pedidos</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="rounded-2xl border border-border/50 bg-surface p-6 text-center">
-              <div className="text-4xl mb-3">📱</div>
-              <h3 className="font-bold text-text mb-1">Celular</h3>
-              <p className="text-sm text-text-secondary">Gestioná pedidos mientras estás en la cocina. Todo el control desde tu bolsillo.</p>
+          {/* Phone + Tablet side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            {/* Customer view — phone */}
+            <div className="text-center">
+              <div className="inline-block relative">
+                <div className="rounded-[2.5rem] border-[6px] border-slate-800 bg-slate-800 shadow-2xl overflow-hidden w-[280px] mx-auto">
+                  <img src="/showcase/restaurant.png" alt="Vista del cliente" className="w-full" />
+                </div>
+              </div>
+              <h3 className="font-bold text-text mt-6 mb-1">Tus clientes</h3>
+              <p className="text-sm text-text-secondary">Ven tu menú con fotos, eligen y piden por WhatsApp</p>
             </div>
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 text-center shadow-md">
-              <div className="text-4xl mb-3">📋</div>
-              <h3 className="font-bold text-text mb-1">Tablet</h3>
-              <p className="text-sm text-text-secondary">Ideal para la caja. Kanban completo, tickets imprimibles, todo de un vistazo.</p>
+
+            {/* Owner view — tablet */}
+            <div className="text-center">
+              <div className="inline-block relative">
+                <div className="rounded-2xl border-[4px] border-slate-800 bg-slate-800 shadow-2xl overflow-hidden w-full max-w-[500px] mx-auto">
+                  <img src="/showcase/pedidos.png" alt="Panel del dueño" className="w-full" />
+                </div>
+              </div>
+              <h3 className="font-bold text-text mt-6 mb-1">Tu panel</h3>
+              <p className="text-sm text-text-secondary">Gestioná pedidos con un Kanban visual desde tu celular o tablet</p>
             </div>
-            <div className="rounded-2xl border border-border/50 bg-surface p-6 text-center">
-              <div className="text-4xl mb-3">💻</div>
-              <h3 className="font-bold text-text mb-1">Computadora</h3>
-              <p className="text-sm text-text-secondary">Analíticas detalladas, gestión del menú, reportes de ventas semanales.</p>
+          </div>
+
+          {/* More screenshots strip */}
+          <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { src: "/showcase/menu.png", label: "Menú con fotos" },
+              { src: "/showcase/menu-editor.png", label: "Editor de menú" },
+              { src: "/showcase/profile.png", label: "Configuración" },
+              { src: "/showcase/home.png", label: "Tu marca visible" },
+            ].map((s, i) => (
+              <div key={i} className="rounded-xl border border-border/50 bg-surface overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <img src={s.src} alt={s.label} className="w-full aspect-[3/4] object-cover object-top" />
+                <div className="px-3 py-2">
+                  <span className="text-xs font-medium text-text-secondary">{s.label}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Social proof */}
+      <section className="py-14 bg-surface-alt">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="grid grid-cols-3 gap-6 text-center">
+            <div>
+              <div className="text-3xl sm:text-4xl font-extrabold gradient-text">90+</div>
+              <div className="text-sm text-text-secondary mt-1">Restaurantes</div>
+            </div>
+            <div>
+              <div className="text-3xl sm:text-4xl font-extrabold gradient-text">250+</div>
+              <div className="text-sm text-text-secondary mt-1">Pedidos realizados</div>
+            </div>
+            <div>
+              <div className="text-3xl sm:text-4xl font-extrabold gradient-text">$0</div>
+              <div className="text-sm text-text-secondary mt-1">Comisiones</div>
             </div>
           </div>
         </div>
