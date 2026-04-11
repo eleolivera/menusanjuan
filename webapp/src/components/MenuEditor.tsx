@@ -209,29 +209,20 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
       {/* Categories */}
       {categories.map((cat) => (
         <div key={cat.id} id={`cat-${cat.id}`} className="rounded-xl border border-white/5 bg-slate-900/30 overflow-hidden scroll-mt-4">
-          {/* Category header */}
-          <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
-            {editingCatId === cat.id ? (
-              <div className="flex items-center gap-2 flex-1">
-                <input value={editCatEmoji} onChange={(e) => setEditCatEmoji(e.target.value)} placeholder="🍽️" className="w-10 rounded-md border border-white/10 bg-white/5 px-1 py-1 text-center text-sm text-white focus:border-primary focus:outline-none" />
-                <input value={editCatName} onChange={(e) => setEditCatName(e.target.value)} autoFocus onKeyDown={(e) => e.key === "Enter" && updateCategory(cat.id)} className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-white focus:border-primary focus:outline-none" />
-                <button onClick={() => updateCategory(cat.id)} className="text-[10px] text-primary hover:underline">Guardar</button>
-                <button onClick={() => setEditingCatId(null)} className="text-[10px] text-slate-500 hover:text-white">Cancelar</button>
+          {/* Category header — tap to open category modal */}
+          <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+            <button
+              className="flex items-center gap-2.5 flex-1 text-left"
+              onClick={() => { setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatEmoji(cat.emoji || ""); }}
+            >
+              <span className="text-xl">{cat.emoji || "🍽️"}</span>
+              <div>
+                <span className="text-sm font-semibold text-white">{cat.name}</span>
+                <span className="text-[10px] text-slate-600 ml-2">{cat.items.length} items</span>
               </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatEmoji(cat.emoji || ""); }}>
-                  <span className="text-base">{cat.emoji || "🍽️"}</span>
-                  <span className="text-sm font-semibold text-white">{cat.name}</span>
-                  <span className="text-[10px] text-slate-600">{cat.items.length}</span>
-                  <svg className="h-3 w-3 text-slate-600 opacity-0 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" /></svg>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => startAdd(cat.id)} className="text-[10px] text-primary hover:underline">+ Item</button>
-                  <button onClick={() => deleteCategory(cat.id, cat.name)} className="text-[10px] text-slate-600 hover:text-red-400 transition-colors">Eliminar</button>
-                </div>
-              </>
-            )}
+              <svg className="h-3.5 w-3.5 text-slate-600 ml-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" /></svg>
+            </button>
+            <button onClick={() => startAdd(cat.id)} className="rounded-lg bg-primary/15 px-2.5 py-1.5 text-[10px] font-semibold text-primary hover:bg-primary/25 transition-colors">+ Item</button>
           </div>
 
           {/* Items */}
@@ -268,22 +259,7 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
               </div>
             ))}
 
-            {/* Add item inline */}
-            {addingItemCat === cat.id && (
-              <div className="px-4 py-3 space-y-2 bg-primary/5 animate-fade-in">
-                <div className="flex gap-2">
-                  <input value={form.name} onChange={(e) => updateForm("name", e.target.value)} placeholder="Nombre *" autoFocus className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                  <input value={form.price} onChange={(e) => updateForm("price", e.target.value)} placeholder="Precio *" type="number" className="w-28 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                </div>
-                <input value={form.description} onChange={(e) => updateForm("description", e.target.value)} placeholder="Descripcion (opcional)" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                {/* Image upload */}
-                <ImageUploadField imageUrl={form.imageUrl} onChange={(url) => updateForm("imageUrl", url)} onUpload={handleUpload} uploading={uploading} uploadEndpoint={uploadEndpoint} />
-                <div className="flex gap-2">
-                  <button onClick={() => addItem(cat.id)} disabled={!form.name.trim() || !form.price || saving} className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Guardando..." : "Agregar"}</button>
-                  <button onClick={() => setAddingItemCat(null)} className="text-xs text-slate-500 hover:text-white transition-colors">Cancelar</button>
-                </div>
-              </div>
-            )}
+            {/* Add item — handled by modal below */}
 
             {cat.items.length === 0 && addingItemCat !== cat.id && (
               <div className="px-4 py-6 text-center">
@@ -295,11 +271,101 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
         </div>
       ))}
 
+      {/* Category edit modal */}
+      {editingCatId && (() => {
+        const cat = categories.find((c) => c.id === editingCatId);
+        if (!cat) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingCatId(null)} />
+            <div className="relative w-full max-w-md max-h-[80vh] rounded-t-2xl sm:rounded-2xl bg-slate-900 border border-white/10 shadow-2xl animate-scale-in flex flex-col overflow-hidden">
+              <div className="px-6 pt-5 pb-3 shrink-0 flex items-center justify-between">
+                <h3 className="text-base font-bold text-white">Editar categoría</h3>
+                <button onClick={() => setEditingCatId(null)} className="text-slate-500 hover:text-white transition-colors">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="px-6 overflow-y-auto flex-1 pb-4 space-y-4" style={{ minHeight: 0 }}>
+                <div className="flex gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-400">Emoji</label>
+                    <input value={editCatEmoji} onChange={(e) => setEditCatEmoji(e.target.value)} placeholder="🍽️" className="w-16 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-lg text-white focus:border-primary focus:outline-none" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="mb-1.5 block text-xs font-medium text-slate-400">Nombre</label>
+                    <input value={editCatName} onChange={(e) => setEditCatName(e.target.value)} autoFocus className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-primary focus:outline-none" />
+                  </div>
+                </div>
+
+                {/* Items preview */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-slate-400">{cat.items.length} items</span>
+                  </div>
+                  <div className="space-y-1 max-h-40 overflow-y-auto rounded-xl border border-white/5 bg-white/[0.02] p-2">
+                    {cat.items.map((item) => (
+                      <button key={item.id} onClick={() => { setEditingCatId(null); startEdit(item); }} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 transition-colors text-left">
+                        {item.imageUrl && !isVideo(item.imageUrl) && <img src={item.imageUrl} alt="" className="h-7 w-7 rounded-md object-cover shrink-0" />}
+                        <span className="text-xs text-white truncate flex-1">{item.name}</span>
+                        <span className="text-xs text-primary shrink-0">{formatARS(item.price)}</span>
+                      </button>
+                    ))}
+                    {cat.items.length === 0 && <p className="text-xs text-slate-600 text-center py-2">Sin items</p>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-3 shrink-0 border-t border-white/5 flex items-center justify-between">
+                <button onClick={() => { setEditingCatId(null); deleteCategory(cat.id, cat.name); }} className="text-xs text-red-400 hover:underline">Eliminar</button>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingCatId(null)} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Cancelar</button>
+                  <button onClick={() => updateCategory(editingCatId)} disabled={!editCatName.trim()} className="rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Guardar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Add item modal */}
+      {addingItemCat && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAddingItemCat(null)} />
+          <div className="relative w-full max-w-md max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-slate-900 border border-white/10 shadow-2xl animate-scale-in flex flex-col overflow-hidden">
+            <div className="px-6 pt-5 pb-3 shrink-0 flex items-center justify-between">
+              <h3 className="text-base font-bold text-white">Nuevo item</h3>
+              <button onClick={() => setAddingItemCat(null)} className="text-slate-500 hover:text-white transition-colors">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="px-6 overflow-y-auto flex-1 space-y-3 pb-4" style={{ minHeight: 0 }}>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-400">Nombre *</label>
+                <input value={form.name} onChange={(e) => updateForm("name", e.target.value)} placeholder="Ej: Hamburguesa Completa" autoFocus className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-400">Precio *</label>
+                <input value={form.price} onChange={(e) => updateForm("price", e.target.value)} placeholder="5000" type="number" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-400">Descripción (opcional)</label>
+                <textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} placeholder="Ingredientes, detalles..." rows={2} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none resize-none" />
+              </div>
+              <ImageUploadField imageUrl={form.imageUrl} onChange={(url) => updateForm("imageUrl", url)} onUpload={handleUpload} uploading={uploading} uploadEndpoint={uploadEndpoint} />
+            </div>
+            <div className="px-6 py-3 shrink-0 border-t border-white/5 flex gap-2 justify-end">
+              <button onClick={() => setAddingItemCat(null)} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Cancelar</button>
+              <button onClick={() => addItem(addingItemCat)} disabled={!form.name.trim() || !form.price || saving} className="rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Guardando..." : "Agregar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit item modal */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingItem(null)} />
-          <div className="relative w-full max-w-md max-h-[85vh] rounded-2xl bg-slate-900 border border-white/10 shadow-2xl animate-scale-in flex flex-col overflow-hidden">
+          <div className="relative w-full max-w-md max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-slate-900 border border-white/10 shadow-2xl animate-scale-in flex flex-col overflow-hidden">
             <div className="px-6 pt-5 pb-3 shrink-0 flex items-center justify-between">
               <h3 className="text-base font-bold text-white">Editar item</h3>
               <button onClick={() => setEditingItem(null)} className="text-slate-500 hover:text-white transition-colors">
@@ -307,33 +373,46 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
               </button>
             </div>
             <div className="px-6 overflow-y-auto flex-1 space-y-3 pb-4" style={{ minHeight: 0 }}>
-              <input value={form.name} onChange={(e) => updateForm("name", e.target.value)} placeholder="Nombre" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-              <div className="flex gap-2">
-                <input value={form.price} onChange={(e) => updateForm("price", e.target.value)} placeholder="Precio" type="number" className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                <input value={form.badge} onChange={(e) => updateForm("badge", e.target.value)} placeholder="Badge (Popular, Nuevo)" className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-400">Nombre</label>
+                <input value={form.name} onChange={(e) => updateForm("name", e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
               </div>
-              <textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} placeholder="Descripcion" rows={2} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none resize-none" />
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="mb-1.5 block text-xs font-medium text-slate-400">Precio</label>
+                  <input value={form.price} onChange={(e) => updateForm("price", e.target.value)} type="number" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1.5 block text-xs font-medium text-slate-400">Badge</label>
+                  <input value={form.badge} onChange={(e) => updateForm("badge", e.target.value)} placeholder="Popular, Nuevo" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-400">Descripción</label>
+                <textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} rows={2} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none resize-none" />
+              </div>
 
-              {/* Image */}
               <ImageUploadField imageUrl={form.imageUrl} onChange={(url) => updateForm("imageUrl", url)} onUpload={handleUpload} uploading={uploading} uploadEndpoint={uploadEndpoint} />
 
               {/* Option groups */}
-              <OptionGroupEditor
-                menuItemId={editingItem.id}
-                groups={(editingItem.optionGroups || []).map((g) => ({ id: g.id, title: g.title, minSelections: g.minSelections, maxSelections: g.maxSelections, presetId: g.presetId, options: g.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available })) }))}
-                onUpdate={onRefresh}
-                apiBase={optionGroupApiBase}
-                useAdminApi={useAdminApi}
-                dealerSlug={dealerSlug}
-              />
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-400">Opciones / Variantes</label>
+                <OptionGroupEditor
+                  menuItemId={editingItem.id}
+                  groups={(editingItem.optionGroups || []).map((g) => ({ id: g.id, title: g.title, minSelections: g.minSelections, maxSelections: g.maxSelections, presetId: g.presetId, options: g.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available })) }))}
+                  onUpdate={onRefresh}
+                  apiBase={optionGroupApiBase}
+                  useAdminApi={useAdminApi}
+                  dealerSlug={dealerSlug}
+                />
+              </div>
             </div>
 
-            {/* Footer */}
             <div className="px-6 py-3 shrink-0 border-t border-white/5 flex items-center justify-between">
-              <button onClick={() => { deleteItem(editingItem.id); setEditingItem(null); }} className="text-xs text-red-400 hover:underline">Eliminar item</button>
+              <button onClick={() => { deleteItem(editingItem.id); setEditingItem(null); }} className="text-xs text-red-400 hover:underline">Eliminar</button>
               <div className="flex gap-2">
-                <button onClick={() => setEditingItem(null)} className="rounded-xl border border-white/10 px-4 py-2 text-xs text-slate-400 hover:bg-white/5 transition-colors">Cancelar</button>
-                <button onClick={updateItem} disabled={saving || !form.name.trim() || !form.price} className="rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50">{saving ? "Guardando..." : "Guardar"}</button>
+                <button onClick={() => setEditingItem(null)} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Cancelar</button>
+                <button onClick={updateItem} disabled={saving || !form.name.trim() || !form.price} className="rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Guardando..." : "Guardar"}</button>
               </div>
             </div>
           </div>
