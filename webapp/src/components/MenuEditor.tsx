@@ -43,6 +43,9 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
   // Toggle feedback
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  // Two-step item creation: after saving, show option groups prompt
+  const [createdItem, setCreatedItem] = useState<{ id: string; name: string; categoryId: string } | null>(null);
+
   // Edit modal
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [form, setForm] = useState({ name: "", description: "", price: "", imageUrl: "", badge: "" });
@@ -100,15 +103,24 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
     onRefresh();
   }
 
-  async function addItem(categoryId: string) {
+  async function addItem(categoryId: string, withOptions = false) {
     if (!form.name.trim() || !form.price) return;
     setSaving(true);
+    let res;
     if (useAdminApi) {
-      await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", categoryId, name: form.name.trim(), description: form.description || null, price: Number(form.price), imageUrl: form.imageUrl || null, badge: form.badge || null }) });
+      res = await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", categoryId, name: form.name.trim(), description: form.description || null, price: Number(form.price), imageUrl: form.imageUrl || null, badge: form.badge || null }) });
     } else {
-      await fetch("/api/restaurante/menu/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ categoryId, name: form.name.trim(), description: form.description || null, price: Number(form.price), imageUrl: form.imageUrl || null, badge: form.badge || null }) });
+      res = await fetch("/api/restaurante/menu/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ categoryId, name: form.name.trim(), description: form.description || null, price: Number(form.price), imageUrl: form.imageUrl || null, badge: form.badge || null }) });
     }
-    setSaving(false); setAddingItemCat(null); onRefresh();
+    const data = await res.json().catch(() => null);
+    setSaving(false);
+    setAddingItemCat(null);
+    await onRefresh();
+
+    if (withOptions && data?.id) {
+      // Transition to step 2: show option groups for the new item
+      setCreatedItem({ id: data.id, name: form.name.trim(), categoryId });
+    }
   }
 
   async function updateItem() {
@@ -353,9 +365,58 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
               </div>
               <ImageUploadField imageUrl={form.imageUrl} onChange={(url) => updateForm("imageUrl", url)} onUpload={handleUpload} uploading={uploading} uploadEndpoint={uploadEndpoint} />
             </div>
-            <div className="px-6 py-3 shrink-0 border-t border-white/5 flex gap-2 justify-end">
-              <button onClick={() => setAddingItemCat(null)} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Cancelar</button>
-              <button onClick={() => addItem(addingItemCat)} disabled={!form.name.trim() || !form.price || saving} className="rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Guardando..." : "Agregar"}</button>
+            <div className="px-6 py-3 shrink-0 border-t border-white/5 flex flex-col gap-2">
+              <button onClick={() => addItem(addingItemCat, true)} disabled={!form.name.trim() || !form.price || saving} className="w-full rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Guardando..." : "Agregar + Configurar Opciones"}</button>
+              <div className="flex gap-2">
+                <button onClick={() => setAddingItemCat(null)} className="flex-1 rounded-xl border border-white/10 px-4 py-2.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Cancelar</button>
+                <button onClick={() => addItem(addingItemCat)} disabled={!form.name.trim() || !form.price || saving} className="flex-1 rounded-xl border border-white/10 px-4 py-2.5 text-xs text-slate-400 hover:bg-white/5 transition-colors disabled:opacity-50">{saving ? "..." : "Agregar sin opciones"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Configure options for newly created item */}
+      {createdItem && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-slate-900 border border-white/10 shadow-2xl animate-scale-in flex flex-col overflow-hidden">
+            <div className="px-6 pt-5 pb-3 shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-white">{createdItem.name}</h3>
+                  <p className="text-[10px] text-slate-500">Item creado — configurá las opciones</p>
+                </div>
+                <button onClick={() => { setCreatedItem(null); }} className="text-slate-500 hover:text-white transition-colors">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+            <div className="px-6 overflow-y-auto flex-1 pb-4" style={{ minHeight: 0 }}>
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 mb-4">
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  ¿Este item tiene <strong className="text-white">gustos, tamaños, extras</strong> u otras opciones?
+                  Agregalos acá. Si creaste una <strong className="text-white">Lista de Opciones</strong> antes, podés reutilizarla.
+                </p>
+              </div>
+
+              <OptionGroupEditor
+                menuItemId={createdItem.id}
+                groups={[]}
+                onUpdate={onRefresh}
+                apiBase={optionGroupApiBase}
+                useAdminApi={useAdminApi}
+                dealerSlug={dealerSlug}
+              />
+            </div>
+
+            <div className="px-6 py-3 shrink-0 border-t border-white/5">
+              <button
+                onClick={() => { setCreatedItem(null); onRefresh(); }}
+                className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-all"
+              >
+                Listo
+              </button>
             </div>
           </div>
         </div>

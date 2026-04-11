@@ -6,7 +6,6 @@ import Link from "next/link";
 import { LocationPicker } from "@/components/LocationPicker";
 import { PhoneInput } from "@/components/PhoneInput";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
-import { PresetManager } from "@/components/PresetManager";
 import { useSmartSave } from "@/hooks/useSmartSave";
 import { SaveIndicator } from "@/components/SaveIndicator";
 
@@ -351,17 +350,6 @@ export default function ProfilePage() {
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
             </div>
           </div>
-        </section>
-
-        {/* Reusable option lists */}
-        <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
-          <div className="mb-4">
-            <h2 className="text-sm font-bold text-white">Listas reusables</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Ideal para heladerias, pizzerias, o cualquier menu con muchas variantes compartidas.
-            </p>
-          </div>
-          <PresetManager />
         </section>
 
         {/* POS toggle */}
