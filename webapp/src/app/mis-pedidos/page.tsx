@@ -78,7 +78,7 @@ export default function MisPedidosPage() {
 
   useEffect(() => {
     fetchOrders(true);
-    pollRef.current = setInterval(() => fetchOrders(), 15000);
+    pollRef.current = setInterval(() => fetchOrders(), 5000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [fetchOrders]);
 
