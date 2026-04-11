@@ -17,7 +17,7 @@ type Category = { id: string; name: string; emoji: string | null; sortOrder?: nu
 
 type MenuEditorProps = {
   categories: Category[];
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
   apiBase: string; // "/api/restaurante/menu" or "/api/admin/restaurants/{id}/menu"
   useAdminApi?: boolean; // admin uses { type: "category" | "item" | "option-group" } pattern
   uploadEndpoint?: string; // "/api/upload" — pass null to disable file upload
@@ -65,14 +65,29 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
 
   // ─── API calls ───
 
+  const [addingCatLoading, setAddingCatLoading] = useState(false);
+
   async function addCategory() {
-    if (!newCatName.trim()) return;
+    if (!newCatName.trim() || addingCatLoading) return;
+    setAddingCatLoading(true);
+    let res;
     if (useAdminApi) {
-      await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "category", name: newCatName.trim(), emoji: newCatEmoji || null }) });
+      res = await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "category", name: newCatName.trim(), emoji: newCatEmoji || null }) });
     } else {
-      await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newCatName.trim(), emoji: newCatEmoji || null }) });
+      res = await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newCatName.trim(), emoji: newCatEmoji || null }) });
     }
-    setNewCatName(""); setNewCatEmoji(""); setAddingCat(false); onRefresh();
+    const data = await res.json().catch(() => null);
+    const newCatId = data?.id || data?.categoryId;
+    setNewCatName(""); setNewCatEmoji(""); setAddingCat(false); setAddingCatLoading(false);
+    await onRefresh();
+    // Auto-open add item for the new category and scroll to it
+    if (newCatId) {
+      setTimeout(() => {
+        setAddingItemCat(newCatId);
+        setForm({ name: "", description: "", price: "", imageUrl: "", badge: "" });
+        document.getElementById(`cat-${newCatId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
   }
 
   async function deleteCategory(catId: string, catName: string) {
@@ -174,7 +189,7 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
         <div className="flex gap-2 animate-fade-in">
           <input value={newCatEmoji} onChange={(e) => setNewCatEmoji(e.target.value)} placeholder="Emoji" className="w-14 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center text-sm text-white focus:border-primary focus:outline-none" />
           <input value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Nombre de la categoria" autoFocus onKeyDown={(e) => e.key === "Enter" && addCategory()} className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-          <button onClick={addCategory} disabled={!newCatName.trim()} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Crear</button>
+          <button onClick={addCategory} disabled={!newCatName.trim() || addingCatLoading} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{addingCatLoading ? "Creando..." : "Crear"}</button>
           <button onClick={() => setAddingCat(false)} className="text-xs text-slate-500 hover:text-white transition-colors">Cancelar</button>
         </div>
       )}
@@ -193,7 +208,7 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
 
       {/* Categories */}
       {categories.map((cat) => (
-        <div key={cat.id} className="rounded-xl border border-white/5 bg-slate-900/30 overflow-hidden">
+        <div key={cat.id} id={`cat-${cat.id}`} className="rounded-xl border border-white/5 bg-slate-900/30 overflow-hidden scroll-mt-4">
           {/* Category header */}
           <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
             {editingCatId === cat.id ? (
