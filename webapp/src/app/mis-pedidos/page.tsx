@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { getAllOrderRefs } from "@/lib/order-tracker";
 import { OrderStatusStepper } from "@/components/OrderStatusStepper";
@@ -34,16 +34,17 @@ export default function MisPedidosPage() {
   const [orders, setOrders] = useState<TrackedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
+  const fetchOrders = useCallback(async (isInitial = false) => {
     const refs = getAllOrderRefs();
     if (refs.length === 0) {
-      setLoading(false);
+      setOrders([]);
+      if (isInitial) setLoading(false);
       return;
     }
 
-    // Fetch status for each order
-    Promise.all(
+    const results = await Promise.all(
       refs.map(async (ref) => {
         try {
           const res = await fetch(`/api/orders/track?id=${ref.orderId}&token=${ref.token}`);
@@ -60,13 +61,26 @@ export default function MisPedidosPage() {
             };
           }
         } catch {}
-        return { ...ref };
+        return { ...ref } as TrackedOrder;
       })
-    ).then((results) => {
-      setOrders(results);
-      setLoading(false);
-    });
+    );
+
+    setOrders(results);
+    if (isInitial) setLoading(false);
+
+    // Stop polling if no pending orders left
+    const hasPending = results.some((o) => o.status && !["DELIVERED", "CANCELLED"].includes(o.status!));
+    if (!hasPending && pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
   }, []);
+
+  useEffect(() => {
+    fetchOrders(true);
+    pollRef.current = setInterval(() => fetchOrders(), 15000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [fetchOrders]);
 
   const pending = orders.filter((o) => o.status && !["DELIVERED", "CANCELLED"].includes(o.status));
   const completed = orders.filter((o) => o.status && ["DELIVERED", "CANCELLED"].includes(o.status));
