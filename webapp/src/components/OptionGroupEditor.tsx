@@ -192,6 +192,23 @@ export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/ap
                 options={editOptions} setOptions={setEditOptions}
                 onSave={handleSaveEdit} onCancel={() => setEditingId(null)}
                 saving={saving} saveLabel="Guardar"
+                onEditPreset={(pid) => setEditingPresetId(editingPresetId === pid ? null : pid)}
+                editingPresetInline={!!editPresetId && editingPresetId === editPresetId}
+                inlinePresetEditor={editPresetId && editingPresetId === editPresetId && presets.find(p => p.id === editPresetId) ? (
+                  <InlinePresetEditor
+                    preset={presets.find(p => p.id === editPresetId)!}
+                    dealerSlug={dealerSlug}
+                    useAdminApi={useAdminApi}
+                    onDone={() => {
+                      setEditingPresetId(null);
+                      const url = useAdminApi && dealerSlug
+                        ? `/api/restaurante/option-presets?slug=${dealerSlug}`
+                        : "/api/restaurante/option-presets";
+                      fetch(url).then((r) => r.ok ? r.json() : []).then(setPresets).catch(() => {});
+                      onUpdate();
+                    }}
+                  />
+                ) : undefined}
               />
             ) : (
               <div>
@@ -281,6 +298,7 @@ function GroupForm({
   title, setTitle, min, setMin, max, setMax,
   presetId, setPresetId, presets,
   options, setOptions, onSave, onCancel, saving, saveLabel,
+  onEditPreset, editingPresetInline, inlinePresetEditor,
 }: {
   title: string; setTitle: (v: string) => void;
   min: number; setMin: (v: number) => void;
@@ -291,6 +309,9 @@ function GroupForm({
   setOptions: (v: { name: string; priceDelta: number; available?: boolean }[]) => void;
   onSave: () => void; onCancel: () => void;
   saving: boolean; saveLabel: string;
+  onEditPreset?: (presetId: string) => void;
+  editingPresetInline?: boolean;
+  inlinePresetEditor?: React.ReactNode;
 }) {
   function updateOption(i: number, field: string, value: any) {
     const copy = [...options];
@@ -358,17 +379,24 @@ function GroupForm({
           </select>
           {linkedPreset && (
             <div className="mt-2 rounded-lg bg-cyan-400/5 border border-cyan-400/20 p-2">
-              <p className="text-[10px] text-cyan-400 mb-1">Lista compartida — los cambios se aplican a todos los items que la usan.</p>
-              <div className="flex flex-wrap gap-1">
-                {linkedPreset.options.slice(0, 8).map((o) => (
-                  <span key={o.id} className="text-[9px] bg-white/5 text-slate-400 px-1.5 py-0.5 rounded">
-                    {o.name}
-                  </span>
-                ))}
-                {linkedPreset.options.length > 8 && (
-                  <span className="text-[9px] text-slate-500">+{linkedPreset.options.length - 8} mas</span>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] text-cyan-400">Lista compartida — los cambios aplican a todos los items.</p>
+                {onEditPreset && !editingPresetInline && (
+                  <button type="button" onClick={() => onEditPreset(linkedPreset.id)} className="text-[10px] text-cyan-300 hover:underline shrink-0 ml-2">Editar lista</button>
                 )}
               </div>
+              {editingPresetInline && inlinePresetEditor ? inlinePresetEditor : (
+                <div className="flex flex-wrap gap-1">
+                  {linkedPreset.options.slice(0, 8).map((o) => (
+                    <span key={o.id} className="text-[9px] bg-white/5 text-slate-400 px-1.5 py-0.5 rounded">
+                      {o.name}
+                    </span>
+                  ))}
+                  {linkedPreset.options.length > 8 && (
+                    <span className="text-[9px] text-slate-500">+{linkedPreset.options.length - 8} mas</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
