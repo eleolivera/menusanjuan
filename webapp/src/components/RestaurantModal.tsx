@@ -74,6 +74,8 @@ export function RestaurantModal({
   const [showMap, setShowMap] = useState(false);
   const [posEnabled, _setPosEnabled] = useState(false);
   const setPosEnabled = (v: boolean) => { _setPosEnabled(v); if (v !== initialData.current.posEnabled) setDirty(true); };
+  const [rating, _setRating] = useState<number | null>(null);
+  const setRating = (v: number | null) => { _setRating(v); setDirty(true); };
   const initialData = useRef<Record<string, any>>({});
   const setName = (v: string) => { _setName(v); if (v !== initialData.current.name) setDirty(true); };
   const setPhone = (v: string) => { _setPhone(v); if (v !== initialData.current.phone) setDirty(true); };
@@ -107,6 +109,7 @@ export function RestaurantModal({
         _setCuisineType(d.cuisineType); _setDescription(d.description || "");
         _setIsActive(d.isActive); setHours(parseHours(d.openHours));
         _setPosEnabled(d.posEnabled || false);
+        _setRating(d.rating ?? null);
         setLatitude(d.latitude ?? null); setLongitude(d.longitude ?? null);
         setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
         if (d.lastPassword) setActivatedCode(d.lastPassword);
@@ -146,7 +149,7 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
     await fetch(`/api/admin/restaurants/${restaurantId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, isActive, posEnabled, logoUrl, coverUrl, openHours: JSON.stringify(hours) }),
+      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, isActive, posEnabled, rating, logoUrl, coverUrl, openHours: JSON.stringify(hours) }),
     });
     setSaving(false); setSaved(true); setDirty(false);
     setTimeout(() => setSaved(false), 2000);
@@ -350,6 +353,15 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Tipo de cocina</label>
                 <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setCuisineType(vals[vals.length - 1] || "")} darkMode />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Rating (1.0 - 5.0)</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" step="0.1" min="0" max="5" value={rating ?? ""} onChange={(e) => setRating(e.target.value ? Number(e.target.value) : null)} placeholder="Ej: 4.5"
+                    className="w-24 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
+                  {rating && <span className="text-amber-400 text-sm">{"★".repeat(Math.round(rating))}</span>}
+                </div>
               </div>
 
               {/* Hours */}
