@@ -373,3 +373,32 @@ enum OrderStatus {
   DELIVERED   // Entregado — delivered/picked up
   CANCELLED   // Cancelado
 }
+
+// ─── Bot ───
+
+model BotFeedback {
+  id            String   @id @default(cuid())
+  sessionId     String                        // wa_phone or admin_xxx
+  rating        Int                           // 1 = bad, 2 = good
+  note          String?                       // optional reviewer note
+  userMessage   String                        // what customer said
+  botReply      String                        // what bot replied
+  selectedSlug  String?                       // restaurant context if any
+  conversation  String?                       // full conversation JSON
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  costCents     Float    @default(0)
+  responseMs    Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([rating])
+}
+
+model BotPrompt {
+  id        String   @id @default(cuid())
+  key       String   @unique               // "discovery" or "ordering"
+  content   String                          // the system prompt template
+  updatedAt DateTime @updatedAt
+  updatedBy String?                         // admin email
+}
