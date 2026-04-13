@@ -44,12 +44,18 @@ export default function BotTestPage() {
   const [sessionId] = useState(() => `admin_${Date.now()}`);
   const [showDebug, setShowDebug] = useState(true);
   const [feedbackNote, setFeedbackNote] = useState<{ idx: number; text: string } | null>(null);
+  const [showInstructions, setShowInstructions] = useState(true);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Feedback list state
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
+
+  // Paste conversation state
+  const [pasteText, setPasteText] = useState("");
+  const [pasteSaving, setPasteSaving] = useState(false);
+  const [pasteSaved, setPasteSaved] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/session")
@@ -202,12 +208,37 @@ export default function BotTestPage() {
       {tab === "chat" && (
         <>
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ minHeight: 0 }}>
-            {messages.length === 0 && (
+            {messages.length === 0 && showInstructions && (
               <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="text-4xl mb-4">🤖</div>
-                  <p className="text-sm text-slate-500">Escribi algo para testear el bot</p>
-                  <p className="text-[10px] text-slate-600 mt-1">Usa los pulgares para marcar respuestas buenas o malas</p>
+                <div className="max-w-sm">
+                  <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+                    <div className="text-center mb-4">
+                      <div className="text-4xl mb-2">🤖</div>
+                      <h2 className="text-base font-bold text-white">Bot de MenuSanJuan</h2>
+                    </div>
+                    <div className="space-y-3 text-sm text-slate-400">
+                      <p>Probalo como si fueras un cliente que quiere pedir comida.</p>
+                      <div className="space-y-2">
+                        <div className="flex gap-2 items-start">
+                          <span className="text-lg shrink-0">👍</span>
+                          <span>Si la respuesta esta bien, dale <strong className="text-white">pulgar arriba</strong></span>
+                        </div>
+                        <div className="flex gap-2 items-start">
+                          <span className="text-lg shrink-0">👎</span>
+                          <span>Si la respuesta esta mal, dale <strong className="text-white">pulgar abajo</strong> y escribi que deberia haber dicho</span>
+                        </div>
+                        <div className="flex gap-2 items-start">
+                          <span className="text-lg shrink-0">📋</span>
+                          <span>Si probaste el bot en <strong className="text-white">WhatsApp</strong>, anda a la pestana <strong className="text-white">Feedback</strong> y pega la conversacion</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 pt-1">Cada feedback nos ayuda a mejorar el bot. Probalo varias veces con distintos pedidos.</p>
+                    </div>
+                    <button onClick={() => { setShowInstructions(false); inputRef.current?.focus(); }}
+                      className="w-full mt-4 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2.5 text-sm font-semibold text-white">
+                      Empezar a probar
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -335,6 +366,51 @@ export default function BotTestPage() {
             </button>
           </div>
 
+          {/* Paste WhatsApp conversation */}
+          <div className="rounded-xl border border-white/5 bg-slate-900/50 p-4 mb-4">
+            <h3 className="text-xs font-bold text-white mb-2">📋 Pegar conversacion de WhatsApp</h3>
+            <p className="text-[10px] text-slate-500 mb-3">
+              Si probaste el bot por WhatsApp, copia y pega la conversacion aca. Esto nos ayuda a ver como responde el bot en la vida real.
+            </p>
+            <textarea
+              value={pasteText}
+              onChange={(e) => { setPasteText(e.target.value); setPasteSaved(false); }}
+              placeholder="Pega aca la conversacion de WhatsApp..."
+              rows={4}
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-primary focus:outline-none resize-none mb-2"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  if (!pasteText.trim()) return;
+                  setPasteSaving(true);
+                  await fetch("/api/admin/bot", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      action: "feedback",
+                      sessionId: `paste_${Date.now()}`,
+                      rating: 0,
+                      note: "Conversacion pegada de WhatsApp",
+                      userMessage: "[Conversacion completa]",
+                      botReply: pasteText.trim(),
+                      debug: {},
+                    }),
+                  });
+                  setPasteSaving(false);
+                  setPasteSaved(true);
+                  setPasteText("");
+                  loadFeedback();
+                }}
+                disabled={!pasteText.trim() || pasteSaving}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-30"
+              >
+                {pasteSaving ? "Guardando..." : "Guardar conversacion"}
+              </button>
+              {pasteSaved && <span className="text-[10px] text-emerald-400">Guardado</span>}
+            </div>
+          </div>
+
           {loadingFeedback ? (
             <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
           ) : feedbackList.length === 0 ? (
@@ -347,7 +423,7 @@ export default function BotTestPage() {
             feedbackList.map((fb) => (
               <div key={fb.id} className="rounded-xl border border-white/5 bg-slate-900/50 p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-lg ${fb.rating === 2 ? "" : ""}`}>{fb.rating === 2 ? "👍" : "👎"}</span>
+                  <span className="text-lg">{fb.rating === 2 ? "👍" : fb.rating === 1 ? "👎" : "📋"}</span>
                   <span className="text-[10px] text-slate-500">{new Date(fb.createdAt).toLocaleString("es-AR")}</span>
                   <span className="text-[10px] font-mono text-slate-600">{fb.responseMs}ms / {fb.inputTokens}+{fb.outputTokens}tok / ${fb.costCents.toFixed(3)}</span>
                   {fb.selectedSlug && <span className="text-[10px] text-primary">@ {fb.selectedSlug}</span>}
