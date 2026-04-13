@@ -132,9 +132,9 @@ async function getDirectory(): Promise<{ list: RestaurantSummary[]; text: string
 // ── Single restaurant menu (loaded on demand) ──
 type MenuItem = { id: string; name: string; price: number; description: string | null; category: string };
 
-const menuCache = new Map<string, { items: MenuItem[]; text: string; ts: number }>();
+const menuCache = new Map<string, { items: MenuItem[]; text: string; categoryList: string; ts: number }>();
 
-async function getRestaurantMenu(slug: string): Promise<{ items: MenuItem[]; text: string } | null> {
+async function getRestaurantMenu(slug: string): Promise<{ items: MenuItem[]; text: string; categoryList: string } | null> {
   const cached = menuCache.get(slug);
   if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached;
 
@@ -154,9 +154,11 @@ async function getRestaurantMenu(slug: string): Promise<{ items: MenuItem[]; tex
 
   const items: MenuItem[] = [];
   let text = "";
+  const categoryNames: string[] = [];
 
   for (const cat of dealer.categories) {
     if (cat.items.length === 0) continue;
+    categoryNames.push(`${cat.name} (${cat.items.length})`);
     text += `\n${cat.name}\n`;
     for (const item of cat.items) {
       items.push({ id: item.id, name: item.name, price: item.price, description: item.description, category: cat.name });
@@ -164,7 +166,8 @@ async function getRestaurantMenu(slug: string): Promise<{ items: MenuItem[]; tex
     }
   }
 
-  const result = { items, text, ts: Date.now() };
+  const categoryList = categoryNames.join(", ");
+  const result = { items, text, categoryList, ts: Date.now() };
   menuCache.set(slug, result);
   return result;
 }
@@ -203,6 +206,8 @@ async function generateBotReply(phone: string, name: string, userMessage: string
 El cliente ya eligio el restaurante. Ahora ayudalo a armar su pedido.
 
 RESTAURANTE: ${convo.selectedSlug}
+CATEGORIAS: ${menu.categoryList}
+
 MENU COMPLETO (cada item tiene un [ID] entre corchetes):
 ${menu.text}
 
@@ -211,8 +216,12 @@ INSTRUCCIONES:
 - Se calido y conciso — es WhatsApp
 - NUNCA uses markdown. Texto plano + *negrita WhatsApp*
 - NUNCA inventes items ni precios
-- Sugeri 4-6 items destacados si el cliente no sabe que pedir
-- Sugeri combinaciones ("queres agregar una bebida?")
+
+FLUJO DENTRO DEL RESTAURANTE:
+1. PRIMERO mostra las categorias disponibles y pregunta que le interesa
+2. Cuando elija una categoria, mostra los items de esa categoria con precios
+3. Ayudalo a elegir y sugeri combinaciones ("queres agregar una bebida?")
+4. Si ya sabe que quiere, saltea directo a armar el pedido
 - Si quiere ver todo el menu: https://www.menusanjuan.com/${convo.selectedSlug}
 
 CUANDO EL CLIENTE CONFIRME SU PEDIDO:
