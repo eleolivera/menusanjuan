@@ -185,9 +185,10 @@ async function generateBotReply(phone: string, name: string, userMessage: string
   }
   const convo = conversations.get(phone)!;
 
-  // Reset conversation if user says "reiniciar" or "nuevo pedido"
+  // Reset conversation
   const lower = userMessage.toLowerCase();
-  if (lower === "reiniciar" || lower === "nuevo pedido" || lower === "volver") {
+  const resetWords = ["reiniciar", "nuevo pedido", "volver", "reset", "hola", "empezar"];
+  if (resetWords.some((w) => lower === w)) {
     convo.messages = [];
     convo.selectedSlug = undefined;
   }
