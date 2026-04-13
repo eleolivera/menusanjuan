@@ -3,30 +3,44 @@ import { prisma } from "@/lib/prisma";
 
 const anthropic = new Anthropic();
 
-// ── Conversation state ──
+// ── Conversation state (DB-backed for Vercel serverless) ──
 export type BotMessage = { role: "user" | "assistant"; content: string };
 
 export type ConvoState = {
   messages: BotMessage[];
   selectedSlug?: string;
-  ts: number;
 };
 
-const conversations = new Map<string, ConvoState>();
-
-export function getConvo(sessionId: string): ConvoState {
-  const existing = conversations.get(sessionId);
-  if (existing && Date.now() - existing.ts < 30 * 60 * 1000) {
-    existing.ts = Date.now();
-    return existing;
+export async function getConvo(sessionId: string): Promise<ConvoState> {
+  const row = await prisma.$queryRawUnsafe<{ messages: string; selectedSlug: string | null }[]>(
+    `SELECT messages, "selectedSlug" FROM "BotConversation" WHERE id = $1`,
+    sessionId
+  );
+  if (row.length > 0) {
+    return {
+      messages: JSON.parse(row[0].messages),
+      selectedSlug: row[0].selectedSlug || undefined,
+    };
   }
-  const fresh: ConvoState = { messages: [], ts: Date.now() };
-  conversations.set(sessionId, fresh);
-  return fresh;
+  return { messages: [] };
 }
 
-export function resetConvo(sessionId: string) {
-  conversations.delete(sessionId);
+async function saveConvo(sessionId: string, convo: ConvoState) {
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "BotConversation" (id, messages, "selectedSlug", "updatedAt")
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (id) DO UPDATE SET messages = $2, "selectedSlug" = $3, "updatedAt" = NOW()`,
+    sessionId,
+    JSON.stringify(convo.messages),
+    convo.selectedSlug || null
+  );
+}
+
+export async function resetConvo(sessionId: string) {
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "BotConversation" WHERE id = $1`,
+    sessionId
+  );
 }
 
 // ── Restaurant directory ──
@@ -112,12 +126,12 @@ export async function generateBotReply(
   name: string,
   text: string
 ): Promise<{ reply: string; debug: BotDebug }> {
-  const convo = getConvo(sessionId);
+  let convo = await getConvo(sessionId);
 
   const lower = text.toLowerCase();
   if (["reiniciar", "nuevo pedido", "volver", "reset", "hola", "empezar"].includes(lower)) {
-    convo.messages = [];
-    convo.selectedSlug = undefined;
+    convo = { messages: [] };
+    await saveConvo(sessionId, convo);
   }
 
   let system: string;
@@ -212,6 +226,7 @@ Cliente: ${name}`;
     convo.selectedSlug = sel[1];
     reply = reply.replace(/SELECTED::[a-z0-9-]+/, "").trim();
     convo.messages = [{ role: "assistant", content: reply }];
+    await saveConvo(sessionId, convo);
     return {
       reply,
       debug: { selectedSlug: convo.selectedSlug, inputTokens, outputTokens, costCents, responseMs, systemPromptLength: system.length },
@@ -232,6 +247,7 @@ Cliente: ${name}`;
 
   convo.messages.push({ role: "assistant", content: reply });
   if (convo.messages.length > 16) convo.messages = convo.messages.slice(-16);
+  await saveConvo(sessionId, convo);
 
   return {
     reply,

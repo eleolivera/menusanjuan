@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   // Feedback
   if (action === "feedback") {
     const { rating, note, userMessage, botReply, debug } = body;
-    const convo = getConvo(sessionId);
+    const convo = await getConvo(sessionId);
 
     await prisma.botFeedback.create({
       data: {
