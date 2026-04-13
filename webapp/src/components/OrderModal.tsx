@@ -46,8 +46,14 @@ export function OrderModal({
   const [step, setStep] = useState<"cart" | "method" | "info" | "confirm" | "tracking">(
     trackingOrder ? "tracking" : "cart"
   );
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("msj_name") || "";
+    return "";
+  });
+  const [phone, setPhone] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("msj_phone") || "";
+    return "";
+  });
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -203,6 +209,10 @@ _Pedido realizado desde MenuSanJuan_`;
       setOrderNumber(order.orderNumber);
       setOrderId(order.id);
       setOrderToken(order.customerAccessToken || "");
+
+      // Cache name and phone for next order
+      localStorage.setItem("msj_name", name);
+      localStorage.setItem("msj_phone", phone);
 
       // Save to localStorage for persistent tracking
       if (order.customerAccessToken) {
