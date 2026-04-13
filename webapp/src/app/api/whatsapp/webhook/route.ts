@@ -11,9 +11,14 @@ const anthropic = new Anthropic();
 // Per-phone conversation state
 type ConvoState = {
   messages: { role: "user" | "assistant"; content: string }[];
-  selectedSlug?: string; // once a restaurant is picked
+  selectedSlug?: string;
 };
 const conversations = new Map<string, ConvoState>();
+
+// Dedup: track processed message IDs to avoid retries
+const processedMessages = new Set<string>();
+// Also track phones currently being processed to avoid concurrent replies
+const processingPhones = new Set<string>();
 
 // ── Webhook verification ──
 export async function GET(req: NextRequest) {
@@ -35,27 +40,43 @@ export async function POST(req: NextRequest) {
 
   if (value?.messages) {
     for (const message of value.messages) {
+      const msgId = message.id;
       const from = message.from;
       const text = message.text?.body?.trim();
       const contactName = value.contacts?.[0]?.profile?.name || "Cliente";
       if (!text) continue;
 
+      // Skip if already processed (Meta retries) or currently processing this phone
+      if (processedMessages.has(msgId) || processingPhones.has(from)) continue;
+      processedMessages.add(msgId);
+      // Clean up old message IDs after 5 minutes
+      setTimeout(() => processedMessages.delete(msgId), 5 * 60 * 1000);
+
       console.log(`[WhatsApp] ${contactName} (${from}): ${text}`);
 
-      try {
-        const reply = await generateBotReply(from, contactName, text);
-        await sendWhatsAppMessage(from, reply);
-      } catch (err) {
-        console.error("[WhatsApp] Bot error:", err);
-        await sendWhatsAppMessage(
-          from,
-          "Disculpa, tuve un problema. Intenta de nuevo en un momento."
-        );
-      }
+      // Process in background — return 200 immediately
+      processingPhones.add(from);
+      processMessage(from, contactName, text).finally(() => {
+        processingPhones.delete(from);
+      });
     }
   }
 
+  // Return 200 immediately so Meta doesn't retry
   return NextResponse.json({ status: "ok" });
+}
+
+async function processMessage(from: string, contactName: string, text: string) {
+  try {
+    const reply = await generateBotReply(from, contactName, text);
+    await sendWhatsAppMessage(from, reply);
+  } catch (err) {
+    console.error("[WhatsApp] Bot error:", err);
+    await sendWhatsAppMessage(
+      from,
+      "Disculpa, tuve un problema. Intenta de nuevo en un momento."
+    );
+  }
 }
 
 // ── Restaurant directory (lightweight, no items) ──
