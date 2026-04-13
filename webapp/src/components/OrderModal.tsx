@@ -466,16 +466,25 @@ _Pedido realizado desde MenuSanJuan_`;
               <div className="rounded-xl border border-border/50 bg-surface-alt p-4 mb-4">
                 <div className="text-xs font-bold text-primary uppercase tracking-wider mb-3">Resumen</div>
                 {items.map((ci) => (
-                  <div key={ci.cartKey} className="py-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-text-secondary">{ci.quantity}x {ci.item.name}</span>
-                      <span className="font-semibold text-text">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</span>
-                    </div>
-                    {ci.selectedOptions.length > 0 && (
-                      <div className="text-[10px] text-text-muted ml-4">
-                        {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                  <div key={ci.cartKey} className="group py-1 flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-text-secondary">{ci.quantity}x {ci.item.name}</span>
+                        <span className="font-semibold text-text">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</span>
                       </div>
-                    )}
+                      {ci.selectedOptions.length > 0 && (
+                        <div className="text-[10px] text-text-muted ml-4">
+                          {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { onRemove(ci.cartKey); if (items.length <= 1) setStep("cart"); }}
+                      className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full text-text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+                      title="Quitar"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                    </button>
                   </div>
                 ))}
                 <div className="mt-2 border-t border-border/50 pt-2 flex justify-between text-sm">

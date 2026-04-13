@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import type { MenuCategoryData, MenuItemData } from "@/data/menus";
 import type { Restaurant } from "@/data/restaurants";
 import type { DeliveryConfig } from "@/lib/delivery";
@@ -38,11 +39,42 @@ export function StoreMenu({
   const [pendingOrder, setPendingOrder] = useState<OrderRef | null>(null);
   const [trackingMode, setTrackingMode] = useState(false);
 
+  const searchParams = useSearchParams();
+
   // Check localStorage for pending orders on mount
   useEffect(() => {
     const ref = getLatestOrderRef(restaurant.slug);
     if (ref) setPendingOrder(ref);
   }, [restaurant.slug]);
+
+  // Pre-fill cart from ?pedido= URL parameter (used by WhatsApp bot)
+  useEffect(() => {
+    const pedido = searchParams.get("pedido");
+    if (!pedido) return;
+    try {
+      const decoded = JSON.parse(atob(pedido)) as { id: string; qty: number }[];
+      const allItems = categories.flatMap((c) => c.items);
+      const entries: CartEntry[] = [];
+      for (const { id, qty } of decoded) {
+        const item = allItems.find((i) => i.id === id);
+        if (item && qty > 0) {
+          entries.push({
+            cartKey: `ck-${++cartKeyCounter}`,
+            item,
+            quantity: qty,
+            selectedOptions: [],
+            optionsDelta: 0,
+          });
+        }
+      }
+      if (entries.length > 0) {
+        setCart(entries);
+        setShowModal(true);
+      }
+    } catch {
+      // Invalid pedido param — ignore
+    }
+  }, [searchParams, categories]);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const addItem = useCallback((item: MenuItemData) => {
