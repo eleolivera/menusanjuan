@@ -154,16 +154,18 @@ export function LocationPicker({
 
   function handleConfirm() {
     setIsConfirmed(true);
-    // Send written address (for receipt) + coords (for QR)
-    onLocationConfirm(writtenAddress, coords.lat, coords.lng);
+    // Send written address (for receipt) + coords (for delivery)
+    // If no written address, use a descriptive fallback
+    const addr = writtenAddress.trim() || `Ubicacion en mapa (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`;
+    onLocationConfirm(addr, coords.lat, coords.lng);
   }
 
   function handleEdit() {
     setIsConfirmed(false);
   }
 
-  // Can confirm when we have a written address
-  const canConfirm = writtenAddress.trim().length > 0;
+  // Can confirm with written address OR if map was touched (pin dropped / Mi ubicacion)
+  const canConfirm = writtenAddress.trim().length > 0 || mapTouched;
 
   if (!isLoaded) {
     return (
