@@ -234,10 +234,10 @@ _Pedido realizado desde MenuSanJuan_`;
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-surface shadow-2xl animate-scale-in">
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-t-2xl sm:rounded-2xl bg-surface shadow-2xl animate-scale-in">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border/50 bg-surface px-5 py-4">
           <h2 className="text-lg font-bold text-text">
