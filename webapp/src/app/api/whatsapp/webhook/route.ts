@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 
@@ -7,18 +8,6 @@ const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN!;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID!;
 
 const anthropic = new Anthropic();
-
-// Per-phone conversation state
-type ConvoState = {
-  messages: { role: "user" | "assistant"; content: string }[];
-  selectedSlug?: string;
-};
-const conversations = new Map<string, ConvoState>();
-
-// Dedup: track processed message IDs to avoid retries
-const processedMessages = new Set<string>();
-// Also track phones currently being processed to avoid concurrent replies
-const processingPhones = new Set<string>();
 
 // ── Webhook verification ──
 export async function GET(req: NextRequest) {
@@ -40,61 +29,92 @@ export async function POST(req: NextRequest) {
 
   if (value?.messages) {
     for (const message of value.messages) {
-      const msgId = message.id;
-      const from = message.from;
-      const text = message.text?.body?.trim();
-      const contactName = value.contacts?.[0]?.profile?.name || "Cliente";
-      if (!text) continue;
+      const msgId = message.id as string;
+      const from = message.from as string;
+      const text = (message.text?.body as string)?.trim();
+      const contactName = (value.contacts?.[0]?.profile?.name as string) || "Cliente";
+      if (!text || !msgId) continue;
 
-      // Skip if already processed (Meta retries) or currently processing this phone
-      if (processedMessages.has(msgId) || processingPhones.has(from)) continue;
-      processedMessages.add(msgId);
-      // Clean up old message IDs after 5 minutes
-      setTimeout(() => processedMessages.delete(msgId), 5 * 60 * 1000);
+      // Use after() so Vercel keeps the function alive after returning 200
+      after(async () => {
+        try {
+          // Dedup: check if we already processed this message
+          const existing = await prisma.$queryRawUnsafe<{ id: string }[]>(
+            `SELECT id FROM "Order" WHERE "customerAccessToken" = $1 LIMIT 1`,
+            `wa_${msgId}`
+          );
+          // Use a lightweight dedup check — store processed msg IDs in a simple way
+          // We'll use an in-process check plus timestamp-based guard
+          if (isRecentlyProcessed(msgId)) return;
+          markProcessed(msgId);
 
-      console.log(`[WhatsApp] ${contactName} (${from}): ${text}`);
-
-      // Process in background — return 200 immediately
-      processingPhones.add(from);
-      processMessage(from, contactName, text).finally(() => {
-        processingPhones.delete(from);
+          console.log(`[WhatsApp] ${contactName} (${from}): ${text}`);
+          const reply = await generateBotReply(from, contactName, text);
+          await sendWhatsAppMessage(from, reply);
+        } catch (err) {
+          console.error("[WhatsApp] Bot error:", err);
+          await sendWhatsAppMessage(
+            from,
+            "Disculpa, tuve un problema. Intenta de nuevo en un momento."
+          ).catch(() => {});
+        }
       });
     }
   }
 
-  // Return 200 immediately so Meta doesn't retry
   return NextResponse.json({ status: "ok" });
 }
 
-async function processMessage(from: string, contactName: string, text: string) {
-  try {
-    const reply = await generateBotReply(from, contactName, text);
-    await sendWhatsAppMessage(from, reply);
-  } catch (err) {
-    console.error("[WhatsApp] Bot error:", err);
-    await sendWhatsAppMessage(
-      from,
-      "Disculpa, tuve un problema. Intenta de nuevo en un momento."
-    );
+// ── Simple in-memory dedup (best effort on serverless) ──
+const processed = new Map<string, number>();
+
+function isRecentlyProcessed(msgId: string): boolean {
+  const ts = processed.get(msgId);
+  if (!ts) return false;
+  // Expire after 5 minutes
+  if (Date.now() - ts > 5 * 60 * 1000) {
+    processed.delete(msgId);
+    return false;
+  }
+  return true;
+}
+
+function markProcessed(msgId: string) {
+  processed.set(msgId, Date.now());
+  // Cleanup old entries
+  if (processed.size > 500) {
+    const cutoff = Date.now() - 5 * 60 * 1000;
+    for (const [k, v] of processed) {
+      if (v < cutoff) processed.delete(k);
+    }
   }
 }
 
-// ── Restaurant directory (lightweight, no items) ──
-type RestaurantSummary = {
-  slug: string;
-  name: string;
-  cuisineType: string | null;
-  rating: number | null;
-  deliveryTimeMin: number | null;
-  itemCount: number;
+// ── Conversation state (in-memory, best effort) ──
+type ConvoState = {
+  messages: { role: "user" | "assistant"; content: string }[];
+  selectedSlug?: string;
+  ts: number;
 };
+const conversations = new Map<string, ConvoState>();
 
-let directoryCache: { list: RestaurantSummary[]; text: string; ts: number } | null = null;
-
-async function getDirectory(): Promise<{ list: RestaurantSummary[]; text: string }> {
-  if (directoryCache && Date.now() - directoryCache.ts < 10 * 60 * 1000) {
-    return directoryCache;
+function getConvo(phone: string): ConvoState {
+  const existing = conversations.get(phone);
+  // Expire conversations after 30 min of inactivity
+  if (existing && Date.now() - existing.ts < 30 * 60 * 1000) {
+    existing.ts = Date.now();
+    return existing;
   }
+  const fresh: ConvoState = { messages: [], ts: Date.now() };
+  conversations.set(phone, fresh);
+  return fresh;
+}
+
+// ── Restaurant directory ──
+let dirCache: { text: string; ts: number } | null = null;
+
+async function getDirectory(): Promise<string> {
+  if (dirCache && Date.now() - dirCache.ts < 10 * 60 * 1000) return dirCache.text;
 
   const dealers = await prisma.dealer.findMany({
     where: { isActive: true },
@@ -106,35 +126,21 @@ async function getDirectory(): Promise<{ list: RestaurantSummary[]; text: string
     orderBy: { name: "asc" },
   });
 
-  const list: RestaurantSummary[] = [];
   let text = "";
-
   for (const d of dealers) {
-    const itemCount = d.categories.reduce((sum, c) => sum + c.items.length, 0);
-    if (itemCount === 0) continue;
-
-    list.push({
-      slug: d.slug,
-      name: d.name,
-      cuisineType: d.cuisineType,
-      rating: d.rating ? Number(d.rating) : null,
-      deliveryTimeMin: d.deliveryTimeMin,
-      itemCount,
-    });
-
-    text += `- ${d.name} (${d.slug}) — ${d.cuisineType || "Varios"}, ${itemCount} items${d.rating ? `, ${d.rating} estrellas` : ""}\n`;
+    const count = d.categories.reduce((s, c) => s + c.items.length, 0);
+    if (count === 0) continue;
+    text += `- ${d.name} (${d.slug}) — ${d.cuisineType || "Varios"}, ${count} items${d.rating ? `, ${d.rating} estrellas` : ""}\n`;
   }
 
-  directoryCache = { list, text, ts: Date.now() };
-  return { list, text };
+  dirCache = { text, ts: Date.now() };
+  return text;
 }
 
-// ── Single restaurant menu (loaded on demand) ──
-type MenuItem = { id: string; name: string; price: number; description: string | null; category: string };
+// ── Single restaurant menu ──
+const menuCache = new Map<string, { text: string; cats: string; ts: number }>();
 
-const menuCache = new Map<string, { items: MenuItem[]; text: string; categoryList: string; ts: number }>();
-
-async function getRestaurantMenu(slug: string): Promise<{ items: MenuItem[]; text: string; categoryList: string } | null> {
+async function getMenu(slug: string): Promise<{ text: string; cats: string } | null> {
   const cached = menuCache.get(slug);
   if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached;
 
@@ -142,181 +148,150 @@ async function getRestaurantMenu(slug: string): Promise<{ items: MenuItem[]; tex
     where: { slug, isActive: true },
     include: {
       categories: {
-        include: {
-          items: { where: { available: true }, orderBy: { sortOrder: "asc" } },
-        },
+        include: { items: { where: { available: true }, orderBy: { sortOrder: "asc" } } },
         orderBy: { sortOrder: "asc" },
       },
     },
   });
-
   if (!dealer) return null;
 
-  const items: MenuItem[] = [];
+  const catNames: string[] = [];
   let text = "";
-  const categoryNames: string[] = [];
 
   for (const cat of dealer.categories) {
     if (cat.items.length === 0) continue;
-    categoryNames.push(`${cat.name} (${cat.items.length})`);
+    catNames.push(`${cat.name} (${cat.items.length})`);
     text += `\n${cat.name}\n`;
     for (const item of cat.items) {
-      items.push({ id: item.id, name: item.name, price: item.price, description: item.description, category: cat.name });
       text += `- [${item.id}] ${item.name} ($${item.price.toLocaleString("es-AR")})${item.description ? ` — ${item.description}` : ""}\n`;
     }
   }
 
-  const categoryList = categoryNames.join(", ");
-  const result = { items, text, categoryList, ts: Date.now() };
+  const result = { text, cats: catNames.join(", "), ts: Date.now() };
   menuCache.set(slug, result);
   return result;
 }
 
 // ── Checkout link ──
-function buildCheckoutLink(slug: string, cartItems: { id: string; qty: number }[]): string {
-  const encoded = btoa(JSON.stringify(cartItems));
-  return `https://www.menusanjuan.com/${slug}?pedido=${encoded}`;
+function buildCheckoutLink(slug: string, items: { id: string; qty: number }[]): string {
+  return `https://www.menusanjuan.com/${slug}?pedido=${btoa(JSON.stringify(items))}`;
 }
 
 // ── Generate reply ──
-async function generateBotReply(phone: string, name: string, userMessage: string): Promise<string> {
-  if (!conversations.has(phone)) {
-    conversations.set(phone, { messages: [] });
-  }
-  const convo = conversations.get(phone)!;
+async function generateBotReply(phone: string, name: string, text: string): Promise<string> {
+  const convo = getConvo(phone);
 
-  // Reset conversation
-  const lower = userMessage.toLowerCase();
-  const resetWords = ["reiniciar", "nuevo pedido", "volver", "reset", "hola", "empezar"];
-  if (resetWords.some((w) => lower === w)) {
+  // Reset triggers
+  const lower = text.toLowerCase();
+  if (["reiniciar", "nuevo pedido", "volver", "reset", "hola", "empezar"].includes(lower)) {
     convo.messages = [];
     convo.selectedSlug = undefined;
   }
 
-  let systemPrompt: string;
+  let system: string;
 
   if (convo.selectedSlug) {
-    // ── STEP 2: Restaurant selected, show its menu ──
-    const menu = await getRestaurantMenu(convo.selectedSlug);
+    const menu = await getMenu(convo.selectedSlug);
     if (!menu) {
       convo.selectedSlug = undefined;
       return "No encontre ese restaurante. Escribi *hola* para empezar de nuevo.";
     }
 
-    systemPrompt = `Sos el asistente de MenuSanJuan, la plataforma de delivery de San Juan, Argentina.
-El cliente ya eligio el restaurante. Ahora ayudalo a armar su pedido.
+    system = `Sos el asistente de MenuSanJuan, delivery de San Juan, Argentina.
+El cliente eligio un restaurante. Ayudalo a pedir.
 
 RESTAURANTE: ${convo.selectedSlug}
-CATEGORIAS: ${menu.categoryList}
+CATEGORIAS: ${menu.cats}
 
-MENU COMPLETO (cada item tiene un [ID] entre corchetes):
+MENU (cada item tiene [ID]):
 ${menu.text}
 
-INSTRUCCIONES:
-- Responde en espanol argentino informal (vos, tuteo)
-- Se calido y conciso — es WhatsApp
-- NUNCA uses markdown. Texto plano + *negrita WhatsApp*
-- NUNCA inventes items ni precios
+REGLAS:
+- Espanol argentino informal, conciso, WhatsApp
+- Texto plano + *negrita*. NO markdown
+- NO inventes items/precios
+- PRIMERO mostra las categorias y pregunta cual le interesa
+- Cuando elija categoria, mostra esos items con precios
+- Sugeri combos ("queres agregar bebida?")
+- Menu completo: https://www.menusanjuan.com/${convo.selectedSlug}
 
-FLUJO DENTRO DEL RESTAURANTE:
-1. PRIMERO mostra las categorias disponibles y pregunta que le interesa
-2. Cuando elija una categoria, mostra los items de esa categoria con precios
-3. Ayudalo a elegir y sugeri combinaciones ("queres agregar una bebida?")
-4. Si ya sabe que quiere, saltea directo a armar el pedido
-- Si quiere ver todo el menu: https://www.menusanjuan.com/${convo.selectedSlug}
+CONFIRMAR PEDIDO:
+Mostra resumen + total, y al final esta linea EXACTA:
+CHECKOUT_LINK::${convo.selectedSlug}::[{"id":"ID","qty":N}]
 
-CUANDO EL CLIENTE CONFIRME SU PEDIDO:
-Mostra resumen con items, cantidades y total.
-Al FINAL agrega esta linea EXACTA (el sistema genera el link):
-CHECKOUT_LINK::${convo.selectedSlug}::[{"id":"ITEM_ID","qty":CANTIDAD}]
+- "cambiar"/"volver" → decile que escriba *nuevo pedido*
+- "humano" → "Te comunico con alguien. Un momento."
 
-- Si dice "otro restaurante", "cambiar", o "volver", responde que puede escribir *nuevo pedido* para empezar de nuevo
-- Si dice "humano", responde: "Te comunico con alguien del equipo. Un momento."
-
-El cliente se llama ${name}.`;
+Cliente: ${name}`;
   } else {
-    // ── STEP 1: Help discover a restaurant ──
     const dir = await getDirectory();
 
-    systemPrompt = `Sos el asistente de MenuSanJuan, la plataforma de delivery de San Juan, Argentina.
-Ayudas a la gente a descubrir donde comer y hacer pedidos.
+    system = `Sos el asistente de MenuSanJuan, delivery de San Juan, Argentina.
+Ayudas a descubrir restaurantes y pedir comida.
 
-RESTAURANTES DISPONIBLES (${dir.list.length}):
-${dir.text}
+RESTAURANTES:
+${dir}
 
-INSTRUCCIONES:
-- Responde en espanol argentino informal (vos, tuteo)
-- Se calido y conciso — es WhatsApp
-- NUNCA uses markdown. Texto plano + *negrita WhatsApp*
-- Pregunta que tipo de comida busca si no lo dice
-- Sugeri 2-3 restaurantes que encajen con lo que busca
-- Mostra tipo de cocina y rating si tiene
+REGLAS:
+- Espanol argentino informal, conciso, WhatsApp
+- Texto plano + *negrita*. NO markdown
+- Pregunta que tipo de comida busca
+- Sugeri 2-3 restaurantes que encajen
+- Mostra tipo cocina y rating
 
-CUANDO EL CLIENTE ELIJA UN RESTAURANTE:
-Responde confirmando la eleccion y agrega al FINAL esta linea EXACTA:
-SELECTED::slug-del-restaurante
+CUANDO ELIJA UN RESTAURANTE:
+Confirma y al FINAL agrega: SELECTED::slug-del-restaurante
+Ejemplo: SELECTED::hc-cafe
 
-Ejemplo si elige HC Cafe:
-SELECTED::hc-cafe
+- Si ya nombra un restaurante, confirma y agrega SELECTED::
+- "humano" → "Te comunico con alguien. Un momento."
+- Ver todos: https://www.menusanjuan.com
 
-- Si el cliente ya dice un restaurante de entrada, confirma y agrega SELECTED::
-- Si dice "humano", responde: "Te comunico con alguien del equipo. Un momento."
-- Si quiere ver todos los restaurantes: https://www.menusanjuan.com
-
-El cliente se llama ${name}.`;
+Cliente: ${name}`;
   }
 
-  convo.messages.push({ role: "user", content: userMessage });
-  const recentMessages = convo.messages.slice(-20);
+  convo.messages.push({ role: "user", content: text });
+  const recent = convo.messages.slice(-16);
 
-  const response = await anthropic.messages.create({
+  const res = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 600,
-    system: systemPrompt,
-    messages: recentMessages,
+    max_tokens: 500,
+    system,
+    messages: recent,
   });
 
-  let reply = response.content[0].type === "text"
-    ? response.content[0].text
-    : "No pude generar una respuesta.";
+  let reply = res.content[0].type === "text" ? res.content[0].text : "No pude responder.";
 
-  // Handle SELECTED:: — restaurant was chosen
-  const selectedMatch = reply.match(/SELECTED::([a-z0-9-]+)/);
-  if (selectedMatch) {
-    convo.selectedSlug = selectedMatch[1];
+  // Handle SELECTED::
+  const sel = reply.match(/SELECTED::([a-z0-9-]+)/);
+  if (sel) {
+    convo.selectedSlug = sel[1];
     reply = reply.replace(/SELECTED::[a-z0-9-]+/, "").trim();
-    // Clear message history for fresh menu conversation
-    convo.messages = [];
-    convo.messages.push({ role: "assistant", content: reply });
+    convo.messages = [{ role: "assistant", content: reply }];
     return reply;
   }
 
-  // Handle CHECKOUT_LINK:: — order confirmed
-  const linkMatch = reply.match(/CHECKOUT_LINK::([a-z0-9-]+)::(\[.*\])/);
-  if (linkMatch) {
+  // Handle CHECKOUT_LINK::
+  const link = reply.match(/CHECKOUT_LINK::([a-z0-9-]+)::(\[.*\])/);
+  if (link) {
     try {
-      const slug = linkMatch[1];
-      const cartItems = JSON.parse(linkMatch[2]) as { id: string; qty: number }[];
-      const link = buildCheckoutLink(slug, cartItems);
-      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, `Completa tu pedido aca:\n${link}`);
+      const cart = JSON.parse(link[2]) as { id: string; qty: number }[];
+      const url = buildCheckoutLink(link[1], cart);
+      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, `Completa tu pedido aca:\n${url}`);
     } catch {
       reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, "");
     }
   }
 
   convo.messages.push({ role: "assistant", content: reply });
-  if (convo.messages.length > 20) {
-    convo.messages = convo.messages.slice(-20);
-  }
+  if (convo.messages.length > 16) convo.messages = convo.messages.slice(-16);
 
   return reply;
 }
 
-// ── Send message via WhatsApp Cloud API ──
+// ── Send WhatsApp message ──
 async function sendWhatsAppMessage(to: string, text: string) {
-  const url = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
-
-  const res = await fetch(url, {
+  const res = await fetch(`https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${ACCESS_TOKEN}`,
@@ -331,7 +306,6 @@ async function sendWhatsAppMessage(to: string, text: string) {
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    console.error("[WhatsApp] Send failed:", err);
+    console.error("[WhatsApp] Send failed:", await res.text());
   }
 }

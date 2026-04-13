@@ -200,7 +200,7 @@ export function LocationPicker({
             }}
             disabled={!ready || isConfirmed}
             placeholder="Escribí tu dirección..."
-            className="w-full rounded-xl border border-border bg-white px-4 py-3 pl-10 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors disabled:bg-surface-alt disabled:text-text-secondary"
+            className="w-full rounded-xl border border-border bg-white px-4 py-3 pl-10 text-base text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors disabled:bg-surface-alt disabled:text-text-secondary"
           />
         </div>
 

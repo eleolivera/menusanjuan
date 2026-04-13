@@ -368,7 +368,7 @@ _Pedido realizado desde MenuSanJuan_`;
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-text">Nombre</label>
                   <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre"
-                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-base text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
                 </div>
                 <PhoneInput value={phone} onChange={setPhone} label="Teléfono" placeholder="264 555 1234" required />
 
@@ -445,7 +445,7 @@ _Pedido realizado desde MenuSanJuan_`;
                     Notas <span className="text-text-muted font-normal">(opcional)</span>
                   </label>
                   <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Sin cebolla, extra salsa, etc." rows={2}
-                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
+                    className="w-full rounded-xl border border-border bg-white px-4 py-3 text-base text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
                 </div>
               </div>
 

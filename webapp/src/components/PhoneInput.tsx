@@ -84,8 +84,8 @@ export function PhoneInput({
 
   const selectedCountry = COUNTRIES.find((c) => c.code === country)!;
   const inputClass = darkMode
-    ? "rounded-r-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-    : "rounded-r-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors";
+    ? "rounded-r-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+    : "rounded-r-xl border border-border bg-white px-4 py-3 text-base text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors";
   const btnClass = darkMode
     ? "rounded-l-xl border border-white/10 border-r-0 bg-white/5 px-3 py-3 text-sm text-white hover:bg-white/10 transition-colors"
     : "rounded-l-xl border border-border border-r-0 bg-surface-alt px-3 py-3 text-sm text-text hover:bg-surface-hover transition-colors";
