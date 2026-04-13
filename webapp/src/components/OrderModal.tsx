@@ -455,7 +455,7 @@ _Pedido realizado desde MenuSanJuan_`;
                 </button>
                 <button
                   onClick={() => setStep("confirm")}
-                  disabled={!name.trim() || !phone.trim() || (deliveryMethod === "delivery" && !address.trim()) || isOutOfRange}
+                  disabled={!name.trim() || !phone.trim() || (deliveryMethod === "delivery" && !address.trim() && latitude === null) || isOutOfRange}
                   className="flex-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
                 >
                   Revisar Pedido
