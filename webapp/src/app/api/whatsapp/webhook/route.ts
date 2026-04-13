@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 
@@ -22,10 +21,18 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
+// ── Dedup ──
+const processed = new Set<string>();
+
 // ── Incoming messages ──
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const value = body.entry?.[0]?.changes?.[0]?.value;
+
+  // Ignore status updates (delivered, read, etc.)
+  if (value?.statuses) {
+    return NextResponse.json({ status: "ok" });
+  }
 
   if (value?.messages) {
     for (const message of value.messages) {
@@ -35,62 +42,34 @@ export async function POST(req: NextRequest) {
       const contactName = (value.contacts?.[0]?.profile?.name as string) || "Cliente";
       if (!text || !msgId) continue;
 
-      // Use after() so Vercel keeps the function alive after returning 200
-      after(async () => {
-        try {
-          // Dedup: check if we already processed this message
-          const existing = await prisma.$queryRawUnsafe<{ id: string }[]>(
-            `SELECT id FROM "Order" WHERE "customerAccessToken" = $1 LIMIT 1`,
-            `wa_${msgId}`
-          );
-          // Use a lightweight dedup check — store processed msg IDs in a simple way
-          // We'll use an in-process check plus timestamp-based guard
-          if (isRecentlyProcessed(msgId)) return;
-          markProcessed(msgId);
+      // Skip duplicates
+      if (processed.has(msgId)) {
+        console.log(`[WhatsApp] Skipping duplicate: ${msgId}`);
+        continue;
+      }
+      processed.add(msgId);
+      setTimeout(() => processed.delete(msgId), 5 * 60 * 1000);
 
-          console.log(`[WhatsApp] ${contactName} (${from}): ${text}`);
-          const reply = await generateBotReply(from, contactName, text);
-          await sendWhatsAppMessage(from, reply);
-        } catch (err) {
-          console.error("[WhatsApp] Bot error:", err);
-          await sendWhatsAppMessage(
-            from,
-            "Disculpa, tuve un problema. Intenta de nuevo en un momento."
-          ).catch(() => {});
-        }
-      });
+      console.log(`[WhatsApp] ${contactName} (${from}): ${text}`);
+
+      try {
+        const reply = await generateBotReply(from, contactName, text);
+        await sendWhatsAppMessage(from, reply);
+        console.log(`[WhatsApp] Replied to ${from}`);
+      } catch (err) {
+        console.error("[WhatsApp] Bot error:", err);
+        await sendWhatsAppMessage(
+          from,
+          "Disculpa, tuve un problema. Intenta de nuevo en un momento."
+        ).catch(() => {});
+      }
     }
   }
 
   return NextResponse.json({ status: "ok" });
 }
 
-// ── Simple in-memory dedup (best effort on serverless) ──
-const processed = new Map<string, number>();
-
-function isRecentlyProcessed(msgId: string): boolean {
-  const ts = processed.get(msgId);
-  if (!ts) return false;
-  // Expire after 5 minutes
-  if (Date.now() - ts > 5 * 60 * 1000) {
-    processed.delete(msgId);
-    return false;
-  }
-  return true;
-}
-
-function markProcessed(msgId: string) {
-  processed.set(msgId, Date.now());
-  // Cleanup old entries
-  if (processed.size > 500) {
-    const cutoff = Date.now() - 5 * 60 * 1000;
-    for (const [k, v] of processed) {
-      if (v < cutoff) processed.delete(k);
-    }
-  }
-}
-
-// ── Conversation state (in-memory, best effort) ──
+// ── Conversation state ──
 type ConvoState = {
   messages: { role: "user" | "assistant"; content: string }[];
   selectedSlug?: string;
@@ -100,7 +79,6 @@ const conversations = new Map<string, ConvoState>();
 
 function getConvo(phone: string): ConvoState {
   const existing = conversations.get(phone);
-  // Expire conversations after 30 min of inactivity
   if (existing && Date.now() - existing.ts < 30 * 60 * 1000) {
     existing.ts = Date.now();
     return existing;
@@ -181,7 +159,6 @@ function buildCheckoutLink(slug: string, items: { id: string; qty: number }[]): 
 async function generateBotReply(phone: string, name: string, text: string): Promise<string> {
   const convo = getConvo(phone);
 
-  // Reset triggers
   const lower = text.toLowerCase();
   if (["reiniciar", "nuevo pedido", "volver", "reset", "hola", "empezar"].includes(lower)) {
     convo.messages = [];
