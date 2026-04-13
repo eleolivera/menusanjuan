@@ -197,7 +197,7 @@ export default function BotTestPage() {
             </button>
             {totalCost > 0 && (
               <div className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-[10px] font-mono text-emerald-400">
-                ${totalCost.toFixed(3)}
+                {totalCost.toFixed(2)}¢
               </div>
             )}
           </>
@@ -279,7 +279,7 @@ export default function BotTestPage() {
                       <div className="flex flex-wrap gap-2 text-[10px] font-mono text-slate-600">
                         <span>{msg.debug.responseMs}ms</span>
                         <span>{msg.debug.inputTokens}+{msg.debug.outputTokens} tok</span>
-                        <span>${msg.debug.costCents.toFixed(3)}</span>
+                        <span>{msg.debug.costCents.toFixed(2)}¢</span>
                         {msg.debug.selectedSlug && <span className="text-primary">@ {msg.debug.selectedSlug}</span>}
                       </div>
                     )}
@@ -425,7 +425,7 @@ export default function BotTestPage() {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-lg">{fb.rating === 2 ? "👍" : fb.rating === 1 ? "👎" : "📋"}</span>
                   <span className="text-[10px] text-slate-500">{new Date(fb.createdAt).toLocaleString("es-AR")}</span>
-                  <span className="text-[10px] font-mono text-slate-600">{fb.responseMs}ms / {fb.inputTokens}+{fb.outputTokens}tok / ${fb.costCents.toFixed(3)}</span>
+                  <span className="text-[10px] font-mono text-slate-600">{fb.responseMs}ms / {fb.inputTokens}+{fb.outputTokens}tok / {fb.costCents.toFixed(2)}¢</span>
                   {fb.selectedSlug && <span className="text-[10px] text-primary">@ {fb.selectedSlug}</span>}
                 </div>
 
