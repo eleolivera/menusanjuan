@@ -8,11 +8,12 @@ const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID!;
 
 const anthropic = new Anthropic();
 
-// In-memory conversation history (per phone number)
-const conversations = new Map<
-  string,
-  { role: "user" | "assistant"; content: string }[]
->();
+// Per-phone conversation state
+type ConvoState = {
+  messages: { role: "user" | "assistant"; content: string }[];
+  selectedSlug?: string; // once a restaurant is picked
+};
+const conversations = new Map<string, ConvoState>();
 
 // ── Webhook verification ──
 export async function GET(req: NextRequest) {
@@ -22,28 +23,21 @@ export async function GET(req: NextRequest) {
   const challenge = params.get("hub.challenge");
 
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("[WhatsApp] Webhook verified");
     return new NextResponse(challenge, { status: 200 });
   }
-
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
 // ── Incoming messages ──
 export async function POST(req: NextRequest) {
   const body = await req.json();
-
-  const entry = body.entry?.[0];
-  const changes = entry?.changes?.[0];
-  const value = changes?.value;
+  const value = body.entry?.[0]?.changes?.[0]?.value;
 
   if (value?.messages) {
     for (const message of value.messages) {
       const from = message.from;
       const text = message.text?.body?.trim();
-      const contactName =
-        value.contacts?.[0]?.profile?.name || "Cliente";
-
+      const contactName = value.contacts?.[0]?.profile?.name || "Cliente";
       if (!text) continue;
 
       console.log(`[WhatsApp] ${contactName} (${from}): ${text}`);
@@ -64,189 +58,224 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ status: "ok" });
 }
 
-// ── Restaurant + menu data ──
-type RestaurantMenu = {
+// ── Restaurant directory (lightweight, no items) ──
+type RestaurantSummary = {
   slug: string;
   name: string;
   cuisineType: string | null;
-  address: string | null;
-  phone: string | null;
   rating: number | null;
   deliveryTimeMin: number | null;
-  items: {
-    id: string;
-    name: string;
-    price: number;
-    description: string | null;
-    category: string;
-  }[];
+  itemCount: number;
 };
 
-let menuCache: { data: RestaurantMenu[]; summary: string; ts: number } | null =
-  null;
+let directoryCache: { list: RestaurantSummary[]; text: string; ts: number } | null = null;
 
-async function getAllMenus(): Promise<{
-  data: RestaurantMenu[];
-  summary: string;
-}> {
-  // Cache for 10 minutes
-  if (menuCache && Date.now() - menuCache.ts < 10 * 60 * 1000) {
-    return menuCache;
+async function getDirectory(): Promise<{ list: RestaurantSummary[]; text: string }> {
+  if (directoryCache && Date.now() - directoryCache.ts < 10 * 60 * 1000) {
+    return directoryCache;
   }
 
   const dealers = await prisma.dealer.findMany({
     where: { isActive: true },
     include: {
       categories: {
-        include: {
-          items: {
-            where: { available: true },
-            orderBy: { sortOrder: "asc" },
-          },
-        },
-        orderBy: { sortOrder: "asc" },
+        include: { items: { where: { available: true }, select: { id: true } } },
       },
     },
     orderBy: { name: "asc" },
   });
 
-  const restaurants: RestaurantMenu[] = [];
-  let summary = "";
+  const list: RestaurantSummary[] = [];
+  let text = "";
 
   for (const d of dealers) {
-    const items: RestaurantMenu["items"] = [];
-    let menuText = "";
+    const itemCount = d.categories.reduce((sum, c) => sum + c.items.length, 0);
+    if (itemCount === 0) continue;
 
-    for (const cat of d.categories) {
-      for (const item of cat.items) {
-        items.push({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          description: item.description,
-          category: cat.name,
-        });
-        menuText += `  - [${item.id}] ${item.name} ($${item.price.toLocaleString("es-AR")})${item.description ? ` — ${item.description}` : ""}\n`;
-      }
-    }
-
-    if (items.length === 0) continue;
-
-    restaurants.push({
+    list.push({
       slug: d.slug,
       name: d.name,
       cuisineType: d.cuisineType,
-      address: d.address,
-      phone: d.phone,
       rating: d.rating ? Number(d.rating) : null,
       deliveryTimeMin: d.deliveryTimeMin,
-      items,
+      itemCount,
     });
 
-    summary += `\n## ${d.name} (slug: ${d.slug})`;
-    summary += `\nTipo: ${d.cuisineType || "Varios"} | Rating: ${d.rating || "N/A"} | Delivery: ${d.deliveryTimeMin ? `~${d.deliveryTimeMin} min` : "Consultar"}`;
-    summary += `\nMenu:\n${menuText}`;
+    text += `- ${d.name} (${d.slug}) — ${d.cuisineType || "Varios"}, ${itemCount} items${d.rating ? `, ${d.rating} estrellas` : ""}\n`;
   }
 
-  menuCache = { data: restaurants, summary, ts: Date.now() };
-  return { data: restaurants, summary };
+  directoryCache = { list, text, ts: Date.now() };
+  return { list, text };
 }
 
-// ── Generate checkout link ──
-function buildCheckoutLink(
-  slug: string,
-  cartItems: { id: string; qty: number }[]
-): string {
+// ── Single restaurant menu (loaded on demand) ──
+type MenuItem = { id: string; name: string; price: number; description: string | null; category: string };
+
+const menuCache = new Map<string, { items: MenuItem[]; text: string; ts: number }>();
+
+async function getRestaurantMenu(slug: string): Promise<{ items: MenuItem[]; text: string } | null> {
+  const cached = menuCache.get(slug);
+  if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached;
+
+  const dealer = await prisma.dealer.findFirst({
+    where: { slug, isActive: true },
+    include: {
+      categories: {
+        include: {
+          items: { where: { available: true }, orderBy: { sortOrder: "asc" } },
+        },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+
+  if (!dealer) return null;
+
+  const items: MenuItem[] = [];
+  let text = "";
+
+  for (const cat of dealer.categories) {
+    if (cat.items.length === 0) continue;
+    text += `\n${cat.name}\n`;
+    for (const item of cat.items) {
+      items.push({ id: item.id, name: item.name, price: item.price, description: item.description, category: cat.name });
+      text += `- [${item.id}] ${item.name} ($${item.price.toLocaleString("es-AR")})${item.description ? ` — ${item.description}` : ""}\n`;
+    }
+  }
+
+  const result = { items, text, ts: Date.now() };
+  menuCache.set(slug, result);
+  return result;
+}
+
+// ── Checkout link ──
+function buildCheckoutLink(slug: string, cartItems: { id: string; qty: number }[]): string {
   const encoded = btoa(JSON.stringify(cartItems));
   return `https://www.menusanjuan.com/${slug}?pedido=${encoded}`;
 }
 
-// ── Generate reply with Claude ──
-async function generateBotReply(
-  phone: string,
-  name: string,
-  userMessage: string
-): Promise<string> {
+// ── Generate reply ──
+async function generateBotReply(phone: string, name: string, userMessage: string): Promise<string> {
   if (!conversations.has(phone)) {
-    conversations.set(phone, []);
+    conversations.set(phone, { messages: [] });
   }
-  const history = conversations.get(phone)!;
+  const convo = conversations.get(phone)!;
 
-  const menus = await getAllMenus();
-  const restaurantCount = menus.data.length;
+  // Reset conversation if user says "reiniciar" or "nuevo pedido"
+  const lower = userMessage.toLowerCase();
+  if (lower === "reiniciar" || lower === "nuevo pedido" || lower === "volver") {
+    convo.messages = [];
+    convo.selectedSlug = undefined;
+  }
 
-  const systemPrompt = `Sos el asistente de MenuSanJuan, la plataforma de delivery de San Juan, Argentina. Ayudas a la gente a descubrir restaurantes, elegir que comer, y hacer pedidos.
+  let systemPrompt: string;
 
-RESTAURANTES DISPONIBLES (${restaurantCount} activos):
-${menus.summary}
+  if (convo.selectedSlug) {
+    // ── STEP 2: Restaurant selected, show its menu ──
+    const menu = await getRestaurantMenu(convo.selectedSlug);
+    if (!menu) {
+      convo.selectedSlug = undefined;
+      return "No encontre ese restaurante. Escribi *hola* para empezar de nuevo.";
+    }
+
+    systemPrompt = `Sos el asistente de MenuSanJuan, la plataforma de delivery de San Juan, Argentina.
+El cliente ya eligio el restaurante. Ahora ayudalo a armar su pedido.
+
+RESTAURANTE: ${convo.selectedSlug}
+MENU COMPLETO (cada item tiene un [ID] entre corchetes):
+${menu.text}
 
 INSTRUCCIONES:
-- Responde siempre en espanol argentino informal (vos, tuteo)
-- Se calido, amigable y conciso — como un amigo que sabe de comida
-- Mantene las respuestas cortas — es WhatsApp, no un email
-- NUNCA uses markdown. Solo texto plano. Usa *asteriscos* para negrita de WhatsApp
-- NUNCA inventes restaurantes, items ni precios que no esten en los datos
+- Responde en espanol argentino informal (vos, tuteo)
+- Se calido y conciso — es WhatsApp
+- NUNCA uses markdown. Texto plano + *negrita WhatsApp*
+- NUNCA inventes items ni precios
+- Sugeri 4-6 items destacados si el cliente no sabe que pedir
+- Sugeri combinaciones ("queres agregar una bebida?")
+- Si quiere ver todo el menu: https://www.menusanjuan.com/${convo.selectedSlug}
 
-FLUJO:
-1. DESCUBRIR — Si el cliente no sabe que quiere, pregunta que tipo de comida busca (cafe, pizza, sushi, hamburguesas, etc). Sugeri 2-3 restaurantes que tengan eso.
-2. ELEGIR — Cuando elija un restaurante, mostra los items mas populares o relevantes (no todo el menu, solo 4-6 opciones). Si quiere ver todo el menu, manda el link: https://www.menusanjuan.com/SLUG
-3. PEDIR — Ayudalo a armar el pedido. Sugeri combinaciones ("queres agregar una bebida?")
-4. CHECKOUT — Cuando confirme, genera el link de checkout.
+CUANDO EL CLIENTE CONFIRME SU PEDIDO:
+Mostra resumen con items, cantidades y total.
+Al FINAL agrega esta linea EXACTA (el sistema genera el link):
+CHECKOUT_LINK::${convo.selectedSlug}::[{"id":"ITEM_ID","qty":CANTIDAD}]
 
-Para generar el link de checkout, al FINAL de tu mensaje agrega esta linea EXACTA:
-CHECKOUT_LINK::SLUG::[{"id":"ITEM_ID","qty":CANTIDAD}]
-
-Ejemplo si pidio 2 Cafe Mediano y 1 Brownie de HC Cafe:
-CHECKOUT_LINK::hc-cafe::[{"id":"hc_cf_02","qty":2},{"id":"hc_ps_04","qty":1}]
-
-IMPORTANTE:
-- Usa los IDs exactos del menu (estan entre corchetes)
-- Usa el slug exacto del restaurante
-- El link se genera automaticamente, vos solo pone la linea CHECKOUT_LINK
-- Si no sabes que recomendar, podes mandar al menu completo: https://www.menusanjuan.com/SLUG
-- Si el cliente pide algo que ningun restaurante tiene, decile que no lo encontraste y sugeri alternativas
-- Si dice "humano" o "hablar con alguien", responde: "Te comunico con alguien del equipo de MenuSanJuan. Un momento."
+- Si dice "otro restaurante", "cambiar", o "volver", responde que puede escribir *nuevo pedido* para empezar de nuevo
+- Si dice "humano", responde: "Te comunico con alguien del equipo. Un momento."
 
 El cliente se llama ${name}.`;
+  } else {
+    // ── STEP 1: Help discover a restaurant ──
+    const dir = await getDirectory();
 
-  history.push({ role: "user", content: userMessage });
-  const recentHistory = history.slice(-20);
+    systemPrompt = `Sos el asistente de MenuSanJuan, la plataforma de delivery de San Juan, Argentina.
+Ayudas a la gente a descubrir donde comer y hacer pedidos.
+
+RESTAURANTES DISPONIBLES (${dir.list.length}):
+${dir.text}
+
+INSTRUCCIONES:
+- Responde en espanol argentino informal (vos, tuteo)
+- Se calido y conciso — es WhatsApp
+- NUNCA uses markdown. Texto plano + *negrita WhatsApp*
+- Pregunta que tipo de comida busca si no lo dice
+- Sugeri 2-3 restaurantes que encajen con lo que busca
+- Mostra tipo de cocina y rating si tiene
+
+CUANDO EL CLIENTE ELIJA UN RESTAURANTE:
+Responde confirmando la eleccion y agrega al FINAL esta linea EXACTA:
+SELECTED::slug-del-restaurante
+
+Ejemplo si elige HC Cafe:
+SELECTED::hc-cafe
+
+- Si el cliente ya dice un restaurante de entrada, confirma y agrega SELECTED::
+- Si dice "humano", responde: "Te comunico con alguien del equipo. Un momento."
+- Si quiere ver todos los restaurantes: https://www.menusanjuan.com
+
+El cliente se llama ${name}.`;
+  }
+
+  convo.messages.push({ role: "user", content: userMessage });
+  const recentMessages = convo.messages.slice(-20);
 
   const response = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 800,
+    max_tokens: 600,
     system: systemPrompt,
-    messages: recentHistory,
+    messages: recentMessages,
   });
 
-  let reply =
-    response.content[0].type === "text"
-      ? response.content[0].text
-      : "No pude generar una respuesta.";
+  let reply = response.content[0].type === "text"
+    ? response.content[0].text
+    : "No pude generar una respuesta.";
 
-  // Replace CHECKOUT_LINK::slug::[items] with actual link
+  // Handle SELECTED:: — restaurant was chosen
+  const selectedMatch = reply.match(/SELECTED::([a-z0-9-]+)/);
+  if (selectedMatch) {
+    convo.selectedSlug = selectedMatch[1];
+    reply = reply.replace(/SELECTED::[a-z0-9-]+/, "").trim();
+    // Clear message history for fresh menu conversation
+    convo.messages = [];
+    convo.messages.push({ role: "assistant", content: reply });
+    return reply;
+  }
+
+  // Handle CHECKOUT_LINK:: — order confirmed
   const linkMatch = reply.match(/CHECKOUT_LINK::([a-z0-9-]+)::(\[.*\])/);
   if (linkMatch) {
     try {
       const slug = linkMatch[1];
-      const cartItems = JSON.parse(linkMatch[2]) as {
-        id: string;
-        qty: number;
-      }[];
+      const cartItems = JSON.parse(linkMatch[2]) as { id: string; qty: number }[];
       const link = buildCheckoutLink(slug, cartItems);
-      reply = reply.replace(
-        /CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/,
-        `Completa tu pedido aca:\n${link}`
-      );
+      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, `Completa tu pedido aca:\n${link}`);
     } catch {
       reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, "");
     }
   }
 
-  history.push({ role: "assistant", content: reply });
-
-  if (history.length > 20) {
-    conversations.set(phone, history.slice(-20));
+  convo.messages.push({ role: "assistant", content: reply });
+  if (convo.messages.length > 20) {
+    convo.messages = convo.messages.slice(-20);
   }
 
   return reply;

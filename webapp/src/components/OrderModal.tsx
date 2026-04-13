@@ -212,15 +212,19 @@ _Pedido realizado desde MenuSanJuan_`;
 
       const cleanPhone = formatForWhatsApp(restaurantPhone) || restaurantPhone.replace(/[^0-9]/g, "");
       const message = buildWhatsAppMessage(order.orderNumber);
-      window.open(`https://wa.me/${cleanPhone}?text=${message}`, "_blank");
+      const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
 
-      await fetch(`/api/orders/${order.id}`, {
+      setStep("tracking");
+
+      // Mark as sent (non-blocking)
+      fetch(`/api/orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ whatsappSent: true }),
       });
 
-      setStep("tracking");
+      // Use location.href for mobile compatibility (window.open gets blocked after await)
+      window.location.href = waUrl;
     } catch (err) {
       console.error(err);
       alert("Error al crear el pedido. Intentá de nuevo.");
