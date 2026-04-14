@@ -253,6 +253,8 @@ REGLAS:
 - NO numeres las categorias ni los items
 - Si el cliente ya pidio algo especifico (ej "una coca", "un lomo"), busca en el menu y mostra las opciones que coincidan
 - Si no pidio nada especifico, mostra las categorias disponibles
+- Si mencionas un link al menu, usa este: https://www.menusanjuan.com/${convo.selectedSlug}
+- NO uses el link generico menusanjuan.com, siempre el del restaurante
 
 Cliente: ${name}`;
 
