@@ -227,15 +227,73 @@ Cliente: ${name}`;
   const outputTokens = res.usage.output_tokens;
   const costCents = (inputTokens * 0.08 + outputTokens * 0.4) / 1000;
 
-  // Handle SELECTED::
+  // Handle SELECTED:: — restaurant chosen, now load its menu and respond in context
   const sel = reply.match(/SELECTED::([a-z0-9-]+)/);
   if (sel) {
     convo.selectedSlug = sel[1];
-    reply = reply.replace(/SELECTED::[a-z0-9-]+/, "").trim();
-    convo.messages = [{ role: "assistant", content: reply }];
+    const selReply = reply.replace(/SELECTED::[a-z0-9-]+/, "").trim();
+
+    // Load the restaurant menu and make a follow-up call so the bot
+    // answers with the menu categories (and remembers what the user originally asked)
+    const menu = await getMenu(convo.selectedSlug);
+    if (menu) {
+      const menuSystem = `Sos el asistente de MenuSanJuan, delivery de San Juan, Argentina.
+El cliente acaba de elegir este restaurante. Mostra las categorias del menu y si el cliente ya dijo que quiere algo especifico, busca en el menu y mostrale las opciones.
+
+RESTAURANTE: ${convo.selectedSlug}
+CATEGORIAS: ${menu.cats}
+
+MENU (cada item tiene [ID]):
+${menu.text}
+
+REGLAS:
+- Espanol argentino informal, conciso, WhatsApp
+- Texto plano + *negrita*. NO markdown, NO emojis excesivos
+- NO inventes items/precios
+- NO numeres las categorias ni los items
+- Si el cliente ya pidio algo especifico (ej "una coca", "un lomo"), busca en el menu y mostra las opciones que coincidan
+- Si no pidio nada especifico, mostra las categorias disponibles
+
+Cliente: ${name}`;
+
+      // Include the full conversation so the bot knows what was discussed
+      const contextMessages: BotMessage[] = [
+        ...convo.messages,
+        { role: "assistant", content: selReply },
+        { role: "user", content: "Mostrame que tienen" },
+      ];
+
+      const menuRes = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 500,
+        system: menuSystem,
+        messages: contextMessages.slice(-10),
+      });
+
+      const menuReply = menuRes.content[0].type === "text" ? menuRes.content[0].text : selReply;
+      const fullReply = selReply + "\n\n" + menuReply;
+
+      convo.messages = [
+        ...convo.messages.slice(-4),
+        { role: "assistant", content: fullReply },
+      ];
+      await saveConvo(sessionId, convo);
+
+      const totalInput = inputTokens + menuRes.usage.input_tokens;
+      const totalOutput = outputTokens + menuRes.usage.output_tokens;
+      const totalCost = (totalInput * 0.08 + totalOutput * 0.4) / 1000;
+
+      return {
+        reply: fullReply,
+        debug: { selectedSlug: convo.selectedSlug, inputTokens: totalInput, outputTokens: totalOutput, costCents: totalCost, responseMs: Date.now() - start, systemPromptLength: system.length },
+      };
+    }
+
+    // Fallback if menu not found
+    convo.messages = [{ role: "assistant", content: selReply }];
     await saveConvo(sessionId, convo);
     return {
-      reply,
+      reply: selReply,
       debug: { selectedSlug: convo.selectedSlug, inputTokens, outputTokens, costCents, responseMs, systemPromptLength: system.length },
     };
   }
