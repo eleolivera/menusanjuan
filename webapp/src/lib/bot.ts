@@ -147,7 +147,7 @@ export async function generateBotReply(
     }
 
     system = `Sos el asistente de MenuSanJuan, delivery de San Juan, Argentina.
-El cliente ya eligio el restaurante. QUEDATE EN ESTE RESTAURANTE. No sugiereas otros restaurantes a menos que el cliente lo pida explicitamente.
+El cliente ya eligio el restaurante (${convo.selectedSlug}). Ayudalo a pedir de aca.
 
 RESTAURANTE: ${convo.selectedSlug}
 CATEGORIAS: ${menu.cats}
@@ -162,15 +162,22 @@ REGLAS:
 - NO numeres las categorias ni los items. Mostralos por nombre
 - Cuando mostres categorias, listalas por nombre nada mas
 - Si el cliente dice que quiere algo (ej "un lomo"), busca en el menu de ESTE restaurante y mostra las opciones que coincidan
-- Si no encontras lo que pide en el menu, decile que no lo tienen y mostra que si tienen
 - Sugeri combos ("queres agregar bebida?")
-- Si el cliente quiere ver todo: https://www.menusanjuan.com/${convo.selectedSlug}
+- Link al menu completo: https://www.menusanjuan.com/${convo.selectedSlug}
+
+SI EL CLIENTE PIDE ALGO QUE NO HAY EN EL MENU:
+- Explicale brevemente que este restaurante no tiene eso
+- OFRECELE CAMBIAR DE RESTAURANTE preguntando naturalmente:
+  "¿Queres que busque un lugar que tenga [lo que pidio]?" o
+  "¿Buscamos otro restaurante que tenga eso?"
+- Si el cliente dice que si, emiti SWITCH:: al final de tu mensaje
+- NO le digas "escribi nuevo pedido" — eso es muy rigido
+- Si prefiere quedarse, mostrale alternativas que SI tiene este restaurante
 
 CONFIRMAR PEDIDO:
 Mostra resumen + total, y al final esta linea EXACTA:
 CHECKOUT_LINK::${convo.selectedSlug}::[{"id":"ID","qty":N}]
 
-- Solo si el cliente dice "otro restaurante" o "cambiar" → decile que escriba *nuevo pedido*
 - "humano" → "Te comunico con alguien. Un momento."
 
 Cliente: ${name}`;
@@ -297,6 +304,18 @@ Cliente: ${name}`;
     return {
       reply: selReply,
       debug: { selectedSlug: convo.selectedSlug, inputTokens, outputTokens, costCents, responseMs, systemPromptLength: system.length },
+    };
+  }
+
+  // Handle SWITCH:: — user wants to switch restaurants
+  if (reply.includes("SWITCH::")) {
+    convo.selectedSlug = undefined;
+    reply = reply.replace(/SWITCH::/g, "").trim();
+    convo.messages.push({ role: "assistant", content: reply });
+    await saveConvo(sessionId, convo);
+    return {
+      reply,
+      debug: { selectedSlug: null, inputTokens, outputTokens, costCents, responseMs, systemPromptLength: system.length },
     };
   }
 
