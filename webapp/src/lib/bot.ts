@@ -26,7 +26,7 @@ export async function getConvo(sessionId: string): Promise<ConvoState> {
       personality: (row[0].personality as Personality) || "normal",
     };
   }
-  return { messages: [], personality: "normal" };
+  return { messages: [], personality: "bardero" };
 }
 
 async function saveConvo(sessionId: string, convo: ConvoState) {

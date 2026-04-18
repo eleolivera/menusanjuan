@@ -274,7 +274,7 @@ export function PublicBotChat() {
     }
     return `pub_${Date.now()}`;
   });
-  const [personality, setPersonality] = useState<"normal" | "bardero">("normal");
+  const [personality, setPersonality] = useState<"normal" | "bardero">("bardero");
   const [carts, setCarts] = useState<BotCart[]>([]);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
