@@ -1,11 +1,30 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
 };
+
+// Parse WhatsApp-style formatting to HTML
+function formatBotMessage(text: string): string {
+  return text
+    // Bold: *text* → <strong>text</strong>
+    .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
+    // Links: https://... → <a>
+    .replace(
+      /(https?:\/\/[^\s]+)/g,
+      '<a href="$1" target="_blank" rel="noopener" class="text-primary underline hover:text-primary/80">$1</a>'
+    )
+    // Line breaks
+    .replace(/\n/g, "<br/>");
+}
+
+function BotMessage({ content }: { content: string }) {
+  const html = useMemo(() => formatBotMessage(content), [content]);
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
 
 export function PublicBotChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -175,13 +194,13 @@ export function PublicBotChat() {
                 </div>
               )}
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${
+                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
                   msg.role === "user"
-                    ? "bg-primary text-white rounded-br-md shadow-sm"
-                    : "bg-white border border-border/50 text-text rounded-bl-md shadow-sm"
+                    ? "bg-primary text-white rounded-br-md shadow-sm whitespace-pre-wrap"
+                    : "bg-white border border-border/50 text-text rounded-bl-md shadow-sm leading-relaxed"
                 }`}
               >
-                {msg.content}
+                {msg.role === "assistant" ? <BotMessage content={msg.content} /> : msg.content}
               </div>
             </div>
           ))}
