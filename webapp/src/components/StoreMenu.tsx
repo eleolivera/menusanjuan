@@ -222,6 +222,7 @@ export function StoreMenu({
           onRemove={decrementEntry}
           onAdd={incrementEntry}
           onUpdateNote={updateNote}
+          onClearCart={() => setCart([])}
           onOrderSent={(id, token, num) => {
             setPendingOrder({ orderId: id, token, orderNumber: num, placedAt: new Date().toISOString() });
           }}
