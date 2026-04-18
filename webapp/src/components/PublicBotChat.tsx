@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
+import { getBotCarts, saveBotCart, removeBotCart, type BotCart } from "@/lib/bot-carts";
+import { getAllOrderRefs } from "@/lib/order-tracker";
 
 // ── Types ──
 type RestaurantCard = {
@@ -123,7 +125,7 @@ function CategoryButtons({ items, onSelect }: { items: CategoryButton[]; onSelec
   );
 }
 
-function CheckoutCard({ block }: { block: BotBlock & { type: "checkout" } }) {
+function CheckoutCard({ block, onCartSaved }: { block: BotBlock & { type: "checkout" }; onCartSaved: () => void }) {
   return (
     <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-amber-50 p-4">
       <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Tu Pedido</div>
@@ -137,13 +139,122 @@ function CheckoutCard({ block }: { block: BotBlock & { type: "checkout" } }) {
         <span className="font-bold text-text">Total</span>
         <span className="text-lg font-extrabold text-text">${block.total.toLocaleString("es-AR")}</span>
       </div>
-      <a
-        href={block.url}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all"
+      <div className="flex gap-2 mt-3">
+        <a
+          href={block.url}
+          target="_blank"
+          rel="noopener"
+          onClick={() => {
+            saveBotCart({
+              slug: block.slug,
+              restaurantName: block.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              items: block.items,
+              total: block.total,
+              checkoutUrl: block.url,
+            });
+            onCartSaved();
+          }}
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all"
+        >
+          Completar pedido
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+        </a>
+        <button
+          onClick={() => {
+            saveBotCart({
+              slug: block.slug,
+              restaurantName: block.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              items: block.items,
+              total: block.total,
+              checkoutUrl: block.url,
+            });
+            onCartSaved();
+          }}
+          className="rounded-xl border border-border px-4 py-3 text-xs font-medium text-text-muted hover:bg-surface-alt transition-colors"
+          title="Guardar para después"
+        >
+          Guardar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Mis Pedidos bar ──
+function MisPedidosBar({ carts, onRefresh }: { carts: BotCart[]; onRefresh: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const recentOrders = typeof window !== "undefined" ? getAllOrderRefs().filter((o) => {
+    const age = Date.now() - new Date(o.placedAt).getTime();
+    return age < 12 * 60 * 60 * 1000; // 12 hours
+  }) : [];
+
+  const totalItems = carts.length + recentOrders.length;
+  if (totalItems === 0) return null;
+
+  return (
+    <div className="shrink-0 border-t border-border/50 bg-white">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-2.5"
       >
-        Completar pedido
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
-      </a>
+        <div className="flex items-center gap-2">
+          <span className="text-sm">🛒</span>
+          <span className="text-xs font-bold text-text">Mis Pedidos</span>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{totalItems}</span>
+        </div>
+        <svg className={`h-4 w-4 text-text-muted transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-3 space-y-2 max-h-48 overflow-y-auto">
+          {/* Active carts */}
+          {carts.map((cart) => (
+            <div key={cart.slug} className="flex items-center gap-3 rounded-lg border border-border/50 bg-surface p-2.5">
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-text truncate">{cart.restaurantName}</div>
+                <div className="text-[10px] text-text-muted">
+                  {cart.items.length} item{cart.items.length !== 1 ? "s" : ""} · ${cart.total.toLocaleString("es-AR")}
+                </div>
+              </div>
+              <a
+                href={cart.checkoutUrl}
+                target="_blank"
+                rel="noopener"
+                className="rounded-lg bg-primary px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-primary/90 transition-colors"
+              >
+                Pedir
+              </a>
+              <button
+                onClick={() => { removeBotCart(cart.slug); onRefresh(); }}
+                className="text-text-muted hover:text-red-400 transition-colors"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+          ))}
+
+          {/* Recent orders */}
+          {recentOrders.map((order) => (
+            <a
+              key={order.orderId}
+              href={`/${order.slug}?track=${order.orderId}&token=${order.token}`}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-emerald-800">{order.orderNumber}</div>
+                <div className="text-[10px] text-emerald-600">
+                  {order.slug.replace(/-/g, " ")} · {new Date(order.placedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+              <span className="text-[10px] font-medium text-emerald-600">Ver estado</span>
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -164,8 +275,13 @@ export function PublicBotChat() {
     return `pub_${Date.now()}`;
   });
   const [personality, setPersonality] = useState<"normal" | "bardero">("normal");
+  const [carts, setCarts] = useState<BotCart[]>([]);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const refreshCarts = useCallback(() => setCarts(getBotCarts()), []);
+
+  useEffect(() => { refreshCarts(); }, [refreshCarts]);
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
@@ -345,7 +461,7 @@ export function PublicBotChat() {
                       return <CategoryButtons key={bi} items={block.items} onSelect={handleCategorySelect} />;
                     }
                     if (block.type === "checkout") {
-                      return <CheckoutCard key={bi} block={block} />;
+                      return <CheckoutCard key={bi} block={block} onCartSaved={refreshCarts} />;
                     }
                     return null;
                   })}
@@ -371,6 +487,9 @@ export function PublicBotChat() {
           <div ref={messagesEnd} />
         </div>
       </div>
+
+      {/* Mis Pedidos bar */}
+      <MisPedidosBar carts={carts} onRefresh={refreshCarts} />
 
       {/* Input */}
       <div className="shrink-0 border-t border-border/50 bg-white px-4 py-3 safe-area-bottom">
