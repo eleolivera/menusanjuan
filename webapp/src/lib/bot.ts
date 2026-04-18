@@ -583,6 +583,9 @@ Cliente: ${name}`;
       const total = checkoutItems.reduce((s, i) => s + i.price * i.qty, 0);
 
       blocks.push({ type: "checkout", url, slug: link[1], items: checkoutItems, total });
+
+      // After checkout, reset to discovery mode for next order
+      convo.selectedSlug = undefined;
     } catch {
       reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, "");
     }
