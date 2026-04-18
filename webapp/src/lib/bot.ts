@@ -157,6 +157,133 @@ function applyPersonality(basePrompt: string, personality: Personality): string 
   return basePrompt;
 }
 
+// ── Rich UI blocks ──
+export type RestaurantCard = {
+  type: "restaurant";
+  slug: string;
+  name: string;
+  cuisineType: string | null;
+  rating: number | null;
+  coverUrl: string | null;
+  logoUrl: string | null;
+  itemCount: number;
+};
+
+export type CategoryButton = {
+  type: "category";
+  name: string;
+  itemCount: number;
+};
+
+export type ItemCard = {
+  type: "item";
+  id: string;
+  name: string;
+  price: number;
+  description: string | null;
+  imageUrl: string | null;
+  category: string;
+};
+
+export type CheckoutBlock = {
+  type: "checkout";
+  url: string;
+  slug: string;
+  items: { name: string; qty: number; price: number }[];
+  total: number;
+};
+
+export type BotBlock =
+  | { type: "restaurants"; items: RestaurantCard[] }
+  | { type: "categories"; items: CategoryButton[]; slug: string; restaurantName: string }
+  | { type: "menu_items"; items: ItemCard[]; category: string }
+  | CheckoutBlock;
+
+// ── Fetch restaurant cards data ──
+async function getRestaurantCards(slugs: string[]): Promise<RestaurantCard[]> {
+  if (slugs.length === 0) return [];
+  const dealers = await prisma.dealer.findMany({
+    where: { slug: { in: slugs }, isActive: true },
+    include: {
+      categories: {
+        include: { items: { where: { available: true }, select: { id: true } } },
+      },
+    },
+  });
+  return dealers.map((d) => ({
+    type: "restaurant" as const,
+    slug: d.slug,
+    name: d.name,
+    cuisineType: d.cuisineType,
+    rating: d.rating ? Number(d.rating) : null,
+    coverUrl: d.coverUrl,
+    logoUrl: d.logoUrl,
+    itemCount: d.categories.reduce((s, c) => s + c.items.length, 0),
+  }));
+}
+
+// ── Fetch category buttons for a restaurant ──
+async function getCategoryButtons(slug: string): Promise<{ buttons: CategoryButton[]; restaurantName: string } | null> {
+  const dealer = await prisma.dealer.findFirst({
+    where: { slug, isActive: true },
+    include: {
+      categories: {
+        include: { items: { where: { available: true }, select: { id: true } } },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+  if (!dealer) return null;
+  return {
+    restaurantName: dealer.name,
+    buttons: dealer.categories
+      .filter((c) => c.items.length > 0)
+      .map((c) => ({ type: "category" as const, name: c.name, itemCount: c.items.length })),
+  };
+}
+
+// ── Fetch item cards for a category in a restaurant ──
+async function getItemCards(slug: string, categoryName: string): Promise<ItemCard[]> {
+  const items = await prisma.menuItem.findMany({
+    where: {
+      available: true,
+      category: {
+        name: { contains: categoryName, mode: "insensitive" },
+        dealer: { slug },
+      },
+    },
+    include: { category: { select: { name: true } } },
+    orderBy: { sortOrder: "asc" },
+  });
+  return items.map((i) => ({
+    type: "item" as const,
+    id: i.id,
+    name: i.name,
+    price: i.price,
+    description: i.description,
+    imageUrl: i.imageUrl,
+    category: i.category.name,
+  }));
+}
+
+// ── Extract slugs mentioned in bot reply ──
+function extractMentionedSlugs(reply: string, directory: string): string[] {
+  const slugs: string[] = [];
+  const lines = directory.split("\n");
+  for (const line of lines) {
+    const match = line.match(/\(([a-z0-9-]+)\)/);
+    if (match) {
+      const slug = match[1];
+      // Check if restaurant name appears in the reply
+      const nameMatch = line.match(/^- (.+?) \(/);
+      if (nameMatch && reply.toLowerCase().includes(nameMatch[1].toLowerCase())) {
+        slugs.push(slug);
+      }
+    }
+  }
+  return slugs.slice(0, 5); // max 5 cards
+}
+
 // ── Debug info returned alongside reply ──
 export type BotDebug = {
   selectedSlug: string | null;
@@ -172,7 +299,7 @@ export async function generateBotReply(
   sessionId: string,
   name: string,
   text: string
-): Promise<{ reply: string; debug: BotDebug }> {
+): Promise<{ reply: string; blocks: BotBlock[]; debug: BotDebug }> {
   let convo = await getConvo(sessionId);
 
   const lower = text.toLowerCase();
@@ -183,7 +310,7 @@ export async function generateBotReply(
     await saveConvo(sessionId, convo);
     return {
       reply: "Jajaja dale culiao, activaste el *modo bardero*. Ahora te voy a atender como se debe, sin filtro. ¿Qué carajo querés morfar?",
-      debug: { selectedSlug: convo.selectedSlug || null, inputTokens: 0, outputTokens: 0, costCents: 0, responseMs: 0, systemPromptLength: 0 },
+      blocks: [], debug: { selectedSlug: convo.selectedSlug || null, inputTokens: 0, outputTokens: 0, costCents: 0, responseMs: 0, systemPromptLength: 0 },
     };
   }
   if (lower === "modo normal" || lower === "normal") {
@@ -191,7 +318,7 @@ export async function generateBotReply(
     await saveConvo(sessionId, convo);
     return {
       reply: "Listo, volví al modo tranquilo. ¿En qué te puedo ayudar?",
-      debug: { selectedSlug: convo.selectedSlug || null, inputTokens: 0, outputTokens: 0, costCents: 0, responseMs: 0, systemPromptLength: 0 },
+      blocks: [], debug: { selectedSlug: convo.selectedSlug || null, inputTokens: 0, outputTokens: 0, costCents: 0, responseMs: 0, systemPromptLength: 0 },
     };
   }
 
@@ -209,7 +336,7 @@ export async function generateBotReply(
       convo.selectedSlug = undefined;
       return {
         reply: "No encontre ese restaurante. Escribi *hola* para empezar de nuevo.",
-        debug: { selectedSlug: null, inputTokens: 0, outputTokens: 0, costCents: 0, responseMs: 0, systemPromptLength: 0 },
+        blocks: [], debug: { selectedSlug: null, inputTokens: 0, outputTokens: 0, costCents: 0, responseMs: 0, systemPromptLength: 0 },
       };
     }
 
@@ -362,8 +489,16 @@ Cliente: ${name}`;
       const totalOutput = outputTokens + menuRes.usage.output_tokens;
       const totalCost = (totalInput * 0.08 + totalOutput * 0.4) / 1000;
 
+      // Get category buttons for the selected restaurant
+      const catData = await getCategoryButtons(convo.selectedSlug);
+      const blocks: BotBlock[] = [];
+      if (catData) {
+        blocks.push({ type: "categories", items: catData.buttons, slug: convo.selectedSlug, restaurantName: catData.restaurantName });
+      }
+
       return {
         reply: fullReply,
+        blocks,
         debug: { selectedSlug: convo.selectedSlug, inputTokens: totalInput, outputTokens: totalOutput, costCents: totalCost, responseMs: Date.now() - start, systemPromptLength: system.length },
       };
     }
@@ -373,6 +508,7 @@ Cliente: ${name}`;
     await saveConvo(sessionId, convo);
     return {
       reply: selReply,
+      blocks: [],
       debug: { selectedSlug: convo.selectedSlug, inputTokens, outputTokens, costCents, responseMs, systemPromptLength: system.length },
     };
   }
@@ -385,19 +521,44 @@ Cliente: ${name}`;
     await saveConvo(sessionId, convo);
     return {
       reply,
+      blocks: [],
       debug: { selectedSlug: null, inputTokens, outputTokens, costCents, responseMs, systemPromptLength: system.length },
     };
   }
 
   // Handle CHECKOUT_LINK::
+  const blocks: BotBlock[] = [];
   const link = reply.match(/CHECKOUT_LINK::([a-z0-9-]+)::(\[.*\])/);
   if (link) {
     try {
       const cart = JSON.parse(link[2]) as { id: string; qty: number }[];
       const url = buildCheckoutLink(link[1], cart);
-      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, `Completa tu pedido aca:\n${url}`);
+      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, "");
+
+      // Build checkout block with item details
+      const menu = await getMenu(link[1]);
+      const checkoutItems = cart.map((c) => {
+        const menuText = menu?.text || "";
+        const itemMatch = menuText.match(new RegExp(`\\[${c.id}\\] (.+?) \\(\\$([\\d.,]+)\\)`));
+        return { name: itemMatch?.[1] || c.id, qty: c.qty, price: itemMatch ? parseFloat(itemMatch[2].replace(/\./g, "").replace(",", ".")) : 0 };
+      });
+      const total = checkoutItems.reduce((s, i) => s + i.price * i.qty, 0);
+
+      blocks.push({ type: "checkout", url, slug: link[1], items: checkoutItems, total });
     } catch {
       reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, "");
+    }
+  }
+
+  // If we're in discovery mode and the bot mentioned restaurants, attach cards
+  if (!convo.selectedSlug && !link) {
+    const dir = dirCache?.text || "";
+    const mentionedSlugs = extractMentionedSlugs(reply, dir);
+    if (mentionedSlugs.length > 0) {
+      const cards = await getRestaurantCards(mentionedSlugs);
+      if (cards.length > 0) {
+        blocks.push({ type: "restaurants", items: cards });
+      }
     }
   }
 
@@ -407,6 +568,7 @@ Cliente: ${name}`;
 
   return {
     reply,
+    blocks,
     debug: { selectedSlug: convo.selectedSlug || null, inputTokens, outputTokens, costCents, responseMs, systemPromptLength: system.length },
   };
 }

@@ -26,8 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Empty message" }, { status: 400 });
   }
 
-  const { reply, debug } = await generateBotReply(sessionId, "Cliente", message.trim());
+  const { reply, blocks } = await generateBotReply(sessionId, "Cliente", message.trim());
 
-  // Only return reply to public users (no debug info)
-  return NextResponse.json({ reply });
+  return NextResponse.json({ reply, blocks });
 }
