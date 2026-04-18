@@ -29,6 +29,7 @@ export function OrderModal({
   onClose,
   onRemove,
   onAdd,
+  onUpdateNote,
   onOrderSent,
   trackingOrder,
 }: {
@@ -41,12 +42,14 @@ export function OrderModal({
   onClose: () => void;
   onRemove: (cartKey: string) => void;
   onAdd: (cartKey: string) => void;
+  onUpdateNote?: (cartKey: string, note: string) => void;
   onOrderSent?: (orderId: string, token: string, orderNumber: string) => void;
   trackingOrder?: { orderId: string; token: string; orderNumber: string } | null;
 }) {
   const [step, setStep] = useState<"cart" | "method" | "info" | "confirm" | "tracking">(
     trackingOrder ? "tracking" : "cart"
   );
+  const [editingNote, setEditingNote] = useState<{ cartKey: string; text: string } | null>(null);
   const [name, setName] = useState(() => {
     if (typeof window !== "undefined") return localStorage.getItem("msj_name") || "";
     return "";
@@ -275,31 +278,59 @@ _Pedido realizado desde MenuSanJuan_`;
             <>
               <div className="space-y-3 mb-6">
                 {items.map((ci) => (
-                  <div key={ci.cartKey} className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-surface-alt p-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-text truncate">{ci.item.name}</div>
-                      {ci.selectedOptions.length > 0 && (
-                        <div className="text-[10px] text-text-muted mt-0.5">
-                          {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
-                        </div>
-                      )}
-                      {ci.note && (
-                        <div className="text-[10px] text-text-muted mt-0.5 italic">
-                          Nota: {ci.note}
-                        </div>
-                      )}
-                      <div className="text-xs text-text-muted">${(ci.item.price + ci.optionsDelta).toLocaleString("es-AR")} c/u</div>
+                  <div key={ci.cartKey} className="rounded-xl border border-border/50 bg-surface-alt p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-text truncate">{ci.item.name}</div>
+                        {ci.selectedOptions.length > 0 && (
+                          <div className="text-[10px] text-text-muted mt-0.5">
+                            {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                          </div>
+                        )}
+                        <div className="text-xs text-text-muted">${(ci.item.price + ci.optionsDelta).toLocaleString("es-AR")} c/u</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => onRemove(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors">
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" /></svg>
+                        </button>
+                        <span className="min-w-[1.25rem] text-center text-sm font-bold text-text">{ci.quantity}</span>
+                        <button onClick={() => onAdd(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-white transition-colors">
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                        </button>
+                      </div>
+                      <div className="text-sm font-bold text-text w-20 text-right">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => onRemove(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors">
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" /></svg>
+                    {/* Note: show or edit */}
+                    {editingNote?.cartKey === ci.cartKey ? (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={editingNote.text}
+                          onChange={(e) => setEditingNote({ ...editingNote, text: e.target.value.slice(0, 200) })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { onUpdateNote?.(ci.cartKey, editingNote.text); setEditingNote(null); }
+                            if (e.key === "Escape") setEditingNote(null);
+                          }}
+                          placeholder="sin cebolla, bien cocido..."
+                          autoFocus
+                          className="flex-1 rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text placeholder:text-text-muted focus:border-primary focus:outline-none"
+                        />
+                        <button
+                          onClick={() => { onUpdateNote?.(ci.cartKey, editingNote.text); setEditingNote(null); }}
+                          className="rounded-lg bg-primary px-3 py-1.5 text-[10px] font-semibold text-white"
+                        >
+                          OK
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setEditingNote({ cartKey: ci.cartKey, text: ci.note || "" })}
+                        className="mt-1.5 flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
+                        {ci.note ? `Nota: ${ci.note}` : "Agregar nota"}
                       </button>
-                      <span className="min-w-[1.25rem] text-center text-sm font-bold text-text">{ci.quantity}</span>
-                      <button onClick={() => onAdd(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-white transition-colors">
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                      </button>
-                    </div>
-                    <div className="text-sm font-bold text-text w-20 text-right">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</div>
+                    )}
                   </div>
                 ))}
               </div>

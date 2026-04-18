@@ -119,6 +119,10 @@ export function StoreMenu({
     });
   }, []);
 
+  const updateNote = useCallback((cartKey: string, note: string) => {
+    setCart((prev) => prev.map((e) => e.cartKey === cartKey ? { ...e, note } : e));
+  }, []);
+
   const scrollToCategory = useCallback((catId: string) => {
     setActiveCategory(catId);
     sectionRefs.current[catId]?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -217,6 +221,7 @@ export function StoreMenu({
           onClose={() => { setShowModal(false); setTrackingMode(false); }}
           onRemove={decrementEntry}
           onAdd={incrementEntry}
+          onUpdateNote={updateNote}
           onOrderSent={(id, token, num) => {
             setPendingOrder({ orderId: id, token, orderNumber: num, placedAt: new Date().toISOString() });
           }}
