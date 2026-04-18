@@ -6,34 +6,45 @@ const anthropic = new Anthropic();
 // ── Conversation state (DB-backed for Vercel serverless) ──
 export type BotMessage = { role: "user" | "assistant"; content: string };
 
+export type Personality = "normal" | "bardero";
+
 export type ConvoState = {
   messages: BotMessage[];
   selectedSlug?: string;
+  personality: Personality;
 };
 
 export async function getConvo(sessionId: string): Promise<ConvoState> {
-  const row = await prisma.$queryRawUnsafe<{ messages: string; selectedSlug: string | null }[]>(
-    `SELECT messages, "selectedSlug" FROM "BotConversation" WHERE id = $1`,
+  const row = await prisma.$queryRawUnsafe<{ messages: string; selectedSlug: string | null; personality: string | null }[]>(
+    `SELECT messages, "selectedSlug", "personality" FROM "BotConversation" WHERE id = $1`,
     sessionId
   );
   if (row.length > 0) {
     return {
       messages: JSON.parse(row[0].messages),
       selectedSlug: row[0].selectedSlug || undefined,
+      personality: (row[0].personality as Personality) || "normal",
     };
   }
-  return { messages: [] };
+  return { messages: [], personality: "normal" };
 }
 
 async function saveConvo(sessionId: string, convo: ConvoState) {
   await prisma.$executeRawUnsafe(
-    `INSERT INTO "BotConversation" (id, messages, "selectedSlug", "updatedAt")
-     VALUES ($1, $2, $3, NOW())
-     ON CONFLICT (id) DO UPDATE SET messages = $2, "selectedSlug" = $3, "updatedAt" = NOW()`,
+    `INSERT INTO "BotConversation" (id, messages, "selectedSlug", "personality", "updatedAt")
+     VALUES ($1, $2, $3, $4, NOW())
+     ON CONFLICT (id) DO UPDATE SET messages = $2, "selectedSlug" = $3, "personality" = $4, "updatedAt" = NOW()`,
     sessionId,
     JSON.stringify(convo.messages),
-    convo.selectedSlug || null
+    convo.selectedSlug || null,
+    convo.personality
   );
+}
+
+export async function setPersonality(sessionId: string, personality: Personality) {
+  const convo = await getConvo(sessionId);
+  convo.personality = personality;
+  await saveConvo(sessionId, convo);
 }
 
 export async function resetConvo(sessionId: string) {
@@ -110,6 +121,42 @@ function buildCheckoutLink(slug: string, items: { id: string; qty: number }[]): 
   return `https://www.menusanjuan.com/${slug}?pedido=${btoa(JSON.stringify(items))}`;
 }
 
+// ── Bardero personality overlay ──
+const BARDERO_RULES = `
+PERSONALIDAD: MODO BARDERO (activado por el usuario)
+Sos un mozo/camarero argentino re bardero, tipo esos lugares donde te putean pero con onda y la gente va porque se caga de risa. Pensalo como el humor de un asado entre amigos.
+
+ESTILO DE HABLA:
+- Usa puteadas argentinas naturalmente: boludo, la concha de tu madre, no jodas, andá a cagar, qué carajo, la puta madre, ni en pedo, dejate de joder, pelotudo
+- Insultos cariñosos sanjuaninos: culiao, culiado
+- Expresiones callejeras: morfar (comer), garpar (pagar), afanar (robar/cobrar caro), flashear (delirar), mandar fruta (decir cualquiera), bardear
+- Intensificadores: re, re mil, una banda, terrible, alto/a
+- "Qué onda loco", "dale papa", "metele", "bancá un toque"
+- Reacciones exageradas: "la concha de la lora, pediste 3 pizzas solo? sos un animal"
+- Puteadas creativas mezcladas con la comida: "ese lomo es más grande que tu futuro, culiao"
+
+COMO USARLAS:
+- Si el cliente no sabe que pedir: "Bueno loco, ponete las pilas, acá tenemos [categorias]. ¿Qué carajo querés morfar?"
+- Si pide algo que no hay: "Ni en pedo tienen eso acá, boludo. Pero tienen [alternativa] que está de puta madre"
+- Cuando confirma el pedido: "Dale culiao, ahí va tu pedido. No llores cuando veas la cuenta"
+- Si tarda en decidir: "Dale vieja, dejate de joder, ¿pedís o te quedás mirando la carta como un pelotudo?"
+- Sugiriendo extras: "Ni se te ocurra no pedir bebida, boludo. ¿Qué sos, un animal?"
+
+LIMITES IMPORTANTES:
+- NUNCA seas agresivo de verdad ni hagas sentir mal al cliente — es humor, no bullying
+- NUNCA uses insultos racistas, homofobicos o discriminatorios
+- SIEMPRE mantene la funcionalidad: segui ayudando a pedir comida, mostrar categorias, generar links de checkout
+- Las puteadas son el condimento, no el plato principal — la funcion del bot sigue siendo ayudar a pedir
+- Si el cliente se enoja en serio, bajá un cambio: "Eh tranqui, era joda. ¿En qué te ayudo?"
+`;
+
+function applyPersonality(basePrompt: string, personality: Personality): string {
+  if (personality === "bardero") {
+    return basePrompt + "\n" + BARDERO_RULES;
+  }
+  return basePrompt;
+}
+
 // ── Debug info returned alongside reply ──
 export type BotDebug = {
   selectedSlug: string | null;
@@ -129,8 +176,28 @@ export async function generateBotReply(
   let convo = await getConvo(sessionId);
 
   const lower = text.toLowerCase();
+
+  // Personality toggle
+  if (lower === "modo bardero" || lower === "bardero") {
+    convo.personality = "bardero";
+    await saveConvo(sessionId, convo);
+    return {
+      reply: "Jajaja dale culiao, activaste el *modo bardero*. Ahora te voy a atender como se debe, sin filtro. ¿Qué carajo querés morfar?",
+      debug: { selectedSlug: convo.selectedSlug || null, inputTokens: 0, outputTokens: 0, costCents: 0, responseMs: 0, systemPromptLength: 0 },
+    };
+  }
+  if (lower === "modo normal" || lower === "normal") {
+    convo.personality = "normal";
+    await saveConvo(sessionId, convo);
+    return {
+      reply: "Listo, volví al modo tranquilo. ¿En qué te puedo ayudar?",
+      debug: { selectedSlug: convo.selectedSlug || null, inputTokens: 0, outputTokens: 0, costCents: 0, responseMs: 0, systemPromptLength: 0 },
+    };
+  }
+
+  // Reset (preserve personality)
   if (["reiniciar", "nuevo pedido", "volver", "reset", "hola", "empezar"].includes(lower)) {
-    convo = { messages: [] };
+    convo = { messages: [], personality: convo.personality };
     await saveConvo(sessionId, convo);
   }
 
@@ -218,11 +285,14 @@ Cliente: ${name}`;
   convo.messages.push({ role: "user", content: text });
   const recent = convo.messages.slice(-16);
 
+  // Apply personality overlay
+  const finalSystem = applyPersonality(system, convo.personality);
+
   const start = Date.now();
   const res = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 500,
-    system,
+    system: finalSystem,
     messages: recent,
   });
   const responseMs = Date.now() - start;

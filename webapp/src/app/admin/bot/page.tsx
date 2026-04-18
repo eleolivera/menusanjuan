@@ -45,6 +45,7 @@ export default function BotTestPage() {
   const [showDebug, setShowDebug] = useState(true);
   const [feedbackNote, setFeedbackNote] = useState<{ idx: number; text: string } | null>(null);
   const [showInstructions, setShowInstructions] = useState(true);
+  const [personality, setPersonalityState] = useState<"normal" | "bardero">("normal");
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -189,6 +190,20 @@ export default function BotTestPage() {
 
         {tab === "chat" && (
           <>
+            <button
+              onClick={async () => {
+                const next = personality === "normal" ? "bardero" : "normal";
+                setPersonalityState(next);
+                await fetch("/api/admin/bot", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ sessionId, action: "personality", personality: next }),
+                });
+              }}
+              className={`rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors ${personality === "bardero" ? "bg-red-500/20 text-red-400" : "border border-white/10 text-slate-500"}`}
+            >
+              {personality === "bardero" ? "🤬 Bardero" : "😇 Normal"}
+            </button>
             <button onClick={() => setShowDebug(!showDebug)} className={`rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors ${showDebug ? "bg-emerald-500/20 text-emerald-400" : "border border-white/10 text-slate-500"}`}>
               Debug
             </button>

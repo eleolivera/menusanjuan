@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateBotReply, resetConvo, getConvo } from "@/lib/bot";
+import { generateBotReply, resetConvo, getConvo, setPersonality } from "@/lib/bot";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
@@ -24,8 +24,14 @@ export async function POST(req: NextRequest) {
 
   // Reset
   if (action === "reset") {
-    resetConvo(sessionId);
+    await resetConvo(sessionId);
     return NextResponse.json({ status: "reset" });
+  }
+
+  // Personality toggle
+  if (action === "personality") {
+    await setPersonality(sessionId, body.personality);
+    return NextResponse.json({ status: "ok", personality: body.personality });
   }
 
   // Feedback
