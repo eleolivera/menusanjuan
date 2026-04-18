@@ -19,6 +19,7 @@ export type CartEntry = {
   quantity: number;
   selectedOptions: SelectedOptions;
   optionsDelta: number;
+  note: string;
 };
 
 let cartKeyCounter = 0;
@@ -70,10 +71,11 @@ export function StoreMenu({
           }
           entries.push({
             cartKey: `ck-${++cartKeyCounter}`,
-            item: notes ? { ...item, description: `${item.description || ""} | Nota: ${notes}`.trim() } : item,
+            item,
             quantity: qty,
             selectedOptions,
             optionsDelta: 0,
+            note: notes || "",
           });
         }
       }
@@ -87,28 +89,19 @@ export function StoreMenu({
   }, [searchParams, categories]);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
+  // All item taps open the customization sheet
   const addItem = useCallback((item: MenuItemData) => {
-    if (item.optionGroups && item.optionGroups.length > 0) {
-      setCustomizingItem(item);
-    } else {
-      // Simple item — find existing entry or create new
-      setCart((prev) => {
-        const existing = prev.find((e) => e.item.id === item.id && e.selectedOptions.length === 0);
-        if (existing) {
-          return prev.map((e) => e.cartKey === existing.cartKey ? { ...e, quantity: e.quantity + 1 } : e);
-        }
-        return [...prev, { cartKey: `ck-${++cartKeyCounter}`, item, quantity: 1, selectedOptions: [], optionsDelta: 0 }];
-      });
-    }
+    setCustomizingItem(item);
   }, []);
 
-  const addCustomized = useCallback((item: MenuItemData, quantity: number, selectedOptions: SelectedOptions, optionsDelta: number) => {
+  const addCustomized = useCallback((item: MenuItemData, quantity: number, selectedOptions: SelectedOptions, optionsDelta: number, note: string) => {
     setCart((prev) => [...prev, {
       cartKey: `ck-${++cartKeyCounter}`,
       item,
       quantity,
       selectedOptions,
       optionsDelta,
+      note,
     }]);
     setCustomizingItem(null);
   }, []);
@@ -126,22 +119,6 @@ export function StoreMenu({
     });
   }, []);
 
-  // Also support simple add/remove by itemId for items without options (backward compat for MenuItemCard)
-  const simpleAdd = useCallback((itemId: string) => {
-    const allItems = categories.flatMap((c) => c.items);
-    const item = allItems.find((i) => i.id === itemId);
-    if (item) addItem(item);
-  }, [categories, addItem]);
-
-  const simpleRemove = useCallback((itemId: string) => {
-    setCart((prev) => {
-      const entry = prev.find((e) => e.item.id === itemId && e.selectedOptions.length === 0);
-      if (!entry) return prev;
-      if (entry.quantity <= 1) return prev.filter((e) => e.cartKey !== entry.cartKey);
-      return prev.map((e) => e.cartKey === entry.cartKey ? { ...e, quantity: e.quantity - 1 } : e);
-    });
-  }, []);
-
   const scrollToCategory = useCallback((catId: string) => {
     setActiveCategory(catId);
     sectionRefs.current[catId]?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -151,9 +128,9 @@ export function StoreMenu({
   const totalItems = cart.reduce((s, e) => s + e.quantity, 0);
   const totalPrice = cart.reduce((s, e) => s + (e.item.price + e.optionsDelta) * e.quantity, 0);
 
-  // Get simple quantity for a specific item (for MenuItemCard display)
-  function getSimpleQty(itemId: string): number {
-    return cart.filter((e) => e.item.id === itemId && e.selectedOptions.length === 0).reduce((s, e) => s + e.quantity, 0);
+  // Total quantity for an item across all cart entries (any options/notes)
+  function getTotalQty(itemId: string): number {
+    return cart.filter((e) => e.item.id === itemId).reduce((s, e) => s + e.quantity, 0);
   }
 
   // Convert cart to the format OrderModal expects
@@ -163,6 +140,7 @@ export function StoreMenu({
     cartKey: e.cartKey,
     selectedOptions: e.selectedOptions,
     optionsDelta: e.optionsDelta,
+    note: e.note,
   }));
 
   return (
@@ -211,10 +189,8 @@ export function StoreMenu({
                   <MenuItemCard
                     key={item.id}
                     item={item}
-                    quantity={getSimpleQty(item.id)}
-                    onAdd={() => addItem(item)}
-                    onRemove={() => simpleRemove(item.id)}
-                    hasOptions={!!(item.optionGroups && item.optionGroups.length > 0)}
+                    totalInCart={getTotalQty(item.id)}
+                    onClick={() => addItem(item)}
                   />
                 ))}
             </div>
@@ -251,7 +227,7 @@ export function StoreMenu({
       {customizingItem && (
         <ItemCustomizeSheet
           item={customizingItem}
-          onAdd={(qty, opts, delta) => addCustomized(customizingItem, qty, opts, delta)}
+          onAdd={(qty, opts, delta, note) => addCustomized(customizingItem, qty, opts, delta, note)}
           onClose={() => setCustomizingItem(null)}
         />
       )}

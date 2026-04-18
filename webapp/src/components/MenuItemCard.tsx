@@ -10,27 +10,31 @@ function isVideo(url: string): boolean {
 
 export function MenuItemCard({
   item,
-  quantity,
-  onAdd,
-  onRemove,
-  hasOptions,
+  totalInCart,
+  onClick,
 }: {
   item: MenuItemData;
-  quantity: number;
-  onAdd: () => void;
-  onRemove: () => void;
-  hasOptions?: boolean;
+  totalInCart: number;
+  onClick: () => void;
 }) {
-  const isSelected = quantity > 0;
+  const hasQty = totalInCart > 0;
 
   return (
-    <div
-      className={`group flex gap-3 rounded-2xl border bg-surface p-3 transition-all duration-300 ${
-        isSelected
+    <button
+      onClick={item.available ? onClick : undefined}
+      className={`group flex gap-3 rounded-2xl border bg-surface p-3 transition-all duration-300 text-left relative ${
+        hasQty
           ? "border-primary/40 shadow-md shadow-primary/5"
           : "border-border/60 hover:border-primary/20 hover:shadow-sm"
-      } ${!item.available ? "opacity-50" : ""}`}
+      } ${!item.available ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
     >
+      {/* Quantity badge */}
+      {hasQty && (
+        <div className="absolute -top-2 -right-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-md">
+          {totalInCart}
+        </div>
+      )}
+
       {/* Image or Video */}
       {item.imageUrl && (
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200">
@@ -89,46 +93,22 @@ export function MenuItemCard({
             <span className="text-sm font-bold text-text tracking-tight">
               ${item.price.toLocaleString("es-AR")}
             </span>
-            {hasOptions && (
+            {item.optionGroups && item.optionGroups.length > 0 && (
               <span className="text-[9px] text-primary font-medium bg-primary/10 rounded px-1 py-0.5">Personalizable</span>
             )}
           </div>
 
           {item.available ? (
-            <div className="flex items-center gap-1.5">
-              {isSelected && (
-                <button
-                  onClick={onRemove}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
-                  </svg>
-                </button>
-              )}
-              {isSelected && (
-                <span className="min-w-[1.25rem] text-center text-sm font-bold text-primary">
-                  {quantity}
-                </span>
-              )}
-              <button
-                onClick={onAdd}
-                className={`flex h-7 items-center justify-center rounded-lg transition-all ${
-                  isSelected
-                    ? "w-7 bg-primary text-white"
-                    : "w-7 border border-primary/30 text-primary hover:bg-primary hover:text-white"
-                }`}
-              >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              </button>
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-primary/30 text-primary group-hover:bg-primary group-hover:text-white transition-all">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
             </div>
           ) : (
             <span className="text-xs font-medium text-text-muted">No disponible</span>
           )}
         </div>
       </div>
-    </div>
+    </button>
   );
 }

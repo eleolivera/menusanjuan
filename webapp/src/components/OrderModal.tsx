@@ -16,6 +16,7 @@ type CartItem = {
   cartKey: string;
   selectedOptions: SelectedOptions;
   optionsDelta: number;
+  note?: string;
 };
 
 export function OrderModal({
@@ -139,6 +140,9 @@ export function OrderModal({
           });
           line += "\n" + optLines.join("\n");
         }
+        if (ci.note) {
+          line += `\n     > Nota: ${ci.note}`;
+        }
         return line;
       })
       .join("\n");
@@ -194,6 +198,7 @@ _Pedido realizado desde MenuSanJuan_`;
             unitPrice: ci.item.price,
             optionsDelta: ci.optionsDelta,
             selectedOptions: ci.selectedOptions,
+            note: ci.note || "",
             total: (ci.item.price + ci.optionsDelta) * ci.quantity,
           })),
           total: grandTotal,
@@ -276,6 +281,11 @@ _Pedido realizado desde MenuSanJuan_`;
                       {ci.selectedOptions.length > 0 && (
                         <div className="text-[10px] text-text-muted mt-0.5">
                           {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                        </div>
+                      )}
+                      {ci.note && (
+                        <div className="text-[10px] text-text-muted mt-0.5 italic">
+                          Nota: {ci.note}
                         </div>
                       )}
                       <div className="text-xs text-text-muted">${(ci.item.price + ci.optionsDelta).toLocaleString("es-AR")} c/u</div>
@@ -452,7 +462,7 @@ _Pedido realizado desde MenuSanJuan_`;
 
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-text">
-                    Notas <span className="text-text-muted font-normal">(opcional)</span>
+                    Notas de entrega <span className="text-text-muted font-normal">(opcional)</span>
                   </label>
                   <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Sin cebolla, extra salsa, etc." rows={2}
                     className="w-full rounded-xl border border-border bg-white px-4 py-3 text-base text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
@@ -489,6 +499,11 @@ _Pedido realizado desde MenuSanJuan_`;
                       {ci.selectedOptions.length > 0 && (
                         <div className="text-[10px] text-text-muted ml-4">
                           {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                        </div>
+                      )}
+                      {ci.note && (
+                        <div className="text-[10px] text-text-muted ml-4 italic">
+                          Nota: {ci.note}
                         </div>
                       )}
                     </div>
