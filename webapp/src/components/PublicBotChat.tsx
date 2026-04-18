@@ -88,7 +88,7 @@ export function PublicBotChat() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-surface">
+    <div className="fixed inset-0 flex flex-col bg-surface">
       {/* Header */}
       <div className="shrink-0 border-b border-border/50 bg-white px-4 py-3">
         <div className="mx-auto max-w-2xl flex items-center gap-3">
