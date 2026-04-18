@@ -92,7 +92,23 @@ async function getMenu(slug: string): Promise<{ text: string; cats: string } | n
     where: { slug, isActive: true },
     include: {
       categories: {
-        include: { items: { where: { available: true }, orderBy: { sortOrder: "asc" } } },
+        include: {
+          items: {
+            where: { available: true },
+            orderBy: { sortOrder: "asc" },
+            include: {
+              optionGroups: {
+                orderBy: { sortOrder: "asc" },
+                include: {
+                  options: {
+                    where: { available: true },
+                    orderBy: { sortOrder: "asc" },
+                  },
+                },
+              },
+            },
+          },
+        },
         orderBy: { sortOrder: "asc" },
       },
     },
@@ -107,7 +123,22 @@ async function getMenu(slug: string): Promise<{ text: string; cats: string } | n
     catNames.push(`${cat.name} (${cat.items.length})`);
     text += `\n${cat.name}\n`;
     for (const item of cat.items) {
-      text += `- [${item.id}] ${item.name} ($${item.price.toLocaleString("es-AR")})${item.description ? ` — ${item.description}` : ""}\n`;
+      text += `- [${item.id}] ${item.name} ($${item.price.toLocaleString("es-AR")})${item.description ? ` — ${item.description}` : ""}`;
+      if (item.optionGroups.length > 0) {
+        for (const og of item.optionGroups) {
+          const req = og.minSelections > 0 ? "obligatorio" : "opcional";
+          const sel = og.maxSelections === 1 ? "elegir 1" : `elegir hasta ${og.maxSelections}`;
+          const optionNames = og.options.map((o) => {
+            const delta = o.priceDelta > 0 ? ` (+$${o.priceDelta.toLocaleString("es-AR")})` : "";
+            return o.name + delta;
+          });
+          // Show max 10 options in the prompt, indicate if there are more
+          const shown = optionNames.slice(0, 10).join(", ");
+          const more = optionNames.length > 10 ? ` y ${optionNames.length - 10} mas` : "";
+          text += `\n  OPCIONES "${og.title}" (${req}, ${sel}): ${shown}${more}`;
+        }
+      }
+      text += "\n";
     }
   }
 
@@ -368,9 +399,23 @@ SI EL CLIENTE PIDE ALGO QUE NO HAY EN EL MENU:
 - NO le digas "escribi nuevo pedido" — eso es muy rigido
 - Si prefiere quedarse, mostrale alternativas que SI tiene este restaurante
 
+PERSONALIZACION DE ITEMS:
+- Algunos items tienen OPCIONES (sabores, extras, tamano, etc) listadas debajo como "OPCIONES"
+- Si un item tiene opciones OBLIGATORIAS (dice "obligatorio"), SIEMPRE pregunta antes de agregar al pedido
+- Si un item tiene opciones OPCIONALES, pregunta "¿queres agregar algo extra?"
+- El cliente puede pedir el MISMO item varias veces con DIFERENTES opciones (ej: 2 helados 1kg, cada uno con sabores distintos)
+- Cuando el cliente elige opciones, recorda cuales eligio para el resumen
+
+NOTAS POR ITEM:
+- El cliente puede pedir notas especiales: "sin cebolla", "bien cocido", "sin pickles"
+- Incluir las notas en el resumen del pedido
+
 CONFIRMAR PEDIDO:
-Mostra resumen + total, y al final esta linea EXACTA:
-CHECKOUT_LINK::${convo.selectedSlug}::[{"id":"ID","qty":N}]
+Mostra resumen con items, opciones elegidas, notas, cantidades y total.
+Al final agrega esta linea EXACTA:
+CHECKOUT_LINK::${convo.selectedSlug}::[{"id":"ID","qty":N,"options":"sabor1, sabor2","notes":"sin cebolla"}]
+
+Los campos "options" y "notes" son opcionales — solo incluirlos si el cliente eligio opciones o pidio notas.
 
 - "humano" → "Te comunico con alguien. Un momento."
 

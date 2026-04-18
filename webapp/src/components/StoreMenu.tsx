@@ -52,17 +52,27 @@ export function StoreMenu({
     const pedido = searchParams.get("pedido");
     if (!pedido) return;
     try {
-      const decoded = JSON.parse(atob(pedido)) as { id: string; qty: number }[];
+      const decoded = JSON.parse(atob(pedido)) as { id: string; qty: number; options?: string; notes?: string }[];
       const allItems = categories.flatMap((c) => c.items);
       const entries: CartEntry[] = [];
-      for (const { id, qty } of decoded) {
+      for (const { id, qty, options, notes } of decoded) {
         const item = allItems.find((i) => i.id === id);
         if (item && qty > 0) {
+          // Parse options string into SelectedOptions format if provided
+          const selectedOptions: SelectedOptions = [];
+          if (options) {
+            selectedOptions.push({
+              group: "Opciones",
+              groupId: "bot",
+              choices: options.split(",").map((o) => ({ name: o.trim(), priceDelta: 0 })),
+              delta: 0,
+            });
+          }
           entries.push({
             cartKey: `ck-${++cartKeyCounter}`,
-            item,
+            item: notes ? { ...item, description: `${item.description || ""} | Nota: ${notes}`.trim() } : item,
             quantity: qty,
-            selectedOptions: [],
+            selectedOptions,
             optionsDelta: 0,
           });
         }
