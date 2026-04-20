@@ -79,40 +79,6 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
     [cart]
   );
 
-  // Execute actions from bot response
-  const executeActions = useCallback((actions: CompanionAction[]) => {
-    for (const action of actions) {
-      switch (action.type) {
-        case "ADD_ITEM": {
-          const item = allItems.find((i) => i.id === action.itemId);
-          if (!item) break;
-          const selectedOptions: SelectedOptions = [];
-          if (action.options) {
-            selectedOptions.push({
-              group: "Opciones",
-              groupId: "companion",
-              choices: action.options.split(",").map((o) => ({ name: o.trim(), priceDelta: 0 })),
-              delta: 0,
-            });
-          }
-          onAddToCart(item, action.quantity, selectedOptions, 0, action.note || "");
-          break;
-        }
-        case "REMOVE_ITEM": {
-          const entry = cart.find((e) => e.item.id === action.itemId);
-          if (entry) onRemoveFromCart(entry.cartKey);
-          break;
-        }
-        case "CLEAR_CART":
-          onClearCart();
-          break;
-        case "OPEN_CHECKOUT":
-          onOpenCheckout();
-          break;
-      }
-    }
-  }, [allItems, cart, onAddToCart, onRemoveFromCart, onClearCart, onOpenCheckout]);
-
   async function sendMessage(override?: string) {
     const text = (override || input).trim();
     if (!text || sending) return;
@@ -138,8 +104,38 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
 
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
 
+      // Execute actions directly (not via callback ref to avoid stale closures)
       if (data.actions?.length > 0) {
-        executeActions(data.actions);
+        for (const action of data.actions) {
+          switch (action.type) {
+            case "ADD_ITEM": {
+              const item = allItems.find((i: MenuItemData) => i.id === action.itemId);
+              if (!item) break;
+              const opts: SelectedOptions = [];
+              if (action.options) {
+                opts.push({
+                  group: "Opciones",
+                  groupId: "companion",
+                  choices: action.options.split(",").map((o: string) => ({ name: o.trim(), priceDelta: 0 })),
+                  delta: 0,
+                });
+              }
+              onAddToCart(item, action.quantity || 1, opts, 0, action.note || "");
+              break;
+            }
+            case "REMOVE_ITEM": {
+              const entry = cart.find((e) => e.item.id === action.itemId);
+              if (entry) onRemoveFromCart(entry.cartKey);
+              break;
+            }
+            case "CLEAR_CART":
+              onClearCart();
+              break;
+            case "OPEN_CHECKOUT":
+              onOpenCheckout();
+              break;
+          }
+        }
       }
     } catch {
       setMessages((prev) => [

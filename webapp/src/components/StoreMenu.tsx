@@ -247,7 +247,7 @@ export function StoreMenu({
         cart={cart}
         onAddToCart={(item, qty, opts, delta, note) => {
           setCart((prev) => [...prev, {
-            cartKey: `ck-${Date.now()}`,
+            cartKey: `ck-companion-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             item,
             quantity: qty,
             selectedOptions: opts,
