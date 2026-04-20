@@ -5,8 +5,23 @@ import type { MenuCategoryData, MenuItemData } from "@/data/menus";
 import type { CartEntry } from "./StoreMenu";
 import type { SelectedOptions } from "./ItemCustomizeSheet";
 
+import Image from "next/image";
+import { ItemCustomizeSheet } from "./ItemCustomizeSheet";
+
 // ── Types ──
-type Message = { role: "user" | "assistant"; content: string };
+type SuggestedItem = {
+  id: string;
+  name: string;
+  price: number;
+  description: string | null;
+  imageUrl: string | null;
+};
+
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+  suggestedItems?: SuggestedItem[];
+};
 type CompanionAction =
   | { type: "ADD_ITEM"; itemId: string; quantity: number; options?: string; note?: string }
   | { type: "REMOVE_ITEM"; itemId: string }
@@ -46,6 +61,7 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [hasGreeted, setHasGreeted] = useState(false);
+  const [customizingItem, setCustomizingItem] = useState<MenuItemData | null>(null);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -102,7 +118,11 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
 
-      setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: data.reply,
+        suggestedItems: data.suggestedItems?.length > 0 ? data.suggestedItems : undefined,
+      }]);
 
       // Execute actions directly (not via callback ref to avoid stale closures)
       if (data.actions?.length > 0) {
@@ -206,24 +226,57 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ minHeight: 0 }}>
           {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              {msg.role === "assistant" && (
-                <div className="shrink-0 mr-2 mt-1 flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-primary to-amber-500 text-white text-[10px] font-bold">
-                  M
+            <div key={i}>
+              <div className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                {msg.role === "assistant" && (
+                  <div className="shrink-0 mr-2 mt-1 flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-primary to-amber-500 text-white text-[10px] font-bold">
+                    M
+                  </div>
+                )}
+                <div
+                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                    msg.role === "user"
+                      ? "bg-primary text-white rounded-br-md"
+                      : "bg-surface-alt text-text rounded-bl-md leading-relaxed"
+                  }`}
+                >
+                  {msg.role === "assistant"
+                    ? <span dangerouslySetInnerHTML={{ __html: formatText(msg.content) }} />
+                    : msg.content
+                  }
+                </div>
+              </div>
+
+              {/* Item cards */}
+              {msg.suggestedItems && msg.suggestedItems.length > 0 && (
+                <div className="ml-8 mt-2 flex gap-2 overflow-x-auto pb-1 snap-x">
+                  {msg.suggestedItems.map((si) => {
+                    const menuItem = allItems.find((i) => i.id === si.id);
+                    return (
+                      <button
+                        key={si.id}
+                        onClick={() => {
+                          if (menuItem) setCustomizingItem(menuItem);
+                        }}
+                        className="shrink-0 w-36 rounded-xl border border-border/50 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-primary/30 transition-all snap-start text-left"
+                      >
+                        {si.imageUrl && (
+                          <div className="relative h-20 bg-slate-100">
+                            <Image src={si.imageUrl} alt={si.name} fill className="object-cover" sizes="144px" />
+                          </div>
+                        )}
+                        <div className="p-2">
+                          <div className="text-[11px] font-bold text-text truncate">{si.name}</div>
+                          {si.description && (
+                            <div className="text-[9px] text-text-muted truncate mt-0.5">{si.description}</div>
+                          )}
+                          <div className="text-xs font-bold text-primary mt-1">${si.price.toLocaleString("es-AR")}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
-              <div
-                className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-                  msg.role === "user"
-                    ? "bg-primary text-white rounded-br-md"
-                    : "bg-surface-alt text-text rounded-bl-md leading-relaxed"
-                }`}
-              >
-                {msg.role === "assistant"
-                  ? <span dangerouslySetInnerHTML={{ __html: formatText(msg.content) }} />
-                  : msg.content
-                }
-              </div>
             </div>
           ))}
 
@@ -282,6 +335,23 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
           </div>
         </div>
       </div>
+
+      {/* Item customize sheet — opens when user taps a suggested item card */}
+      {customizingItem && (
+        <ItemCustomizeSheet
+          item={customizingItem}
+          onAdd={(qty, opts, delta, note) => {
+            onAddToCart(customizingItem, qty, opts, delta, note);
+            setCustomizingItem(null);
+            // Add a confirmation message to chat
+            setMessages((prev) => [...prev, {
+              role: "assistant",
+              content: `Listo, te agregué ${qty}x *${customizingItem.name}* al carrito${note ? ` (${note})` : ""}.`,
+            }]);
+          }}
+          onClose={() => setCustomizingItem(null)}
+        />
+      )}
     </>
   );
 }

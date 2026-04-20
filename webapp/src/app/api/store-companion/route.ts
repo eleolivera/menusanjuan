@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing slug or message" }, { status: 400 });
   }
 
-  const { reply, actions } = await generateCompanionReply(
+  const { reply, actions, suggestedItems } = await generateCompanionReply(
     slug,
     message.trim(),
     history || [],
@@ -18,5 +18,5 @@ export async function POST(req: NextRequest) {
     (personality as Personality) || "bardero"
   );
 
-  return NextResponse.json({ reply, actions });
+  return NextResponse.json({ reply, actions, suggestedItems });
 }

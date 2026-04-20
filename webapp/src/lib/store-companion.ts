@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { prisma } from "@/lib/prisma";
 import { getMenu, applyPersonality, type Personality } from "@/lib/bot-shared";
 
 const anthropic = new Anthropic();
@@ -20,6 +21,14 @@ export type CompanionAction =
   | { type: "CLEAR_CART" }
   | { type: "OPEN_CHECKOUT" };
 
+export type SuggestedItem = {
+  id: string;
+  name: string;
+  price: number;
+  description: string | null;
+  imageUrl: string | null;
+};
+
 // ── Generate reply ──
 export async function generateCompanionReply(
   slug: string,
@@ -27,10 +36,10 @@ export async function generateCompanionReply(
   history: CompanionMessage[],
   cart: CartSummaryItem[],
   personality: Personality
-): Promise<{ reply: string; actions: CompanionAction[] }> {
+): Promise<{ reply: string; actions: CompanionAction[]; suggestedItems: SuggestedItem[] }> {
   const menu = await getMenu(slug);
   if (!menu) {
-    return { reply: "No encontré el menú de este restaurante.", actions: [] };
+    return { reply: "No encontré el menú de este restaurante.", actions: [], suggestedItems: [] };
   }
 
   const cartSummary = cart.length > 0
@@ -76,13 +85,26 @@ Ejemplos:
 - Con opciones: ACTION::ADD_ITEM::og_9j_1kg::1::Chocolate, Dulce de leche, Frutilla::
 - Con nota: ACTION::ADD_ITEM::hc_hb_01::1::::sin cebolla, bien cocido
 
+MOSTRAR ITEMS AL CLIENTE:
+Cuando recomiendes o menciones items del menu, agrega esta linea para que aparezcan como tarjetas interactivas que el cliente puede tocar para agregar:
+SHOW_ITEMS::item_id1,item_id2,item_id3
+
+Ejemplo: si recomendas 3 hamburguesas, agrega:
+SHOW_ITEMS::hc_hb_01,hc_hb_02,hc_hb_03
+
+Usa SHOW_ITEMS siempre que:
+- El cliente pregunta que hay / que recomendas
+- Mostras opciones de una categoria
+- Sugeris items especificos
+- El cliente pide ver algo
+
 IMPORTANTE:
-- Solo emiti acciones cuando el cliente CLARAMENTE pide agregar, sacar, o modificar algo
-- Si solo pregunta sobre un item (precio, descripcion), NO emitas accion — solo respondele
-- Si un item tiene opciones OBLIGATORIAS y el cliente no las especifico, PREGUNTALE antes de emitir ADD_ITEM
-- Podes agregar MULTIPLES acciones en un solo mensaje (ej: agregar 3 items distintos)
+- Solo emiti acciones ADD/REMOVE cuando el cliente CLARAMENTE pide agregar o sacar algo
+- Si solo pregunta o explora, usa SHOW_ITEMS para mostrar las opciones como tarjetas
+- Si un item tiene opciones OBLIGATORIAS y el cliente no las especifico, usa SHOW_ITEMS para que el toque la tarjeta y elija
+- Podes agregar MULTIPLES acciones en un solo mensaje
 - Despues de agregar items, menciona el nuevo total del carrito
-- Cuando el carrito tenga items, ofrece de vez en cuando: "¿Queres ir al checkout?"`;
+- Cuando el carrito tenga items, ofrece de vez en cuando: "Queres ir al checkout?"`;
 
   const system = applyPersonality(basePrompt, personality);
 
@@ -125,8 +147,33 @@ IMPORTANTE:
     }
   }
 
-  // Strip action lines from reply
-  reply = reply.replace(/ACTION::.+\n?/g, "").trim();
+  // Parse SHOW_ITEMS:: lines and look up item data
+  const suggestedItems: SuggestedItem[] = [];
+  const showItemsMatch = reply.match(/SHOW_ITEMS::(.+)/g) || [];
+  if (showItemsMatch.length > 0) {
+    const allItemIds = showItemsMatch
+      .map((line) => line.replace("SHOW_ITEMS::", "").split(",").map((id) => id.trim()))
+      .flat();
 
-  return { reply, actions };
+    // Look up items from DB
+    const items = await prisma.menuItem.findMany({
+      where: { id: { in: allItemIds }, available: true },
+      select: { id: true, name: true, price: true, description: true, imageUrl: true },
+    });
+
+    for (const item of items) {
+      suggestedItems.push({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        imageUrl: item.imageUrl,
+      });
+    }
+  }
+
+  // Strip action and show_items lines from reply
+  reply = reply.replace(/ACTION::.+\n?/g, "").replace(/SHOW_ITEMS::.+\n?/g, "").trim();
+
+  return { reply, actions, suggestedItems };
 }
