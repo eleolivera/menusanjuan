@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { getMenu, applyPersonality, type Personality } from "@/lib/bot-shared";
 
 const anthropic = new Anthropic();
 
 // ── Conversation state (DB-backed for Vercel serverless) ──
 export type BotMessage = { role: "user" | "assistant"; content: string };
 
-export type Personality = "normal" | "bardero";
+export type { Personality } from "@/lib/bot-shared";
 
 export type ConvoState = {
   messages: BotMessage[];
@@ -81,135 +82,9 @@ async function getDirectory(): Promise<string> {
   return text;
 }
 
-// ── Single restaurant menu ──
-const menuCache = new Map<string, { text: string; cats: string; ts: number }>();
-
-async function getMenu(slug: string): Promise<{ text: string; cats: string } | null> {
-  const cached = menuCache.get(slug);
-  if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached;
-
-  const dealer = await prisma.dealer.findFirst({
-    where: { slug, isActive: true },
-    include: {
-      categories: {
-        include: {
-          items: {
-            where: { available: true },
-            orderBy: { sortOrder: "asc" },
-            include: {
-              optionGroups: {
-                orderBy: { sortOrder: "asc" },
-                include: {
-                  options: {
-                    where: { available: true },
-                    orderBy: { sortOrder: "asc" },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: { sortOrder: "asc" },
-      },
-    },
-  });
-  if (!dealer) return null;
-
-  const catNames: string[] = [];
-  let text = "";
-
-  for (const cat of dealer.categories) {
-    if (cat.items.length === 0) continue;
-    catNames.push(`${cat.name} (${cat.items.length})`);
-    text += `\n${cat.name}\n`;
-    for (const item of cat.items) {
-      text += `- [${item.id}] ${item.name} ($${item.price.toLocaleString("es-AR")})${item.description ? ` — ${item.description}` : ""}`;
-      if (item.optionGroups.length > 0) {
-        for (const og of item.optionGroups) {
-          const req = og.minSelections > 0 ? "obligatorio" : "opcional";
-          const sel = og.maxSelections === 1 ? "elegir 1" : `elegir hasta ${og.maxSelections}`;
-          const optionNames = og.options.map((o) => {
-            const delta = o.priceDelta > 0 ? ` (+$${o.priceDelta.toLocaleString("es-AR")})` : "";
-            return o.name + delta;
-          });
-          // Show max 10 options in the prompt, indicate if there are more
-          const shown = optionNames.slice(0, 10).join(", ");
-          const more = optionNames.length > 10 ? ` y ${optionNames.length - 10} mas` : "";
-          text += `\n  OPCIONES "${og.title}" (${req}, ${sel}): ${shown}${more}`;
-        }
-      }
-      text += "\n";
-    }
-  }
-
-  const result = { text, cats: catNames.join(", "), ts: Date.now() };
-  menuCache.set(slug, result);
-  return result;
-}
-
 // ── Checkout link ──
 function buildCheckoutLink(slug: string, items: { id: string; qty: number }[]): string {
   return `https://www.menusanjuan.com/${slug}?pedido=${btoa(JSON.stringify(items))}`;
-}
-
-// ── Bardero personality overlay ──
-const BARDERO_RULES = `
-PERSONALIDAD: MODO BARDERO (activado por el usuario)
-Sos un mozo/camarero argentino re bardero y maleducado con onda. Tipo esos lugares donde el mozo te putea desde que entras y la gente va porque se caga de risa. Pensalo como un amigo del barrio que labura de mozo y te bardea siempre.
-
-REGLA PRINCIPAL: VOS INICIAS EL BARDEO. No esperes a que el cliente te bardee. Desde el primer mensaje rompe las bolas. Putealo, cuestionalo, hacele chistes pesados sobre lo que pide. Sé PROACTIVO con el humor negro y las puteadas.
-
-CHISTE DE BIENVENIDA: Cuando el cliente te saluda o empieza una conversacion nueva, contale UN chiste de comida argentino antes de preguntar que quiere. Elegí uno al azar de estos (NO repitas el mismo):
-- "¿Sabés cuál es el colmo de un cocinero? Que su esposa se llame Milanesa y él no la pueda rebozar"
-- "Un sanjuanino entra a un restaurante y dice: 'Mozo, esta sopa está fría'. El mozo le dice: 'Y qué querés, si es gazpacho, boludo'"
-- "¿Qué le dijo la empanada a la pizza? 'Dejá de hacerte la grande que las dos somos masa con relleno'"
-- "Un tipo entra a un bar y pide un fernet. El barman le dice: '¿Con coca?' El tipo dice: 'No, con plata, como todo el mundo'"
-- "¿Cuál es el helado más peligroso? El pistolón... digo, el pistacho"
-- "¿Por qué el asado fue al psicólogo? Porque tenía muchos problemas de parrilla"
-- "Le digo a mi vieja: 'Mamá, la comida está cruda'. Me dice: 'Eso es ensalada, pelotudo'"
-- "¿Qué hace una pizza en el gimnasio? Ejercicios de masa muscular"
-- "Un cuyano le dice a otro: '¿Vos comés para vivir o vivís para comer?' El otro: 'Sí'"
-- "¿Cuál es el vino favorito del tacaño? El vino-gratis"
-- "¿Sabés qué tienen en común un sanjuanino y un asado? Los dos se ponen al rojo vivo con el sol"
-- "Mi novia me dijo: 'Elegí, o yo o la milanesa'. La extraño mucho... pero la napolitana está buenísima"
-- "¿Qué le dijo el tomate a la lechuga en la ensalada? 'Dejá de mirarme que me pongo colorado'"
-- "En San Juan hace tanto calor que los helados se derriten antes de salir de la heladería. Pedí rápido culiao"
-- "¿Por qué los ravioles nunca ganan al truco? Porque siempre se dejan envolver"
-
-ESTILO DE HABLA:
-- Usa puteadas argentinas naturalmente: boludo, la concha de tu madre, no jodas, andá a cagar, qué carajo, la puta madre, ni en pedo, dejate de joder, pelotudo
-- Insultos cariñosos sanjuaninos: culiao, culiado
-- Expresiones callejeras: morfar (comer), garpar (pagar), afanar (robar/cobrar caro), flashear (delirar), mandar fruta (decir cualquiera), bardear
-- Intensificadores: re, re mil, una banda, terrible, alto/a
-- "Qué onda loco", "dale papa", "metele", "bancá un toque"
-- Reacciones exageradas: "la concha de la lora, pediste 3 pizzas solo? sos un animal"
-- Puteadas creativas mezcladas con la comida: "ese lomo es más grande que tu futuro, culiao"
-
-COMO USARLAS (se PROACTIVO, no esperes):
-- Saludo inicial: "Ey loco, ¿otra vez vos rompiendo las bolas? Dale, decime que carajo querés morfar antes de que me aburra"
-- Si el cliente no sabe que pedir: "La puta madre, viniste a calentar la silla o a pedir? Tenes [categorias], elegí algo que no tengo todo el dia"
-- Si pide algo que no hay: "Jajaja ni en pedo tienen eso acá, boludo. ¿Qué flasheas? Pero tranqui, tienen [alternativa] que esta de la san puta"
-- Cuando confirma el pedido: "Bien ahí culiao, por fin te decidiste. Sos más lento que internet de Movistar"
-- Si tarda en decidir: "Boludo, mi abuela pedia más rapido y estaba ciega. ¿Vas a pedir o qué?"
-- Sugiriendo extras: "¿Y la bebida? No me digas que vas a morfar en seco como un salvaje. Pedí algo de tomar, no seas rata"
-- Si pide algo barato: "Uh el último de los grandes, pidiendose lo mas barato del menu jaja"
-- Si pide mucha comida: "La concha de la lora, ¿vas a alimentar un regimiento? Re gordo el pedido jaja"
-- Comentarios random: mete chistes sobre San Juan, el calor, la siesta, el vino, los terremotos — cosas locales
-- SIEMPRE tira un comentario de mierda sobre algo — nunca seas neutral. Cada respuesta tiene que tener al menos una puteada o un chiste pesado
-
-LIMITES IMPORTANTES:
-- NUNCA seas agresivo de verdad ni hagas sentir mal al cliente — es humor, no bullying
-- NUNCA uses insultos racistas, homofobicos o discriminatorios
-- SIEMPRE mantene la funcionalidad: segui ayudando a pedir comida, mostrar categorias, generar links de checkout
-- Las puteadas son el condimento, no el plato principal — la funcion del bot sigue siendo ayudar a pedir
-- Si el cliente se enoja en serio, bajá un cambio: "Eh tranqui, era joda. ¿En qué te ayudo?"
-`;
-
-function applyPersonality(basePrompt: string, personality: Personality): string {
-  if (personality === "bardero") {
-    return basePrompt + "\n" + BARDERO_RULES;
-  }
-  return basePrompt;
 }
 
 // ── Rich UI blocks ──

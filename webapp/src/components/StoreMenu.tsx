@@ -11,6 +11,7 @@ import { FloatingCart } from "./FloatingCart";
 import { OrderModal } from "./OrderModal";
 import { ItemCustomizeSheet, type SelectedOptions } from "./ItemCustomizeSheet";
 import { OrderStatusBanner } from "./OrderStatusBanner";
+import { StoreCompanion } from "./StoreCompanion";
 import { getLatestOrderRef, type OrderRef } from "@/lib/order-tracker";
 
 export type CartEntry = {
@@ -237,6 +238,27 @@ export function StoreMenu({
           onClose={() => setCustomizingItem(null)}
         />
       )}
+
+      {/* AI Shopping Companion */}
+      <StoreCompanion
+        slug={restaurant.slug}
+        restaurantName={restaurant.name}
+        categories={categories}
+        cart={cart}
+        onAddToCart={(item, qty, opts, delta, note) => {
+          setCart((prev) => [...prev, {
+            cartKey: `ck-${Date.now()}`,
+            item,
+            quantity: qty,
+            selectedOptions: opts,
+            optionsDelta: delta,
+            note,
+          }]);
+        }}
+        onRemoveFromCart={decrementEntry}
+        onClearCart={() => setCart([])}
+        onOpenCheckout={() => { setTrackingMode(false); setShowModal(true); }}
+      />
     </>
   );
 }
