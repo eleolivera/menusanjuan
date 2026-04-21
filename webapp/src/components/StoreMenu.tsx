@@ -89,6 +89,14 @@ export function StoreMenu({
   const [search, setSearch] = useState("");
   const [pastOrders, setPastOrders] = useState<OrderRef[]>([]);
   const [reordering, setReordering] = useState(false);
+  const [toast, setToast] = useState<{ message: string; kind: "warn" | "info" } | null>(null);
+
+  // Auto-dismiss toast after 4s
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const searchParams = useSearchParams();
 
@@ -99,6 +107,11 @@ export function StoreMenu({
     // Load past orders for this restaurant (for re-order)
     setPastOrders(getOrderRefs(restaurant.slug));
   }, [restaurant.slug]);
+
+  // Re-sync past orders whenever pending order changes (new checkout, or dismissal)
+  useEffect(() => {
+    setPastOrders(getOrderRefs(restaurant.slug));
+  }, [pendingOrder, restaurant.slug]);
 
   // Re-order: fetch a past order and pre-fill the cart with those items
   const reorderFromPast = useCallback(async (orderId: string, token: string) => {
@@ -114,12 +127,37 @@ export function StoreMenu({
       for (const oi of orderItems) {
         const item = allItems.find((i) => i.id === oi.menuItemId);
         if (item) {
+          // Recalculate optionsDelta from CURRENT menu prices (menu may have changed since last order)
+          let currentDelta = 0;
+          const currentSelectedOptions: SelectedOptions = [];
+          if (oi.selectedOptions && oi.selectedOptions.length > 0) {
+            for (const so of oi.selectedOptions) {
+              const currentGroup = item.optionGroups?.find((g) => g.id === so.groupId);
+              if (!currentGroup) continue; // group was deleted
+              const validChoices: { name: string; priceDelta: number }[] = [];
+              for (const choice of so.choices) {
+                const currentOption = currentGroup.options.find((o) => o.name === choice.name);
+                if (currentOption && currentOption.available) {
+                  validChoices.push({ name: currentOption.name, priceDelta: currentOption.priceDelta });
+                  currentDelta += currentOption.priceDelta;
+                }
+              }
+              if (validChoices.length > 0) {
+                currentSelectedOptions.push({
+                  group: so.group,
+                  groupId: so.groupId,
+                  choices: validChoices,
+                  delta: validChoices.reduce((s, c) => s + c.priceDelta, 0),
+                });
+              }
+            }
+          }
           entries.push({
             cartKey: `ck-reorder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             item,
             quantity: oi.quantity,
-            selectedOptions: oi.selectedOptions || [],
-            optionsDelta: oi.optionsDelta || 0,
+            selectedOptions: currentSelectedOptions,
+            optionsDelta: currentDelta,
             note: oi.note || "",
           });
         }
@@ -129,13 +167,16 @@ export function StoreMenu({
         setShowModal(true);
         const skipped = orderItems.length - entries.length;
         if (skipped > 0) {
-          alert(`Ojo: ${skipped} producto${skipped > 1 ? "s" : ""} del pedido anterior ya no está${skipped > 1 ? "n" : ""} disponible${skipped > 1 ? "s" : ""}.`);
+          setToast({
+            message: `${skipped} producto${skipped > 1 ? "s" : ""} del pedido anterior ya no está${skipped > 1 ? "n" : ""} disponible${skipped > 1 ? "s" : ""}.`,
+            kind: "warn",
+          });
         }
       } else {
-        alert("Ninguno de los productos del pedido anterior sigue disponible.");
+        setToast({ message: "Ninguno de los productos del pedido anterior sigue disponible.", kind: "warn" });
       }
     } catch {
-      alert("No pudimos cargar el pedido anterior");
+      setToast({ message: "No pudimos cargar el pedido anterior.", kind: "warn" });
     } finally {
       setReordering(false);
     }
@@ -147,7 +188,12 @@ export function StoreMenu({
     if (!itemId) return;
     const allItems = categories.flatMap((c) => c.items);
     const item = allItems.find((i) => i.id === itemId);
-    if (item) setCustomizingItem(item);
+    if (item) {
+      setCustomizingItem(item);
+    } else {
+      // Let user know the item isn't available anymore
+      setToast({ message: "Ese producto ya no está disponible.", kind: "warn" });
+    }
     // Clear the param so reload doesn't re-trigger
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -409,6 +455,17 @@ export function StoreMenu({
           onAdd={(qty, opts, delta, note) => addCustomized(customizingItem, qty, opts, delta, note)}
           onClose={() => setCustomizingItem(null)}
         />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-fade-in">
+          <div className={`rounded-xl px-4 py-3 shadow-lg text-sm font-medium ${
+            toast.kind === "warn" ? "bg-amber-500 text-white" : "bg-slate-900 text-white"
+          }`}>
+            {toast.message}
+          </div>
+        </div>
       )}
 
       {/* AI Shopping Companion */}

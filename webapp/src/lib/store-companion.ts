@@ -17,7 +17,7 @@ export type CartSummaryItem = {
 
 export type CompanionAction =
   | { type: "ADD_ITEM"; itemId: string; quantity: number; options?: string; note?: string }
-  | { type: "REMOVE_ITEM"; itemId: string }
+  | { type: "REMOVE_ITEM"; itemId: string; quantity?: number | "all" }
   | { type: "CLEAR_CART" }
   | { type: "OPEN_CHECKOUT" };
 
@@ -73,13 +73,17 @@ Podes manipular el carrito del cliente. Para hacerlo, agrega al FINAL de tu mens
 
 ACTION::ADD_ITEM::ITEM_ID::CANTIDAD
 ACTION::ADD_ITEM::ITEM_ID::CANTIDAD::OPCIONES::NOTA
-ACTION::REMOVE_ITEM::ITEM_ID
+ACTION::REMOVE_ITEM::ITEM_ID                  (saca 1 unidad)
+ACTION::REMOVE_ITEM::ITEM_ID::all             (saca TODAS las unidades de ese item)
+ACTION::REMOVE_ITEM::ITEM_ID::CANTIDAD        (saca CANTIDAD unidades)
 ACTION::CLEAR_CART
 ACTION::OPEN_CHECKOUT
 
 Ejemplos:
 - Cliente dice "poneme una coca": ACTION::ADD_ITEM::hc_bb_01::1
-- Cliente dice "sacame las papas": ACTION::REMOVE_ITEM::hc_pf_01
+- Cliente dice "sacame una papa": ACTION::REMOVE_ITEM::hc_pf_01
+- Cliente dice "sacame LAS papas" o "sacalas todas": ACTION::REMOVE_ITEM::hc_pf_01::all
+- Cliente dice "sacame 2 cocas": ACTION::REMOVE_ITEM::hc_bb_01::2
 - Cliente dice "limpia todo": ACTION::CLEAR_CART
 - Cliente dice "listo, quiero pagar": ACTION::OPEN_CHECKOUT
 - Con opciones: ACTION::ADD_ITEM::og_9j_1kg::1::Chocolate, Dulce de leche, Frutilla::
@@ -147,7 +151,11 @@ IMPORTANTE:
         note: parts[5] || undefined,
       });
     } else if (type === "REMOVE_ITEM" && parts[2]) {
-      actions.push({ type: "REMOVE_ITEM", itemId: parts[2] });
+      const qty = parts[3];
+      let quantity: number | "all" | undefined;
+      if (qty === "all") quantity = "all";
+      else if (qty && !isNaN(parseInt(qty))) quantity = parseInt(qty);
+      actions.push({ type: "REMOVE_ITEM", itemId: parts[2], quantity });
     } else if (type === "CLEAR_CART") {
       actions.push({ type: "CLEAR_CART" });
     } else if (type === "OPEN_CHECKOUT") {

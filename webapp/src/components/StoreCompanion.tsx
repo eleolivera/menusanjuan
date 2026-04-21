@@ -24,7 +24,7 @@ type Message = {
 };
 type CompanionAction =
   | { type: "ADD_ITEM"; itemId: string; quantity: number; options?: string; note?: string }
-  | { type: "REMOVE_ITEM"; itemId: string }
+  | { type: "REMOVE_ITEM"; itemId: string; quantity?: number | "all" }
   | { type: "CLEAR_CART" }
   | { type: "OPEN_CHECKOUT" };
 
@@ -109,6 +109,8 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
     const text = (override || input).trim();
     if (!text || sending) return;
     if (!override) setInput("");
+    // Snapshot the history BEFORE adding the new user message (the server will add it)
+    const historyForApi = messages.slice(-12);
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setSending(true);
 
@@ -119,7 +121,7 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
         body: JSON.stringify({
           slug,
           message: text,
-          history: messages.slice(-12),
+          history: historyForApi,
           cart: cartSummary,
           personality: "bardero",
         }),
@@ -164,8 +166,30 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
               break;
             }
             case "REMOVE_ITEM": {
-              const entry = cart.find((e) => e.item.id === action.itemId);
-              if (entry) onRemoveFromCart(entry.cartKey);
+              // Find all entries for this item
+              const entries = cart.filter((e) => e.item.id === action.itemId);
+              if (entries.length === 0) break;
+
+              if (action.quantity === "all") {
+                // Remove every unit of every entry
+                for (const entry of entries) {
+                  for (let i = 0; i < entry.quantity; i++) {
+                    onRemoveFromCart(entry.cartKey);
+                  }
+                }
+              } else {
+                // Default: remove 1 unit from the first entry
+                const qty = typeof action.quantity === "number" ? action.quantity : 1;
+                let remaining = qty;
+                for (const entry of entries) {
+                  if (remaining <= 0) break;
+                  const take = Math.min(entry.quantity, remaining);
+                  for (let i = 0; i < take; i++) {
+                    onRemoveFromCart(entry.cartKey);
+                  }
+                  remaining -= take;
+                }
+              }
               break;
             }
             case "CLEAR_CART":
