@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     deliveryMethod: order.deliveryMethod,
     deliveryFee: order.deliveryFee,
     notes: order.notes,
+    whatsappSent: order.whatsappSent,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
   });

@@ -658,6 +658,25 @@ _Pedido realizado desde MenuSanJuan_`;
               )}
 
               <div className="space-y-2">
+                {/* Troubleshooting banner — only if order hasn't been confirmed by restaurant */}
+                {(trackingStatus === "GENERATED" || !trackingData?.whatsappSent) && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-2">
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg shrink-0">⚠️</span>
+                      <div className="flex-1">
+                        <div className="text-sm font-bold text-amber-800 mb-1">
+                          ¿Enviaste el pedido por WhatsApp?
+                        </div>
+                        <div className="text-xs text-amber-700 leading-relaxed">
+                          El restaurante solo recibe tu pedido cuando mandás el mensaje de WhatsApp.
+                          Si WhatsApp no se abrió, o cerraste sin enviar, tocá el botón verde de abajo para reintentarlo.
+                          Tu pedido queda guardado con número <strong>{trackingOrder?.orderNumber || orderNumber}</strong>.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Re-send WhatsApp — full order message if we have it, otherwise generic */}
                 <button
                   onClick={() => {

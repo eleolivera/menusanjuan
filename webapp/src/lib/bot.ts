@@ -55,7 +55,7 @@ export async function resetConvo(sessionId: string) {
   );
 }
 
-// ── Restaurant directory ──
+// ── Restaurant directory with top items ──
 let dirCache: { text: string; ts: number } | null = null;
 
 async function getDirectory(): Promise<string> {
@@ -65,7 +65,14 @@ async function getDirectory(): Promise<string> {
     where: { isActive: true },
     include: {
       categories: {
-        include: { items: { where: { available: true }, select: { id: true } } },
+        include: {
+          items: {
+            where: { available: true },
+            orderBy: { sortOrder: "asc" },
+            take: 8,
+            select: { id: true, name: true, price: true },
+          },
+        },
       },
     },
     orderBy: { name: "asc" },
@@ -73,9 +80,14 @@ async function getDirectory(): Promise<string> {
 
   let text = "";
   for (const d of dealers) {
-    const count = d.categories.reduce((s, c) => s + c.items.length, 0);
-    if (count === 0) continue;
-    text += `- ${d.name} (${d.slug}) — ${d.cuisineType || "Varios"}, ${count} items${d.rating ? `, ${d.rating} estrellas` : ""}\n`;
+    const allItems = d.categories.flatMap((c) => c.items);
+    if (allItems.length === 0) continue;
+    text += `- ${d.name} (slug:${d.slug}) — ${d.cuisineType || "Varios"}${d.rating ? `, ${d.rating}★` : ""}\n`;
+    // Include top items inline so bot can reference them across restaurants
+    const topItems = allItems.slice(0, 5);
+    for (const item of topItems) {
+      text += `  · [${item.id}] ${item.name} ($${item.price.toLocaleString("es-AR")})\n`;
+    }
   }
 
   dirCache = { text, ts: Date.now() };
@@ -115,6 +127,17 @@ export type ItemCard = {
   category: string;
 };
 
+export type CrossItemCard = {
+  type: "cross_item";
+  id: string;
+  slug: string;
+  restaurantName: string;
+  name: string;
+  price: number;
+  description: string | null;
+  imageUrl: string | null;
+};
+
 export type CheckoutBlock = {
   type: "checkout";
   url: string;
@@ -127,6 +150,7 @@ export type BotBlock =
   | { type: "restaurants"; items: RestaurantCard[] }
   | { type: "categories"; items: CategoryButton[]; slug: string; restaurantName: string }
   | { type: "menu_items"; items: ItemCard[]; category: string }
+  | { type: "cross_items"; items: CrossItemCard[] }
   | CheckoutBlock;
 
 // ── Fetch restaurant cards data ──
@@ -316,29 +340,37 @@ Cliente: ${name}`;
     const dir = await getDirectory();
 
     system = `Sos el asistente de MenuSanJuan, delivery de San Juan, Argentina.
-Ayudas a descubrir restaurantes y pedir comida.
+Ayudas a descubrir restaurantes y productos de toda la ciudad.
 
-RESTAURANTES:
+RESTAURANTES Y ALGUNOS ITEMS (cada item tiene [ID] y cada resta slug):
 ${dir}
 
 REGLAS:
 - Espanol argentino informal, conciso, WhatsApp
 - Texto plano + *negrita*. NO markdown, NO emojis excesivos
-- Pregunta que tipo de comida busca
-- Sugeri 2-3 restaurantes que encajen
-- Mostra tipo cocina y rating
+- Sos un asistente que muestra OPCIONES VISUALES con tarjetas — no listes con texto largo
 
-SELECCIONAR RESTAURANTE:
-Es MUY IMPORTANTE que emitas SELECTED:: en estos casos:
-- El cliente nombra un restaurante → SELECTED::slug
-- El cliente dice "a ver que tiene X" o "mostrame X" → SELECTED::slug
-- El cliente dice "dale" o "si" despues de que sugeriste uno → SELECTED::slug
-- El cliente dice "quiero pedir de X" → SELECTED::slug
+MOSTRAR ITEMS DE DIFERENTES RESTAURANTES (cross-restaurant):
+Cuando el cliente busca un tipo de comida (ej: "pizza", "cafe", "algo dulce"), mostrale items concretos de VARIOS restaurantes como tarjetas. Usa este formato al FINAL de tu mensaje:
 
-Al FINAL de tu mensaje agrega: SELECTED::slug-del-restaurante
+CROSS_ITEMS::slug1:id1,slug2:id2,slug3:id3
+
+Ejemplo: cliente dice "quiero pizza":
+Respondes con un comentario breve y al final:
+CROSS_ITEMS::il-pilonte:item-x,abuelo-yuyi:item-y,indalecio-pizzas:item-z
+
+Podes mostrar entre 3 y 6 items de 2-4 restaurantes distintos. Cuando el cliente toque una tarjeta, se abre el restaurante en otra pestana con el item listo para agregar.
+
+SELECCIONAR UN RESTAURANTE ENTERO:
+Solo usa SELECTED::slug si el cliente:
+- Quiere explorar TODO el menu de un restaurante especifico
+- Dice "quiero pedir solo de X"
 Ejemplo: SELECTED::hc-cafe
 
-NUNCA describas un restaurante sin seleccionarlo. Si el cliente muestra interes en un restaurante especifico, seleccionalo directamente.
+PRIORIDAD:
+1. Si el cliente busca un TIPO de comida → usa CROSS_ITEMS (tarjetas visuales)
+2. Si el cliente quiere ENTRAR a un restaurante especifico → usa SELECTED
+3. Si no tenes info suficiente, pregunta primero
 
 - "humano" → "Te comunico con alguien. Un momento."
 - Ver todos: https://www.menusanjuan.com
@@ -490,8 +522,51 @@ Cliente: ${name}`;
     }
   }
 
-  // If we're in discovery mode and the bot mentioned restaurants, attach cards
-  if (!convo.selectedSlug && !link) {
+  // Parse CROSS_ITEMS:: — cross-restaurant item cards
+  const crossMatch = reply.match(/CROSS_ITEMS::([^\n]+)/);
+  if (crossMatch) {
+    const pairs = crossMatch[1]
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.includes(":"))
+      .map((p) => {
+        const [slug, id] = p.split(":");
+        return { slug: slug.trim(), id: id.trim() };
+      });
+
+    if (pairs.length > 0) {
+      const itemIds = pairs.map((p) => p.id);
+      const items = await prisma.menuItem.findMany({
+        where: { id: { in: itemIds }, available: true },
+        include: { category: { include: { dealer: { select: { slug: true, name: true } } } } },
+      });
+
+      const crossCards: CrossItemCard[] = [];
+      for (const pair of pairs) {
+        const item = items.find((i) => i.id === pair.id);
+        if (item && item.category.dealer.slug === pair.slug) {
+          crossCards.push({
+            type: "cross_item",
+            id: item.id,
+            slug: item.category.dealer.slug,
+            restaurantName: item.category.dealer.name,
+            name: item.name,
+            price: item.price,
+            description: item.description,
+            imageUrl: item.imageUrl,
+          });
+        }
+      }
+
+      if (crossCards.length > 0) {
+        blocks.push({ type: "cross_items", items: crossCards });
+      }
+    }
+    reply = reply.replace(/CROSS_ITEMS::[^\n]+/g, "").trim();
+  }
+
+  // If we're in discovery mode and the bot mentioned restaurants (not cross items), attach restaurant cards
+  if (!convo.selectedSlug && !link && !crossMatch) {
     const dir = dirCache?.text || "";
     const mentionedSlugs = extractMentionedSlugs(reply, dir);
     if (mentionedSlugs.length > 0) {

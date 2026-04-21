@@ -49,6 +49,15 @@ export function StoreMenu({
     if (ref) setPendingOrder(ref);
   }, [restaurant.slug]);
 
+  // Open customize sheet for a specific item via ?item= URL parameter (from main bot)
+  useEffect(() => {
+    const itemId = searchParams.get("item");
+    if (!itemId) return;
+    const allItems = categories.flatMap((c) => c.items);
+    const item = allItems.find((i) => i.id === itemId);
+    if (item) setCustomizingItem(item);
+  }, [searchParams, categories]);
+
   // Pre-fill cart from ?pedido= URL parameter (used by WhatsApp bot)
   useEffect(() => {
     const pedido = searchParams.get("pedido");

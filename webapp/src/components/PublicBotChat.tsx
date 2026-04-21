@@ -23,9 +23,21 @@ type CategoryButton = {
   itemCount: number;
 };
 
+type CrossItemCard = {
+  type: "cross_item";
+  id: string;
+  slug: string;
+  restaurantName: string;
+  name: string;
+  price: number;
+  description: string | null;
+  imageUrl: string | null;
+};
+
 type BotBlock =
   | { type: "restaurants"; items: RestaurantCard[] }
   | { type: "categories"; items: CategoryButton[]; slug: string; restaurantName: string }
+  | { type: "cross_items"; items: CrossItemCard[] }
   | { type: "checkout"; url: string; slug: string; items: { name: string; qty: number; price: number }[]; total: number };
 
 type Message = {
@@ -120,6 +132,36 @@ function CategoryButtons({ items, onSelect }: { items: CategoryButton[]; onSelec
         >
           {c.name} <span className="text-text-muted ml-1">({c.itemCount})</span>
         </button>
+      ))}
+    </div>
+  );
+}
+
+function CrossItemCards({ items }: { items: CrossItemCard[] }) {
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+      {items.map((it) => (
+        <a
+          key={`${it.slug}-${it.id}`}
+          href={`/${it.slug}?item=${it.id}`}
+          target="_blank"
+          rel="noopener"
+          className="shrink-0 w-44 rounded-xl border border-border/50 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-primary/30 transition-all snap-start"
+        >
+          {it.imageUrl && (
+            <div className="relative h-24 bg-slate-100">
+              <Image src={it.imageUrl} alt={it.name} fill className="object-cover" sizes="176px" />
+            </div>
+          )}
+          <div className="p-2.5">
+            <div className="text-[10px] text-primary font-semibold truncate">{it.restaurantName}</div>
+            <div className="text-xs font-bold text-text truncate mt-0.5">{it.name}</div>
+            {it.description && (
+              <div className="text-[10px] text-text-muted truncate mt-0.5">{it.description}</div>
+            )}
+            <div className="text-sm font-bold text-text mt-1">${it.price.toLocaleString("es-AR")}</div>
+          </div>
+        </a>
       ))}
     </div>
   );
@@ -459,6 +501,9 @@ export function PublicBotChat() {
                     }
                     if (block.type === "categories") {
                       return <CategoryButtons key={bi} items={block.items} onSelect={handleCategorySelect} />;
+                    }
+                    if (block.type === "cross_items") {
+                      return <CrossItemCards key={bi} items={block.items} />;
                     }
                     if (block.type === "checkout") {
                       return <CheckoutCard key={bi} block={block} onCartSaved={refreshCarts} />;
