@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import type { Restaurant } from "@/data/restaurants";
 import type { DeliveryConfig } from "./delivery";
+import { isRestaurantOpen } from "./hours";
 
 export type RestaurantWithDealerId = Restaurant & {
   dealerId: string | null;
@@ -37,7 +38,7 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
     rating: dealer.rating ?? 0,
     itemCount,
     priceRange: "$$",
-    isOpen: true,
+    isOpen: isRestaurantOpen(dealer.openHours),
     deliveryTimeMin: dealer.deliveryTimeMin ?? null,
     isVerified: dealer.isVerified,
     hasPendingOwner: !!dealer.pendingOwnerEmail,

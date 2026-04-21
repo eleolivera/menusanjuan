@@ -12,7 +12,53 @@ import { OrderModal } from "./OrderModal";
 import { ItemCustomizeSheet, type SelectedOptions } from "./ItemCustomizeSheet";
 import { OrderStatusBanner } from "./OrderStatusBanner";
 import { StoreCompanion } from "./StoreCompanion";
-import { getLatestOrderRef, type OrderRef } from "@/lib/order-tracker";
+import { getLatestOrderRef, getOrderRefs, type OrderRef } from "@/lib/order-tracker";
+
+// Search results component — filters items across all categories
+function SearchResults({
+  search,
+  categories,
+  getTotalQty,
+  onAddItem,
+}: {
+  search: string;
+  categories: MenuCategoryData[];
+  getTotalQty: (id: string) => number;
+  onAddItem: (item: MenuItemData) => void;
+}) {
+  const q = search.toLowerCase().trim();
+  const allItems = categories.flatMap((c) => c.items.filter((i) => i.available));
+  const results = allItems.filter((item) =>
+    item.name.toLowerCase().includes(q) ||
+    (item.description && item.description.toLowerCase().includes(q))
+  );
+
+  if (results.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <div className="text-3xl mb-3">🔍</div>
+        <p className="text-sm text-text-secondary">No encontramos "{search}"</p>
+        <p className="text-xs text-text-muted mt-1">Probá con otra palabra</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="text-sm text-text-muted mb-3">{results.length} resultado{results.length !== 1 ? "s" : ""}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {results.map((item) => (
+          <MenuItemCard
+            key={item.id}
+            item={item}
+            totalInCart={getTotalQty(item.id)}
+            onClick={() => onAddItem(item)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export type CartEntry = {
   cartKey: string;
@@ -40,6 +86,9 @@ export function StoreMenu({
   const [customizingItem, setCustomizingItem] = useState<MenuItemData | null>(null);
   const [pendingOrder, setPendingOrder] = useState<OrderRef | null>(null);
   const [trackingMode, setTrackingMode] = useState(false);
+  const [search, setSearch] = useState("");
+  const [pastOrders, setPastOrders] = useState<OrderRef[]>([]);
+  const [reordering, setReordering] = useState(false);
 
   const searchParams = useSearchParams();
 
@@ -47,7 +96,44 @@ export function StoreMenu({
   useEffect(() => {
     const ref = getLatestOrderRef(restaurant.slug);
     if (ref) setPendingOrder(ref);
+    // Load past orders for this restaurant (for re-order)
+    setPastOrders(getOrderRefs(restaurant.slug));
   }, [restaurant.slug]);
+
+  // Re-order: fetch a past order and pre-fill the cart with those items
+  const reorderFromPast = useCallback(async (orderId: string, token: string) => {
+    if (reordering) return;
+    setReordering(true);
+    try {
+      const res = await fetch(`/api/orders/track?id=${orderId}&token=${token}`);
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      const orderItems = data.items as { menuItemId: string; quantity: number; name: string; unitPrice: number; optionsDelta?: number; selectedOptions?: SelectedOptions; note?: string }[];
+      const allItems = categories.flatMap((c) => c.items);
+      const entries: CartEntry[] = [];
+      for (const oi of orderItems) {
+        const item = allItems.find((i) => i.id === oi.menuItemId);
+        if (item) {
+          entries.push({
+            cartKey: `ck-reorder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            item,
+            quantity: oi.quantity,
+            selectedOptions: oi.selectedOptions || [],
+            optionsDelta: oi.optionsDelta || 0,
+            note: oi.note || "",
+          });
+        }
+      }
+      if (entries.length > 0) {
+        setCart(entries);
+        setShowModal(true);
+      }
+    } catch {
+      alert("No pudimos cargar el pedido anterior");
+    } finally {
+      setReordering(false);
+    }
+  }, [reordering, categories]);
 
   // Open customize sheet for a specific item via ?item= URL parameter (from main bot)
   useEffect(() => {
@@ -178,6 +264,26 @@ export function StoreMenu({
         </div>
       )}
 
+      {/* Re-order from history */}
+      {pastOrders.length > 0 && !pendingOrder && (
+        <div className="mx-auto max-w-7xl px-4 pt-4">
+          <button
+            onClick={() => reorderFromPast(pastOrders[0].orderId, pastOrders[0].token)}
+            disabled={reordering}
+            className="w-full flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3 hover:bg-primary/10 transition-colors disabled:opacity-50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-lg">
+              🔄
+            </div>
+            <div className="flex-1 text-left">
+              <div className="text-sm font-bold text-text">Repetir pedido anterior</div>
+              <div className="text-[11px] text-text-muted">Pedido {pastOrders[0].orderNumber} — {new Date(pastOrders[0].placedAt).toLocaleDateString("es-AR")}</div>
+            </div>
+            <span className="text-xs font-semibold text-primary">{reordering ? "Cargando..." : "Pedir de nuevo"}</span>
+          </button>
+        </div>
+      )}
+
       <div className="mx-auto max-w-7xl px-4 py-6">
         {categories.length === 0 && (
           <div className="py-16 text-center">
@@ -186,30 +292,69 @@ export function StoreMenu({
             <p className="text-sm text-text-secondary">Este restaurante esta armando su menu. Volve pronto.</p>
           </div>
         )}
-        {categories.map((category) => (
-          <section
-            key={category.id}
-            ref={(el) => { sectionRefs.current[category.id] = el; }}
-            className="mb-10 scroll-mt-32"
-          >
-            <h2 className="mb-4 text-xl font-bold text-text flex items-center gap-2">
-              <span>{category.emoji}</span>
-              {category.name}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {category.items
-                .filter((item) => item.available)
-                .map((item) => (
-                  <MenuItemCard
-                    key={item.id}
-                    item={item}
-                    totalInCart={getTotalQty(item.id)}
-                    onClick={() => addItem(item)}
-                  />
-                ))}
-            </div>
-          </section>
-        ))}
+
+        {/* Menu search */}
+        {categories.length > 0 && (
+          <div className="mb-6 relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar en el menu..."
+              className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-3 text-base text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Search results or full menu */}
+        {search.trim() ? (
+          <SearchResults
+            search={search}
+            categories={categories}
+            getTotalQty={getTotalQty}
+            onAddItem={addItem}
+          />
+        ) : (
+          <>
+            {categories.map((category, catIdx) => (
+              <section
+                key={category.id}
+                ref={(el) => { sectionRefs.current[category.id] = el; }}
+                className="mb-10 scroll-mt-32"
+              >
+                <h2 className="mb-4 text-xl font-bold text-text flex items-center gap-2">
+                  <span>{category.emoji}</span>
+                  {category.name}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {category.items
+                    .filter((item) => item.available)
+                    .map((item, itemIdx) => (
+                      <MenuItemCard
+                        key={item.id}
+                        item={catIdx === 0 && itemIdx < 3 ? { ...item, badge: item.badge || "Popular" } : item}
+                        totalInCart={getTotalQty(item.id)}
+                        onClick={() => addItem(item)}
+                      />
+                    ))}
+                </div>
+              </section>
+            ))}
+          </>
+        )}
       </div>
 
       <FloatingCart
