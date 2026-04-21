@@ -178,7 +178,7 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-amber-500 text-white text-xl font-bold shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all animate-bounce-once"
+        className="fixed bottom-6 left-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-amber-500 text-white text-xl font-bold shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all animate-bounce-once"
         title="Asistente de compras"
       >
         <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -200,9 +200,9 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
       <div className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={() => setIsOpen(false)} />
 
       {/* Panel */}
-      <div className="fixed z-50 flex flex-col bg-white shadow-2xl border-l border-border/50
-        bottom-0 right-0 w-full h-[70vh] rounded-t-3xl
-        md:bottom-4 md:right-4 md:w-[360px] md:h-[500px] md:rounded-2xl md:border">
+      <div className="fixed z-50 flex flex-col bg-white shadow-2xl border-border/50
+        bottom-0 right-0 left-0 w-full h-[70vh] rounded-t-3xl
+        md:bottom-4 md:left-4 md:right-auto md:w-[360px] md:h-[500px] md:rounded-2xl md:border">
 
         {/* Header */}
         <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50">
