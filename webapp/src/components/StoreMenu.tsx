@@ -127,6 +127,12 @@ export function StoreMenu({
       if (entries.length > 0) {
         setCart(entries);
         setShowModal(true);
+        const skipped = orderItems.length - entries.length;
+        if (skipped > 0) {
+          alert(`Ojo: ${skipped} producto${skipped > 1 ? "s" : ""} del pedido anterior ya no está${skipped > 1 ? "n" : ""} disponible${skipped > 1 ? "s" : ""}.`);
+        }
+      } else {
+        alert("Ninguno de los productos del pedido anterior sigue disponible.");
       }
     } catch {
       alert("No pudimos cargar el pedido anterior");
@@ -142,6 +148,12 @@ export function StoreMenu({
     const allItems = categories.flatMap((c) => c.items);
     const item = allItems.find((i) => i.id === itemId);
     if (item) setCustomizingItem(item);
+    // Clear the param so reload doesn't re-trigger
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("item");
+      window.history.replaceState({}, "", url.toString());
+    }
   }, [searchParams, categories]);
 
   // Pre-fill cart from ?pedido= URL parameter (used by WhatsApp bot)
@@ -181,6 +193,12 @@ export function StoreMenu({
       }
     } catch {
       // Invalid pedido param — ignore
+    }
+    // Clear the param so reload doesn't re-trigger
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("pedido");
+      window.history.replaceState({}, "", url.toString());
     }
   }, [searchParams, categories]);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});

@@ -130,9 +130,9 @@ IMPORTANTE:
 
   let reply = res.content[0].type === "text" ? res.content[0].text : "No pude responder.";
 
-  // Parse ACTION:: lines
+  // Parse ACTION:: lines (multiline anchored to prevent false matches inside text)
   const actions: CompanionAction[] = [];
-  const actionLines = reply.match(/ACTION::.+/g) || [];
+  const actionLines = reply.match(/^ACTION::.+$/gm) || [];
 
   for (const line of actionLines) {
     const parts = line.split("::");
@@ -155,13 +155,14 @@ IMPORTANTE:
     }
   }
 
-  // Parse SHOW_ITEMS:: lines and look up item data
+  // Parse SHOW_ITEMS:: lines and look up item data (multiline anchored)
   const suggestedItems: SuggestedItem[] = [];
-  const showItemsMatch = reply.match(/SHOW_ITEMS::(.+)/g) || [];
+  const showItemsMatch = reply.match(/^SHOW_ITEMS::(.+)$/gm) || [];
   if (showItemsMatch.length > 0) {
     const allItemIds = showItemsMatch
-      .map((line) => line.replace("SHOW_ITEMS::", "").split(",").map((id) => id.trim()))
-      .flat();
+      .map((line) => line.replace("SHOW_ITEMS::", "").split(",").map((id) => id.trim().replace(/[.,;:!?\s]+$/, "")))
+      .flat()
+      .filter((id) => id && /^[a-z0-9_-]+$/i.test(id));
 
     // Look up items from DB
     const items = await prisma.menuItem.findMany({
@@ -180,8 +181,8 @@ IMPORTANTE:
     }
   }
 
-  // Strip action and show_items lines from reply
-  reply = reply.replace(/ACTION::.+\n?/g, "").replace(/SHOW_ITEMS::.+\n?/g, "").trim();
+  // Strip action and show_items lines from reply (multiline anchored)
+  reply = reply.replace(/^ACTION::.+$/gm, "").replace(/^SHOW_ITEMS::.+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
 
   return { reply, actions, suggestedItems };
 }

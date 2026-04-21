@@ -495,14 +495,14 @@ Cliente: ${name}`;
     };
   }
 
-  // Handle CHECKOUT_LINK::
+  // Handle CHECKOUT_LINK:: — non-greedy JSON array match so trailing text doesn't break parse
   const blocks: BotBlock[] = [];
-  const link = reply.match(/CHECKOUT_LINK::([a-z0-9-]+)::(\[.*\])/);
+  const link = reply.match(/CHECKOUT_LINK::([a-z0-9-]+)::(\[[^\]]*\])/);
   if (link) {
     try {
       const cart = JSON.parse(link[2]) as { id: string; qty: number }[];
       const url = buildCheckoutLink(link[1], cart);
-      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, "");
+      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[[^\]]*\]/, "");
 
       // Build checkout block with item details
       const menu = await getMenu(link[1]);
@@ -518,21 +518,22 @@ Cliente: ${name}`;
       // After checkout, reset to discovery mode for next order
       convo.selectedSlug = undefined;
     } catch {
-      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[.*\]/, "");
+      reply = reply.replace(/CHECKOUT_LINK::[a-z0-9-]+::\[[^\]]*\]/, "");
     }
   }
 
-  // Parse CROSS_ITEMS:: — cross-restaurant item cards
-  const crossMatch = reply.match(/CROSS_ITEMS::([^\n]+)/);
+  // Parse CROSS_ITEMS:: — cross-restaurant item cards (only allow slug:id chars, strip trailing punctuation)
+  const crossMatch = reply.match(/CROSS_ITEMS::([a-z0-9\-:,\s]+)/);
   if (crossMatch) {
     const pairs = crossMatch[1]
       .split(",")
-      .map((p) => p.trim())
+      .map((p) => p.trim().replace(/[.,;:!?\s]+$/, ""))
       .filter((p) => p.includes(":"))
       .map((p) => {
         const [slug, id] = p.split(":");
         return { slug: slug.trim(), id: id.trim() };
-      });
+      })
+      .filter((p) => p.slug && p.id);
 
     if (pairs.length > 0) {
       const itemIds = pairs.map((p) => p.id);
@@ -562,7 +563,7 @@ Cliente: ${name}`;
         blocks.push({ type: "cross_items", items: crossCards });
       }
     }
-    reply = reply.replace(/CROSS_ITEMS::[^\n]+/g, "").trim();
+    reply = reply.replace(/CROSS_ITEMS::[a-z0-9\-:,\s]+/g, "").trim();
   }
 
   // If we're in discovery mode and the bot mentioned restaurants (not cross items), attach restaurant cards

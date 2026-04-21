@@ -39,9 +39,19 @@ type Props = {
   onOpenCheckout: () => void;
 };
 
-// ── Format bot text ──
-function formatText(text: string): string {
+// Escape HTML to prevent XSS
+function escapeHtml(text: string): string {
   return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// ── Format bot text (escapes HTML first) ──
+function formatText(text: string): string {
+  return escapeHtml(text)
     .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
     .replace(/\n/g, "<br/>");
 }
@@ -131,6 +141,16 @@ export function StoreCompanion({ slug, restaurantName, categories, cart, onAddTo
             case "ADD_ITEM": {
               const item = allItems.find((i: MenuItemData) => i.id === action.itemId);
               if (!item) break;
+              // If item has required option groups and bot didn't provide options, open the sheet instead
+              const hasRequired = item.optionGroups?.some((g) => g.minSelections > 0);
+              if (hasRequired && !action.options) {
+                setCustomizingItem(item);
+                setMessages((prev) => [...prev, {
+                  role: "assistant",
+                  content: `Ojo culiao, *${item.name}* necesita que elijas opciones. Abrí el detalle y elegí.`,
+                }]);
+                break;
+              }
               const opts: SelectedOptions = [];
               if (action.options) {
                 opts.push({

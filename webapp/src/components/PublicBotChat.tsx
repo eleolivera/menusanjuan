@@ -69,9 +69,19 @@ function pickSticker(text: string, personality: string): string | undefined {
   return undefined;
 }
 
-// ── Format WhatsApp-style text ──
-function formatBotMessage(text: string): string {
+// Escape HTML to prevent XSS from bot output / item descriptions
+function escapeHtml(text: string): string {
   return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// ── Format WhatsApp-style text (escapes HTML first, then applies *bold* and links) ──
+function formatBotMessage(text: string): string {
+  return escapeHtml(text)
     .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
     .replace(
       /(https?:\/\/[^\s]+)/g,

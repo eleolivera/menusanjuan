@@ -52,6 +52,8 @@ export function OrderModal({
     trackingOrder ? "tracking" : "cart"
   );
   const [editingNote, setEditingNote] = useState<{ cartKey: string; text: string } | null>(null);
+  // Snapshot of items taken right before cart is cleared — used for re-send WhatsApp after checkout
+  const [sentItemsSnapshot, setSentItemsSnapshot] = useState<CartItem[]>([]);
   const [name, setName] = useState(() => {
     if (typeof window !== "undefined") return localStorage.getItem("msj_name") || "";
     return "";
@@ -133,8 +135,8 @@ export function OrderModal({
     }
   }
 
-  function buildWhatsAppMessage(orderNum: string) {
-    const itemLines = items
+  function formatItemLines(cartItems: CartItem[]): string {
+    return cartItems
       .map((ci) => {
         const linePrice = (ci.item.price + ci.optionsDelta) * ci.quantity;
         let line = `  ${ci.quantity}x ${ci.item.name} — $${linePrice.toLocaleString("es-AR")}`;
@@ -151,7 +153,10 @@ export function OrderModal({
         return line;
       })
       .join("\n");
+  }
 
+  function buildWhatsAppMessageFor(orderNum: string, cartItems: CartItem[]): string {
+    const itemLines = formatItemLines(cartItems);
     const methodLabel = deliveryMethod === "pickup" ? "Retiro en local" : "Delivery";
     let deliveryLine = "";
     if (deliveryMethod === "delivery" && deliveryFee > 0) {
@@ -162,14 +167,16 @@ export function OrderModal({
       deliveryLine = "\n🏪 *Retiro en local* (sin costo de envío)";
     }
 
-    const msg = `🍽️ *Nuevo Pedido — ${restaurantName}*
+    const subtotal = cartItems.reduce((s, ci) => s + (ci.item.price + ci.optionsDelta) * ci.quantity, 0);
+
+    return `🍽️ *Nuevo Pedido — ${restaurantName}*
 ━━━━━━━━━━━━━━━━━━
 📋 *Pedido:* ${orderNum}
 
 ${itemLines}
 
-💰 *Subtotal: $${total.toLocaleString("es-AR")}*${deliveryLine}
-💰 *Total: $${grandTotal.toLocaleString("es-AR")}*${!hasDeliveryPricing && deliveryMethod === "delivery" ? " + envío" : ""}
+💰 *Subtotal: $${subtotal.toLocaleString("es-AR")}*${deliveryLine}
+💰 *Total: $${(subtotal + deliveryFee).toLocaleString("es-AR")}*${!hasDeliveryPricing && deliveryMethod === "delivery" ? " + envío" : ""}
 ━━━━━━━━━━━━━━━━━━
 👤 *Nombre:* ${name}
 📱 *Teléfono:* ${phone}
@@ -179,8 +186,39 @@ ${deliveryMethod === "delivery" && latitude && longitude ? `📌 *Mapa:* https:/
 ${notes ? `📝 *Notas:* ${notes}` : ""}
 ━━━━━━━━━━━━━━━━━━
 _Pedido realizado desde MenuSanJuan_`;
+  }
 
-    return encodeURIComponent(msg);
+  function buildWhatsAppMessage(orderNum: string) {
+    return encodeURIComponent(buildWhatsAppMessageFor(orderNum, items));
+  }
+
+  // Rebuild from tracking data (persisted order) — used when cart has been cleared and snapshot is gone
+  function buildWhatsAppFromTracking(orderNum: string, td: any): string {
+    const tdItems = (td.items as any[]) || [];
+    const lines = tdItems.map((it) => {
+      let line = `  ${it.quantity}x ${it.name} — $${(it.total ?? (it.unitPrice * it.quantity)).toLocaleString("es-AR")}`;
+      if (it.selectedOptions?.length > 0) {
+        const optLines = it.selectedOptions.map((so: any) => {
+          const choiceNames = so.choices.map((c: any) => c.priceDelta > 0 ? `${c.name} (+$${c.priceDelta.toLocaleString("es-AR")})` : c.name).join(", ");
+          return `     > ${so.group}: ${choiceNames}`;
+        });
+        line += "\n" + optLines.join("\n");
+      }
+      if (it.note) line += `\n     > Nota: ${it.note}`;
+      return line;
+    }).join("\n");
+
+    return `🍽️ *Nuevo Pedido — ${td.restaurantName || restaurantName}*
+━━━━━━━━━━━━━━━━━━
+📋 *Pedido:* ${orderNum}
+
+${lines}
+
+💰 *Total: $${(td.total || 0).toLocaleString("es-AR")}*
+━━━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${td.customerName || name}
+━━━━━━━━━━━━━━━━━━
+_Pedido realizado desde MenuSanJuan_`;
   }
 
   async function handleSendWhatsApp() {
@@ -236,7 +274,8 @@ _Pedido realizado desde MenuSanJuan_`;
 
       setStep("tracking");
 
-      // Clear the cart — order is saved to DB, no need to keep items
+      // Snapshot items for later re-send, then clear the cart
+      setSentItemsSnapshot(items);
       onClearCart?.();
 
       // Mark as sent (non-blocking)
@@ -683,7 +722,17 @@ _Pedido realizado desde MenuSanJuan_`;
                     const phone = trackingData?.restaurantPhone || restaurantPhone;
                     const cleanPhone = formatForWhatsApp(phone) || phone.replace(/[^0-9]/g, "");
                     const num = trackingOrder?.orderNumber || orderNumber;
-                    const msg = num ? encodeURIComponent(buildWhatsAppMessage(num)) : encodeURIComponent(`Hola! Consulto por mi pedido en ${trackingData?.restaurantName || restaurantName}`);
+                    // Prefer cart items if still present; otherwise use snapshot or tracking data
+                    const itemsForMessage = items.length > 0 ? items : sentItemsSnapshot;
+                    let msg: string;
+                    if (num && itemsForMessage.length > 0) {
+                      msg = encodeURIComponent(buildWhatsAppMessageFor(num, itemsForMessage));
+                    } else if (num && trackingData?.items) {
+                      // Rebuild from tracking data (persisted in DB)
+                      msg = encodeURIComponent(buildWhatsAppFromTracking(num, trackingData));
+                    } else {
+                      msg = encodeURIComponent(`Hola! Consulto por mi pedido en ${trackingData?.restaurantName || restaurantName}`);
+                    }
                     window.location.href = `https://wa.me/${cleanPhone}?text=${msg}`;
                   }}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-sm hover:shadow-md transition-all"
