@@ -1,0 +1,8 @@
+mcp/
+scraper/
+menusanjuan-setup/
+docs/
+*.zip
+*.svg
+*.md
+setup-claude.sh
