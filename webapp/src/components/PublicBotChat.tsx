@@ -316,16 +316,28 @@ export function PublicBotChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [sessionId] = useState(() => {
-    if (typeof window !== "undefined") {
-      const existing = localStorage.getItem("msj_bot_session");
-      if (existing) return existing;
-      const id = `pub_${Date.now()}`;
-      localStorage.setItem("msj_bot_session", id);
-      return id;
+  const [sessionId, setSessionId] = useState(() => {
+    if (typeof window === "undefined") return `pub_${Date.now()}`;
+    const SESSION_TTL = 30 * 60 * 1000;
+    const raw = localStorage.getItem("msj_bot_session_v2");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as { id: string; ts: number; completed?: boolean };
+        if (!parsed.completed && Date.now() - parsed.ts < SESSION_TTL) {
+          return parsed.id;
+        }
+      } catch {}
     }
-    return `pub_${Date.now()}`;
+    const id = `pub_${Date.now()}`;
+    localStorage.setItem("msj_bot_session_v2", JSON.stringify({ id, ts: Date.now() }));
+    localStorage.removeItem("msj_bot_session");
+    return id;
   });
+
+  const bumpSessionActivity = useCallback((completed = false) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("msj_bot_session_v2", JSON.stringify({ id: sessionId, ts: Date.now(), completed }));
+  }, [sessionId]);
   const [personality, setPersonality] = useState<"normal" | "bardero">("bardero");
   const [carts, setCarts] = useState<BotCart[]>([]);
   const messagesEnd = useRef<HTMLDivElement>(null);
@@ -361,6 +373,8 @@ export function PublicBotChat() {
         blocks: data.blocks,
         sticker,
       }]);
+      const hasCheckout = Array.isArray(data.blocks) && data.blocks.some((b: { type: string }) => b.type === "checkout");
+      bumpSessionActivity(hasCheckout);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -399,9 +413,9 @@ export function PublicBotChat() {
       body: JSON.stringify({ sessionId, action: "reset" }),
     });
     setMessages([]);
-    // New session for clean state
     const newId = `pub_${Date.now()}`;
-    localStorage.setItem("msj_bot_session", newId);
+    localStorage.setItem("msj_bot_session_v2", JSON.stringify({ id: newId, ts: Date.now() }));
+    setSessionId(newId);
     inputRef.current?.focus();
   }
 
