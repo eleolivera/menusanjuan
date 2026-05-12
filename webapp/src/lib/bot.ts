@@ -540,8 +540,8 @@ Cliente: ${name}`;
     }
   }
 
-  // Parse CROSS_ITEMS:: — cross-restaurant item cards (only allow slug:id chars, strip trailing punctuation)
-  const crossMatch = reply.match(/CROSS_ITEMS::([a-z0-9\-:,\s]+)/);
+  // Parse CROSS_ITEMS:: — cross-restaurant item cards (allow underscores; item IDs can contain _)
+  const crossMatch = reply.match(/CROSS_ITEMS::([a-z0-9_\-:,\s]+)/);
   if (crossMatch) {
     const pairs = crossMatch[1]
       .split(",")
@@ -581,7 +581,7 @@ Cliente: ${name}`;
         blocks.push({ type: "cross_items", items: crossCards });
       }
     }
-    reply = reply.replace(/CROSS_ITEMS::[a-z0-9\-:,\s]+/g, "").trim();
+    reply = reply.replace(/CROSS_ITEMS::[a-z0-9_\-:,\s]+/g, "").trim();
   }
 
   // If we're in discovery mode and the bot mentioned restaurants (not cross items), attach restaurant cards
