@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { getBotCarts, saveBotCart, removeBotCart, type BotCart } from "@/lib/bot-carts";
 import { getAllOrderRefs } from "@/lib/order-tracker";
 
@@ -84,8 +85,8 @@ function formatBotMessage(text: string): string {
   return escapeHtml(text)
     .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
     .replace(
-      /(https?:\/\/[^\s]+)/g,
-      '<a href="$1" target="_blank" rel="noopener" class="text-primary underline hover:text-primary/80 break-all">$1</a>'
+      /(https?:\/\/[^\s<]+?)([.,;:!?)]*)(?=\s|<|$)/g,
+      '<a href="$1" target="_blank" rel="noopener" class="text-primary underline hover:text-primary/80 break-all">$1</a>$2'
     )
     .replace(/\n/g, "<br/>");
 }
@@ -441,6 +442,12 @@ export function PublicBotChat() {
             <h1 className="text-base font-bold text-text">MenuSanJuan</h1>
             <p className="text-[11px] text-text-muted">Tu asistente de comida en San Juan</p>
           </div>
+          <Link
+            href="/explorar"
+            className="rounded-xl border border-border px-3 py-1.5 text-xs font-medium text-text-muted hover:bg-surface-alt transition-colors"
+          >
+            🍽️ Ver menús
+          </Link>
           <button
             onClick={togglePersonality}
             className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
