@@ -83,8 +83,9 @@ async function getDirectory(): Promise<string> {
     const allItems = d.categories.flatMap((c) => c.items);
     if (allItems.length === 0) continue;
     text += `- ${d.name} (slug:${d.slug}) — ${d.cuisineType || "Varios"}${d.rating ? `, ${d.rating}★` : ""}\n`;
-    // Include top items inline so bot can reference them across restaurants
-    const topItems = allItems.slice(0, 5);
+    // Include up to 12 items per restaurant so the bot can cite the full short menus
+    // (Puerto Pachatas has 14 items — at slice 5 the Pecadora promo was being cut)
+    const topItems = allItems.slice(0, 12);
     for (const item of topItems) {
       text += `  · [${item.id}] ${item.name} ($${item.price.toLocaleString("es-AR")})\n`;
     }
