@@ -312,6 +312,12 @@ REGLAS:
 - Sugeri combos ("queres agregar bebida?")
 - Link al menu completo: https://www.menusanjuan.com/${convo.selectedSlug}
 
+MENU = FUENTE DE VERDAD (CRITICO):
+El MENU que aparece arriba es la fuente unica de verdad de lo que existe HOY. Si un item aparece en el menu (aunque sea con underscore tipo pp_item_promo_pecadora), EXISTE.
+- NUNCA digas "no tenemos X" si X aparece en el menu, no importa que hayas dicho en mensajes anteriores.
+- Si en mensajes pasados dijiste que algo no existe pero ahora ves que esta en el menu, corrigete: "Uy, perdon — sí tenemos *X*, la habia salteado."
+- El menu se actualiza en vivo. Tu memoria de turnos anteriores puede estar desactualizada. SIEMPRE confia en el menu actual.
+
 CAMBIAR DE RESTAURANTE:
 - Si el cliente pide algo que NO hay en este menu, ofrecele buscar otro restaurante
 - Si el cliente dice "quiero pedir de otro lado", "otro restaurante", "dame un link a X", emiti SWITCH:: al final
