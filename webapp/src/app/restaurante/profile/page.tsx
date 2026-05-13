@@ -44,6 +44,8 @@ export default function ProfilePage() {
     cuisineType: "", description: "", logoUrl: "", coverUrl: "",
     openHours: JSON.stringify(parseHours(null)),
     mercadoPagoAlias: "", mercadoPagoCvu: "", bankInfo: "", posEnabled: false,
+    deliveryEnabled: true, deliveryCloseRadius: null, deliveryClosePrice: null,
+    deliveryFarRadius: null, deliveryFarPrice: null, deliveryTimeMin: null,
   });
 
   const FIELD_CONFIG = {
@@ -61,6 +63,12 @@ export default function ProfilePage() {
     mercadoPagoCvu: { tier: "autosave" as const },
     bankInfo: { tier: "autosave" as const },
     posEnabled: { tier: "instant" as const },
+    deliveryEnabled: { tier: "instant" as const },
+    deliveryCloseRadius: { tier: "autosave" as const },
+    deliveryClosePrice: { tier: "autosave" as const },
+    deliveryFarRadius: { tier: "autosave" as const },
+    deliveryFarPrice: { tier: "autosave" as const },
+    deliveryTimeMin: { tier: "autosave" as const },
   };
 
   const { values, setValue, flushField, statuses } = useSmartSave(
@@ -84,6 +92,12 @@ export default function ProfilePage() {
   const mercadoPagoCvu = values.mercadoPagoCvu as string;
   const bankInfo = values.bankInfo as string;
   const posEnabled = values.posEnabled as boolean;
+  const deliveryEnabled = values.deliveryEnabled as boolean;
+  const deliveryCloseRadius = values.deliveryCloseRadius as number | null;
+  const deliveryClosePrice = values.deliveryClosePrice as number | null;
+  const deliveryFarRadius = values.deliveryFarRadius as number | null;
+  const deliveryFarPrice = values.deliveryFarPrice as number | null;
+  const deliveryTimeMin = values.deliveryTimeMin as number | null;
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +139,12 @@ export default function ProfilePage() {
           mercadoPagoCvu: d.mercadoPagoCvu || "",
           bankInfo: d.bankInfo || "",
           posEnabled: d.posEnabled || false,
+          deliveryEnabled: d.deliveryEnabled ?? true,
+          deliveryCloseRadius: d.deliveryCloseRadius,
+          deliveryClosePrice: d.deliveryClosePrice,
+          deliveryFarRadius: d.deliveryFarRadius,
+          deliveryFarPrice: d.deliveryFarPrice,
+          deliveryTimeMin: d.deliveryTimeMin,
         });
         setLoading(false);
       })
@@ -322,6 +342,112 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Delivery Zones */}
+        <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-white">Zonas de Delivery</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Definí cuánto cobrás según la distancia del cliente</p>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <span className="text-xs text-slate-400">Activo</span>
+              <input
+                type="checkbox"
+                checked={deliveryEnabled}
+                onChange={(e) => setValue("deliveryEnabled", e.target.checked)}
+                className="h-5 w-9 appearance-none rounded-full bg-slate-700 transition-colors checked:bg-primary relative cursor-pointer before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
+              />
+              <SaveIndicator status={statuses.deliveryEnabled} />
+            </label>
+          </div>
+
+          {deliveryEnabled && (
+            <div className="space-y-5">
+              <div>
+                <h3 className="text-xs font-semibold text-slate-300 mb-2">Zona cercana</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                      Radio (km) <SaveIndicator status={statuses.deliveryCloseRadius} />
+                    </label>
+                    <input
+                      type="number" step="0.1" min="0"
+                      value={deliveryCloseRadius ?? ""}
+                      onChange={(e) => setValue("deliveryCloseRadius", e.target.value === "" ? null : Number(e.target.value))}
+                      onBlur={() => flushField("deliveryCloseRadius")}
+                      placeholder="3.0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                      Precio (ARS) <SaveIndicator status={statuses.deliveryClosePrice} />
+                    </label>
+                    <input
+                      type="number" step="100" min="0"
+                      value={deliveryClosePrice ?? ""}
+                      onChange={(e) => setValue("deliveryClosePrice", e.target.value === "" ? null : Number(e.target.value))}
+                      onBlur={() => flushField("deliveryClosePrice")}
+                      placeholder="1500"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-semibold text-slate-300 mb-2">Zona lejana</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                      Radio (km) <SaveIndicator status={statuses.deliveryFarRadius} />
+                    </label>
+                    <input
+                      type="number" step="0.1" min="0"
+                      value={deliveryFarRadius ?? ""}
+                      onChange={(e) => setValue("deliveryFarRadius", e.target.value === "" ? null : Number(e.target.value))}
+                      onBlur={() => flushField("deliveryFarRadius")}
+                      placeholder="7.0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                      Precio (ARS) <SaveIndicator status={statuses.deliveryFarPrice} />
+                    </label>
+                    <input
+                      type="number" step="100" min="0"
+                      value={deliveryFarPrice ?? ""}
+                      onChange={(e) => setValue("deliveryFarPrice", e.target.value === "" ? null : Number(e.target.value))}
+                      onBlur={() => flushField("deliveryFarPrice")}
+                      placeholder="3000"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                  Tiempo estimado de entrega (minutos) <SaveIndicator status={statuses.deliveryTimeMin} />
+                </label>
+                <input
+                  type="number" step="5" min="0"
+                  value={deliveryTimeMin ?? ""}
+                  onChange={(e) => setValue("deliveryTimeMin", e.target.value === "" ? null : Number(e.target.value))}
+                  onBlur={() => flushField("deliveryTimeMin")}
+                  placeholder="45"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                />
+              </div>
+
+              <p className="text-[11px] text-slate-500">
+                Más allá del radio lejano no se ofrece envío. Si dejás los campos en blanco, no cobrás envío para esa zona.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* Payment Info */}
