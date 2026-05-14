@@ -294,8 +294,16 @@ export default function ProfilePage() {
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-500 transition-colors" />
             </div>
             <div>
-              <PhoneInput value={phone} onChange={(v) => setValue("phone", v)} onBlur={() => flushField("phone")} label="WhatsApp del Restaurante" placeholder="264 555 1234" required darkMode />
-              <SaveIndicator status={statuses.phone} />
+              <PhoneInput
+                value={phone}
+                onChange={(v) => setValue("phone", v)}
+                onBlur={() => flushField("phone")}
+                label="WhatsApp del Restaurante"
+                placeholder="264 555 1234"
+                required
+                darkMode
+                statusIndicator={<SaveIndicator status={statuses.phone} />}
+              />
             </div>
             <div>
               <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">

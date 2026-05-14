@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { isValidPhone, formatPhoneDisplay, formatForWhatsApp } from "@/lib/phone";
 
 const COUNTRIES = [
@@ -25,6 +25,7 @@ export function PhoneInput({
   placeholder = "264 555 1234",
   required = false,
   darkMode = false,
+  statusIndicator,
 }: {
   value: string;
   onChange: (phone: string) => void;
@@ -33,31 +34,32 @@ export function PhoneInput({
   placeholder?: string;
   required?: boolean;
   darkMode?: boolean;
+  statusIndicator?: React.ReactNode;
 }) {
   const [country, setCountry] = useState("AR");
   const [localNumber, setLocalNumber] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [valid, setValid] = useState<boolean | null>(null);
+  const initialized = useRef(false);
 
-  // Initialize from value
+  // Initialize once the value prop arrives (it may be empty on first render while parent is fetching)
   useEffect(() => {
-    if (value && !localNumber) {
-      // Try to detect country from value
-      const match = COUNTRIES.find((c) => value.startsWith(c.prefix) || value.startsWith(c.prefix.replace("+", "")));
-      if (match) {
-        setCountry(match.code);
-        const stripped = value.replace(match.prefix, "").replace(match.prefix.replace("+", ""), "");
-        setLocalNumber(stripped);
-        // Validate on init
-        const isValid = isValidPhone(value, match.code as any);
-        setValid(stripped.length > 5 ? isValid : null);
-      } else {
-        setLocalNumber(value);
-        const isValid = isValidPhone(value, "AR");
-        setValid(value.length > 5 ? isValid : null);
-      }
+    if (initialized.current) return;
+    if (!value) return;
+    const match = COUNTRIES.find((c) => value.startsWith(c.prefix) || value.startsWith(c.prefix.replace("+", "")));
+    if (match) {
+      setCountry(match.code);
+      const stripped = value.replace(match.prefix, "").replace(match.prefix.replace("+", ""), "");
+      setLocalNumber(stripped);
+      const isValid = isValidPhone(value, match.code as any);
+      setValid(stripped.length > 5 ? isValid : null);
+    } else {
+      setLocalNumber(value);
+      const isValid = isValidPhone(value, "AR");
+      setValid(value.length > 5 ? isValid : null);
     }
-  }, []);
+    initialized.current = true;
+  }, [value]);
 
   function handleChange(num: string) {
     // Only allow digits and spaces
@@ -93,8 +95,9 @@ export function PhoneInput({
   return (
     <div>
       {label && (
-        <label className={`mb-1.5 block text-sm font-medium ${darkMode ? "text-slate-400" : "text-text"}`}>
-          {label} {required && <span className="text-danger">*</span>}
+        <label className={`mb-1.5 flex items-center text-sm font-medium ${darkMode ? "text-slate-400" : "text-text"}`}>
+          <span>{label} {required && <span className="text-danger">*</span>}</span>
+          {statusIndicator}
         </label>
       )}
       <div className="flex relative">
