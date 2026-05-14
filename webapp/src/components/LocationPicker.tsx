@@ -324,6 +324,11 @@ export function LocationPicker({
           <p className="mt-1 ml-6 text-xs text-emerald-700">
             {writtenAddress.trim() || `📍 Ubicación marcada en el mapa (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`}
           </p>
+          {!writtenAddress.trim() && (
+            <div className="mt-3 ml-6 rounded-lg bg-emerald-100/60 border border-emerald-200/60 p-2.5 text-[11px] text-emerald-800">
+              💡 <strong>Tip:</strong> el motorista va a usar el pin para llegar. Si tu casa es difícil de encontrar, tocá <button type="button" onClick={handleEdit} className="underline font-medium hover:text-emerald-900">Cambiar</button> y agregá referencias (depto, timbre, color de puerta, etc.) — ayuda mucho.
+            </div>
+          )}
         </div>
       )}
     </div>
