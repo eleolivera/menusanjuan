@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { RestaurantQrCard } from "@/components/RestaurantQrCard";
 
 const DEFAULT_NAV = [
   { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
@@ -49,6 +50,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [restaurants, setRestaurants] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [pendingClaims, setPendingClaims] = useState<Array<{ id: string; status: string; dealer: { id: string; name: string; slug: string } }>>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
@@ -283,6 +285,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               )}
             </a>
           )}
+
+          {/* My QR — opens modal */}
+          {slug && (
+            <button
+              type="button"
+              onClick={() => setQrOpen(true)}
+              title={collapsed ? "Mi QR" : undefined}
+              className={`w-full flex items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-slate-300 transition-colors ${
+                collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+              }`}
+            >
+              <span className={collapsed ? "text-lg" : "text-base mr-2.5"}>📱</span>
+              {!collapsed && <span className="text-sm font-medium">Mi QR</span>}
+            </button>
+          )}
         </nav>
 
         {/* Logout + collapse */}
@@ -364,6 +381,25 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:shadow-primary/30 transition-all"
             >
               Empezar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* QR modal — accessed from sidebar */}
+      {qrOpen && slug && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setQrOpen(false)}
+        >
+          <div className="w-full max-w-md mx-auto" onClick={(e) => e.stopPropagation()}>
+            <RestaurantQrCard slug={slug} name={restaurantName || slug} />
+            <button
+              type="button"
+              onClick={() => setQrOpen(false)}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/80 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/5 transition-colors"
+            >
+              Cerrar
             </button>
           </div>
         </div>
