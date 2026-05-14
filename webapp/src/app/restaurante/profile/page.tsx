@@ -307,49 +307,14 @@ export default function ProfilePage() {
           }}
         />
 
-        {/* Images section removed — cover + logo are editable in the preview above */}
-
-        {/* Hours of Operation */}
-        <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
-          <h2 className="text-sm font-bold text-white mb-4">Horarios de Atención</h2>
-          <div className="space-y-2">
-            {DAYS.map((day) => (
-              <div key={day.key} className="flex items-center gap-3">
-                <span className="w-20 text-xs font-medium text-slate-400">{day.label}</span>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!hours[day.key]?.closed}
-                    onChange={(e) => updateHours(day.key, "closed", !e.target.checked)}
-                    className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
-                  />
-                  <span className="text-[11px] text-slate-500">Abierto</span>
-                </label>
-                {!hours[day.key]?.closed && (
-                  <div className="flex items-center gap-2">
-                    <input type="time" value={hours[day.key]?.open || "08:00"}
-                      onChange={(e) => updateHours(day.key, "open", e.target.value)}
-                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none" />
-                    <span className="text-xs text-slate-600">a</span>
-                    <input type="time" value={hours[day.key]?.close || "23:00"}
-                      onChange={(e) => updateHours(day.key, "close", e.target.value)}
-                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none" />
-                  </div>
-                )}
-                {hours[day.key]?.closed && (
-                  <span className="text-xs text-slate-600">Cerrado</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Delivery Zones */}
+        {/* Delivery Zones — measured from the address above */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-bold text-white">Zonas de Delivery</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Definí cuánto cobrás según la distancia del cliente</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                La distancia se mide desde <span className="text-primary font-medium">tu dirección de arriba</span> hasta la del cliente
+              </p>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <span className="text-xs text-slate-400">Activo</span>
@@ -362,6 +327,12 @@ export default function ProfilePage() {
               <SaveIndicator status={statuses.deliveryEnabled} />
             </label>
           </div>
+
+          {(!latitude || !longitude) && (
+            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+              ⚠️ Necesitás cargar tu ubicación arriba (con el mapa) para que el cálculo de delivery funcione. Sin coordenadas, los clientes verán "Costo de envío a confirmar".
+            </div>
+          )}
 
           {deliveryEnabled && (
             <div className="space-y-5">
@@ -448,6 +419,41 @@ export default function ProfilePage() {
               </p>
             </div>
           )}
+        </section>
+
+        {/* Hours of Operation */}
+        <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+          <h2 className="text-sm font-bold text-white mb-4">Horarios de Atención</h2>
+          <div className="space-y-2">
+            {DAYS.map((day) => (
+              <div key={day.key} className="flex items-center gap-3">
+                <span className="w-20 text-xs font-medium text-slate-400">{day.label}</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!hours[day.key]?.closed}
+                    onChange={(e) => updateHours(day.key, "closed", !e.target.checked)}
+                    className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                  />
+                  <span className="text-[11px] text-slate-500">Abierto</span>
+                </label>
+                {!hours[day.key]?.closed && (
+                  <div className="flex items-center gap-2">
+                    <input type="time" value={hours[day.key]?.open || "08:00"}
+                      onChange={(e) => updateHours(day.key, "open", e.target.value)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none" />
+                    <span className="text-xs text-slate-600">a</span>
+                    <input type="time" value={hours[day.key]?.close || "23:00"}
+                      onChange={(e) => updateHours(day.key, "close", e.target.value)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none" />
+                  </div>
+                )}
+                {hours[day.key]?.closed && (
+                  <span className="text-xs text-slate-600">Cerrado</span>
+                )}
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* Payment Info */}
