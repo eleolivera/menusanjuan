@@ -45,7 +45,7 @@ export default function ProfilePage() {
     openHours: JSON.stringify(parseHours(null)),
     mercadoPagoAlias: "", mercadoPagoCvu: "", bankInfo: "", posEnabled: false,
     deliveryEnabled: true, deliveryCloseRadius: null, deliveryClosePrice: null,
-    deliveryFarRadius: null, deliveryFarPrice: null, deliveryTimeMin: null,
+    deliveryFarRadius: null, deliveryFarPrice: null, deliveryFee: null, deliveryTimeMin: null,
   });
 
   const FIELD_CONFIG = {
@@ -68,6 +68,7 @@ export default function ProfilePage() {
     deliveryClosePrice: { tier: "autosave" as const },
     deliveryFarRadius: { tier: "autosave" as const },
     deliveryFarPrice: { tier: "autosave" as const },
+    deliveryFee: { tier: "autosave" as const },
     deliveryTimeMin: { tier: "autosave" as const },
   };
 
@@ -97,7 +98,21 @@ export default function ProfilePage() {
   const deliveryClosePrice = values.deliveryClosePrice as number | null;
   const deliveryFarRadius = values.deliveryFarRadius as number | null;
   const deliveryFarPrice = values.deliveryFarPrice as number | null;
+  const deliveryFee = values.deliveryFee as number | null;
   const deliveryTimeMin = values.deliveryTimeMin as number | null;
+  const deliveryMode: "zones" | "flat" = deliveryFee != null && deliveryFee > 0 ? "flat" : "zones";
+
+  function switchDeliveryMode(next: "zones" | "flat") {
+    if (next === "flat") {
+      setValue("deliveryCloseRadius", null);
+      setValue("deliveryClosePrice", null);
+      setValue("deliveryFarRadius", null);
+      setValue("deliveryFarPrice", null);
+      setValue("deliveryFee", deliveryFee ?? 1500);
+    } else {
+      setValue("deliveryFee", null);
+    }
+  }
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +159,7 @@ export default function ProfilePage() {
           deliveryClosePrice: d.deliveryClosePrice,
           deliveryFarRadius: d.deliveryFarRadius,
           deliveryFarPrice: d.deliveryFarPrice,
+          deliveryFee: d.deliveryFee,
           deliveryTimeMin: d.deliveryTimeMin,
         });
         setLoading(false);
@@ -328,7 +344,7 @@ export default function ProfilePage() {
             </label>
           </div>
 
-          {(!latitude || !longitude) && (
+          {(!latitude || !longitude) && deliveryMode === "zones" && (
             <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
               ⚠️ Necesitás cargar tu ubicación arriba (con el mapa) para que el cálculo de delivery funcione. Sin coordenadas, los clientes verán "Costo de envío a confirmar".
             </div>
@@ -336,6 +352,41 @@ export default function ProfilePage() {
 
           {deliveryEnabled && (
             <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-800/60 border border-white/5">
+                <button
+                  type="button"
+                  onClick={() => switchDeliveryMode("zones")}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${deliveryMode === "zones" ? "bg-primary text-white shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Por zonas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchDeliveryMode("flat")}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${deliveryMode === "flat" ? "bg-primary text-white shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Precio fijo
+                </button>
+              </div>
+
+              {deliveryMode === "flat" ? (
+                <div>
+                  <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                    Costo de envío (ARS) — el mismo para todos los clientes <SaveIndicator status={statuses.deliveryFee} />
+                  </label>
+                  <input
+                    type="number" step="100" min="0"
+                    value={deliveryFee ?? ""}
+                    onChange={(e) => setValue("deliveryFee", e.target.value === "" ? null : Number(e.target.value))}
+                    onBlur={() => flushField("deliveryFee")}
+                    placeholder="2500"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-2">
+                    Cobrás lo mismo sin importar la distancia. No necesitás tener tu ubicación cargada en el mapa.
+                  </p>
+                </div>
+              ) : (<>
               <div>
                 <h3 className="text-xs font-semibold text-slate-300 mb-2">Zona cercana</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -400,6 +451,11 @@ export default function ProfilePage() {
                 </div>
               </div>
 
+              <p className="text-[11px] text-slate-500">
+                Más allá del radio lejano no se ofrece envío. Si dejás los campos en blanco, no cobrás envío para esa zona.
+              </p>
+              </>)}
+
               <div>
                 <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
                   Tiempo estimado de entrega (minutos) <SaveIndicator status={statuses.deliveryTimeMin} />
@@ -413,10 +469,6 @@ export default function ProfilePage() {
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                 />
               </div>
-
-              <p className="text-[11px] text-slate-500">
-                Más allá del radio lejano no se ofrece envío. Si dejás los campos en blanco, no cobrás envío para esa zona.
-              </p>
             </div>
           )}
         </section>

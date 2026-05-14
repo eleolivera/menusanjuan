@@ -39,6 +39,7 @@ export async function GET() {
     deliveryClosePrice: dealer.deliveryClosePrice,
     deliveryFarRadius: dealer.deliveryFarRadius,
     deliveryFarPrice: dealer.deliveryFarPrice,
+    deliveryFee: dealer.deliveryFee,
     deliveryTimeMin: dealer.deliveryTimeMin,
     email: user.email,
     hasPassword,
@@ -59,7 +60,7 @@ export async function PATCH(request: NextRequest) {
     description, logoUrl, coverUrl, openHours,
     mercadoPagoAlias, mercadoPagoCvu, bankInfo, posEnabled,
     isActive, deliveryEnabled, deliveryCloseRadius, deliveryClosePrice,
-    deliveryFarRadius, deliveryFarPrice, deliveryTimeMin,
+    deliveryFarRadius, deliveryFarPrice, deliveryFee, deliveryTimeMin,
   } = body;
 
   const updated = await prisma.dealer.update({
@@ -85,6 +86,7 @@ export async function PATCH(request: NextRequest) {
       ...(deliveryClosePrice !== undefined && { deliveryClosePrice: deliveryClosePrice !== null ? Number(deliveryClosePrice) : null }),
       ...(deliveryFarRadius !== undefined && { deliveryFarRadius: deliveryFarRadius !== null ? Number(deliveryFarRadius) : null }),
       ...(deliveryFarPrice !== undefined && { deliveryFarPrice: deliveryFarPrice !== null ? Number(deliveryFarPrice) : null }),
+      ...(deliveryFee !== undefined && { deliveryFee: deliveryFee !== null ? Number(deliveryFee) : null }),
       ...(deliveryTimeMin !== undefined && { deliveryTimeMin: deliveryTimeMin !== null ? Number(deliveryTimeMin) : null }),
     },
   });
