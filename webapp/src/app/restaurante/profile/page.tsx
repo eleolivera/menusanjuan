@@ -370,21 +370,39 @@ export default function ProfilePage() {
               </div>
 
               {deliveryMode === "flat" ? (
-                <div>
-                  <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
-                    Costo de envío (ARS) — el mismo para todos los clientes <SaveIndicator status={statuses.deliveryFee} />
-                  </label>
-                  <input
-                    type="number" step="100" min="0"
-                    value={deliveryFee ?? ""}
-                    onChange={(e) => setValue("deliveryFee", e.target.value === "" ? null : Number(e.target.value))}
-                    onBlur={() => flushField("deliveryFee")}
-                    placeholder="2500"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-2">
-                    Cobrás lo mismo sin importar la distancia. No necesitás tener tu ubicación cargada en el mapa.
-                  </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                      Costo de envío (ARS) — el mismo para todos los clientes <SaveIndicator status={statuses.deliveryFee} />
+                    </label>
+                    <input
+                      type="number" step="100" min="0"
+                      value={deliveryFee ?? ""}
+                      onChange={(e) => setValue("deliveryFee", e.target.value === "" ? null : Number(e.target.value))}
+                      onBlur={() => flushField("deliveryFee")}
+                      placeholder="2500"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                      Distancia máxima (km) — opcional <SaveIndicator status={statuses.deliveryFarRadius} />
+                    </label>
+                    <input
+                      type="number" step="0.5" min="0"
+                      value={deliveryFarRadius ?? ""}
+                      onChange={(e) => setValue("deliveryFarRadius", e.target.value === "" ? null : Number(e.target.value))}
+                      onBlur={() => flushField("deliveryFarRadius")}
+                      placeholder="8.0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1.5">
+                      Si lo dejás vacío, hacés envíos a cualquier distancia. Si ponés un número, los clientes más lejos verán &quot;Fuera del área&quot;.
+                      {(!latitude || !longitude) && deliveryFarRadius != null && (
+                        <span className="block mt-1 text-amber-300">⚠️ Para que la distancia máxima funcione, tenés que cargar tu ubicación arriba en el mapa.</span>
+                      )}
+                    </p>
+                  </div>
                 </div>
               ) : (<>
               <div>
@@ -420,11 +438,11 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <h3 className="text-xs font-semibold text-slate-300 mb-2">Zona lejana</h3>
+                <h3 className="text-xs font-semibold text-slate-300 mb-2">Zona lejana <span className="text-[10px] font-normal text-slate-500">(también es tu distancia máxima)</span></h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
-                      Radio (km) <SaveIndicator status={statuses.deliveryFarRadius} />
+                      Radio máximo (km) <SaveIndicator status={statuses.deliveryFarRadius} />
                     </label>
                     <input
                       type="number" step="0.1" min="0"

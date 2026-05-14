@@ -82,6 +82,9 @@ export function calculateDeliveryFee(
     return { zone: null, fee: null, distanceKm };
   }
 
-  // Flat fee fallback
+  // Flat fee fallback — optionally capped by deliveryFarRadius (used as "max distance")
+  if (config.deliveryFarRadius != null && distanceKm > config.deliveryFarRadius) {
+    return { zone: null, fee: null, distanceKm };
+  }
   return { zone: "close", fee: config.deliveryFee!, distanceKm };
 }
