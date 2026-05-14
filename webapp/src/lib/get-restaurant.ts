@@ -9,6 +9,7 @@ export type RestaurantWithDealerId = Restaurant & {
   hasPendingOwner: boolean;
   ownerUserId: string | null;
   deliveryConfig: DeliveryConfig;
+  mercadoPagoAlias: string | null;
 };
 
 export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithDealerId | null> {
@@ -53,5 +54,6 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
       latitude: dealer.latitude,
       longitude: dealer.longitude,
     },
+    mercadoPagoAlias: dealer.mercadoPagoAlias,
   };
 }

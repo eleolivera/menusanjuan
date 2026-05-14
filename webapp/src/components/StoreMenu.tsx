@@ -437,6 +437,7 @@ export function StoreMenu({
           restaurantPhone={restaurant.phone}
           restauranteSlug={restaurant.slug}
           deliveryConfig={deliveryConfig}
+          mercadoPagoAlias={(restaurant as { mercadoPagoAlias?: string | null }).mercadoPagoAlias ?? null}
           onClose={() => { setShowModal(false); setTrackingMode(false); }}
           onRemove={decrementEntry}
           onAdd={incrementEntry}

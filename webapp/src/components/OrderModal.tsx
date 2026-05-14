@@ -26,6 +26,7 @@ export function OrderModal({
   restaurantPhone,
   restauranteSlug,
   deliveryConfig,
+  mercadoPagoAlias,
   onClose,
   onRemove,
   onAdd,
@@ -40,6 +41,7 @@ export function OrderModal({
   restaurantPhone: string;
   restauranteSlug: string;
   deliveryConfig?: DeliveryConfig | null;
+  mercadoPagoAlias?: string | null;
   onClose: () => void;
   onRemove: (cartKey: string) => void;
   onAdd: (cartKey: string) => void;
@@ -169,6 +171,13 @@ export function OrderModal({
 
     const subtotal = cartItems.reduce((s, ci) => s + (ci.item.price + ci.optionsDelta) * ci.quantity, 0);
 
+    // Mercado Pago alias only when the resta is fully configured.
+    // Skip the alias on the "Por confirmar" delivery state — the resta isn't ready yet.
+    const showAlias = !!mercadoPagoAlias && !(deliveryMethod === "delivery" && !hasDeliveryPricing);
+    const paymentLine = showAlias
+      ? `\n💸 *Transferencia / Mercado Pago:* alias \`${mercadoPagoAlias}\` (mandá el comprobante después)`
+      : "";
+
     return `🍽️ *Nuevo Pedido — ${restaurantName}*
 ━━━━━━━━━━━━━━━━━━
 📋 *Pedido:* ${orderNum}
@@ -183,7 +192,7 @@ ${itemLines}
 📦 *Entrega:* ${methodLabel}
 ${deliveryMethod === "delivery" && address ? `📍 *Dirección:* ${address}` : ""}
 ${deliveryMethod === "delivery" && latitude && longitude ? `📌 *Mapa:* https://www.google.com/maps?q=${latitude},${longitude}` : ""}
-${notes ? `📝 *Notas:* ${notes}` : ""}
+${notes ? `📝 *Notas:* ${notes}` : ""}${paymentLine}
 ━━━━━━━━━━━━━━━━━━
 _Pedido realizado desde MenuSanJuan_`;
   }

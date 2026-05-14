@@ -321,7 +321,9 @@ export function LocationPicker({
               Cambiar
             </button>
           </div>
-          <p className="mt-1 ml-6 text-xs text-emerald-700">{writtenAddress}</p>
+          <p className="mt-1 ml-6 text-xs text-emerald-700">
+            {writtenAddress.trim() || `📍 Ubicación marcada en el mapa (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`}
+          </p>
         </div>
       )}
     </div>
