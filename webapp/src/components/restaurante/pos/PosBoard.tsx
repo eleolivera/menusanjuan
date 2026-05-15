@@ -824,6 +824,7 @@ export function PosBoard({
           total={grandTotal}
           submitting={submitting}
           allowPayLater={mode === "COUNTER"}
+          mode={mode === "COUNTER" ? "mostrador" : "mesa"}
           onPay={(method, tendered) => {
             if (mode === "COUNTER") submitMostrador(method, tendered);
             else if (activeOrderId) payMesa(method, tendered);

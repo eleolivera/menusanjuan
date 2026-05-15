@@ -11,6 +11,7 @@ export function PosPaymentSheet({
   onClose,
   submitting,
   allowPayLater = false,
+  mode = "mostrador",
 }: {
   total: number;
   onPay: (method: string, cashTendered?: number) => void;
@@ -18,8 +19,13 @@ export function PosPaymentSheet({
   onClose: () => void;
   submitting: boolean;
   allowPayLater?: boolean;
+  /** "mostrador" = pre-pay (items go to kitchen with payment).
+   *  "mesa" = post-pay (items already in kitchen, payment closes the table). */
+  mode?: "mostrador" | "mesa";
 }) {
   const [payLater, setPayLater] = useState(false);
+  const confirmLabel = mode === "mesa" ? "Cobrar y cerrar mesa" : "Confirmar y enviar a cocina";
+  const payLaterLabel = mode === "mesa" ? "Cerrar mesa sin cobrar" : "Enviar a cocina (cobrar después)";
 
   function handleCollect(data: CollectedPayment) {
     onPay(data.paymentMethod, data.cashTendered);
@@ -53,7 +59,7 @@ export function PosPaymentSheet({
             }`}>
               <div>
                 <div className={`text-sm font-medium ${payLater ? "text-amber-300" : "text-white"}`}>
-                  Cobrar al entregar
+                  Cobrar después
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5">
                   El pedido sale a cocina sin marcarse pagado.
@@ -72,7 +78,7 @@ export function PosPaymentSheet({
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-center">
               <p className="text-sm text-amber-200 font-medium">El pedido va a cocina sin pago.</p>
               <p className="text-[11px] text-amber-300/70 mt-1.5">
-                Vas a poder marcarlo pagado desde el tablero de pedidos o el delivery lo cobra al entregar.
+                Vas a poder marcarlo pagado desde el tablero de pedidos.
               </p>
             </div>
           ) : (
@@ -82,7 +88,7 @@ export function PosPaymentSheet({
               onCancel={onClose}
               layout="inline"
               submitting={submitting}
-              confirmLabel="Confirmar y enviar a cocina"
+              confirmLabel={confirmLabel}
             />
           )}
         </div>
@@ -95,7 +101,7 @@ export function PosPaymentSheet({
               disabled={submitting}
               className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3.5 text-base font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg disabled:opacity-30 transition-all"
             >
-              {submitting ? "Procesando..." : "Enviar a cocina (cobrar después)"}
+              {submitting ? "Procesando..." : payLaterLabel}
             </button>
           </div>
         )}
