@@ -7,6 +7,7 @@ import { LocationPicker } from "@/components/LocationPicker";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
 import { MoneyInput } from "@/components/MoneyInput";
+import { ScheduleEditor } from "@/components/ScheduleEditor";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -51,6 +52,9 @@ export default function AdminRestaurantDetail() {
   const [rating, setRating] = useState("");
   const [deliveryFee, setDeliveryFee] = useState("");
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
+  const [pickupEnabled, setPickupEnabled] = useState(true);
+  const [pickupHoursJson, setPickupHoursJson] = useState<string | null>(null);
+  const [deliveryHoursJson, setDeliveryHoursJson] = useState<string | null>(null);
   const [deliveryCloseRadius, setDeliveryCloseRadius] = useState("");
   const [deliveryClosePrice, setDeliveryClosePrice] = useState("");
   const [deliveryFarRadius, setDeliveryFarRadius] = useState("");
@@ -122,6 +126,9 @@ export default function AdminRestaurantDetail() {
     setRating(d.rating != null ? String(d.rating) : "");
     setDeliveryFee(d.deliveryFee != null ? String(d.deliveryFee) : "");
     setDeliveryEnabled(d.deliveryEnabled !== false);
+    setPickupEnabled((d as any).pickupEnabled !== false);
+    setPickupHoursJson((d as any).pickupHours || null);
+    setDeliveryHoursJson((d as any).deliveryHours || null);
     setDeliveryCloseRadius(d.deliveryCloseRadius != null ? String(d.deliveryCloseRadius) : "");
     setDeliveryClosePrice(d.deliveryClosePrice != null ? String(d.deliveryClosePrice) : "");
     setDeliveryFarRadius(d.deliveryFarRadius != null ? String(d.deliveryFarRadius) : "");
@@ -134,7 +141,7 @@ export default function AdminRestaurantDetail() {
     await fetch(`/api/admin/restaurants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, isActive, openHours: JSON.stringify(hours), rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, deliveryCloseRadius: deliveryCloseRadius ? Number(deliveryCloseRadius) : null, deliveryClosePrice: deliveryClosePrice ? Number(deliveryClosePrice) : null, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null, deliveryFarPrice: deliveryFarPrice ? Number(deliveryFarPrice) : null }),
+      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, isActive, openHours: JSON.stringify(hours), pickupHours: pickupHoursJson, deliveryHours: deliveryHoursJson, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, pickupEnabled, deliveryCloseRadius: deliveryCloseRadius ? Number(deliveryCloseRadius) : null, deliveryClosePrice: deliveryClosePrice ? Number(deliveryClosePrice) : null, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null, deliveryFarPrice: deliveryFarPrice ? Number(deliveryFarPrice) : null }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -431,25 +438,65 @@ Probalo y decime qué te parece!`;
                 </div>
               </div>
             </div>
-            {/* Delivery zones */}
+            {/* Servicios disponibles (delivery + pickup independientes) */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs font-semibold text-white">Delivery</label>
-                  <div className="group relative">
-                    <span className="cursor-help text-slate-500 hover:text-slate-300 transition-colors text-xs">ⓘ</span>
-                    <div className="absolute left-0 bottom-full mb-2 w-56 rounded-lg bg-slate-800 border border-white/10 p-3 text-[11px] text-slate-300 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-20 shadow-xl">
-                      <strong className="text-white block mb-1">¿Cómo funciona?</strong>
-                      Configurá dos zonas por radio (km) desde tu local. El precio de envío se calcula automáticamente según la distancia del cliente.<br/><br/>
-                      Si no querés zonas, dejá los radios vacíos y usá la <strong>tarifa fija</strong> — se aplica igual para todos.<br/><br/>
-                      Si desactivás el toggle, solo se ofrece <strong>retiro en local</strong>.
-                    </div>
+              <label className="text-xs font-semibold text-white block">Servicios que ofrece</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryEnabled(!deliveryEnabled)}
+                  className={`rounded-lg border-2 p-3 text-left transition-colors ${
+                    deliveryEnabled ? "border-primary/50 bg-primary/5" : "border-white/10 bg-slate-900/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">🛵 Delivery</span>
+                    <span className={`text-[10px] ${deliveryEnabled ? "text-emerald-400" : "text-slate-500"}`}>{deliveryEnabled ? "ON" : "OFF"}</span>
                   </div>
-                </div>
-                <button onClick={() => setDeliveryEnabled(!deliveryEnabled)} className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer rounded-full transition-colors ${deliveryEnabled ? "bg-emerald-500" : "bg-slate-700"}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-1 ${deliveryEnabled ? "translate-x-5 ml-0.5" : "translate-x-1"}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPickupEnabled(!pickupEnabled)}
+                  className={`rounded-lg border-2 p-3 text-left transition-colors ${
+                    pickupEnabled ? "border-primary/50 bg-primary/5" : "border-white/10 bg-slate-900/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">🏪 Retiro</span>
+                    <span className={`text-[10px] ${pickupEnabled ? "text-emerald-400" : "text-slate-500"}`}>{pickupEnabled ? "ON" : "OFF"}</span>
+                  </div>
                 </button>
               </div>
+              {!deliveryEnabled && !pickupEnabled && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
+                  ⚠️ Ambos apagados — el cliente no puede pedir.
+                </div>
+              )}
+            </div>
+
+            {/* Hours per method */}
+            <div className="space-y-3">
+              <ScheduleEditor
+                title="Horarios de Delivery"
+                emoji="🛵"
+                value={deliveryHoursJson}
+                onChange={(v) => setDeliveryHoursJson(v)}
+                copyFromLabel="Retiro"
+                onCopyFromOther={() => { if (pickupHoursJson) setDeliveryHoursJson(pickupHoursJson); }}
+              />
+              <ScheduleEditor
+                title="Horarios de Retiro"
+                emoji="🏪"
+                value={pickupHoursJson}
+                onChange={(v) => setPickupHoursJson(v)}
+                copyFromLabel="Delivery"
+                onCopyFromOther={() => { if (deliveryHoursJson) setPickupHoursJson(deliveryHoursJson); }}
+              />
+            </div>
+
+            {/* Delivery zones */}
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+              <label className="text-xs font-semibold text-white block">Zonas de Delivery (radios + precio por distancia)</label>
               {deliveryEnabled && (
                 <>
                   <div className="grid grid-cols-2 gap-3">

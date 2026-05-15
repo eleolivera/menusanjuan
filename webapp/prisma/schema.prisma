@@ -107,12 +107,15 @@ model Dealer {
   pendingOwnerEmail String?                  // Email of future owner — auto-links on registration
   sourceProfileId String?                    // ID from scraped source
   sourceSite  String?                        // "google-maps", "instagram", "manual", etc.
-  openHours   String?                        // JSON string of hours
+  openHours     String?                      // LEGACY: kept for back-compat. New code uses pickupHours / deliveryHours.
+  pickupHours   String?                      // JSON: {"lun":[{"open":"12:00","close":"14:00"},{"open":"20:00","close":"00:30"}],...}
+  deliveryHours String?                      // Same shape as pickupHours but separate schedule for delivery
   mercadoPagoAlias String?
   mercadoPagoCvu   String?
   bankInfo    String?
   rating      Float?                           // Star rating (1.0-5.0), admin-set
   deliveryEnabled    Boolean  @default(true)   // Whether restaurant offers delivery
+  pickupEnabled      Boolean  @default(true)   // Whether restaurant accepts in-person pickup
   deliveryCloseRadius Float?                   // Close zone radius in km (e.g. 3.0)
   deliveryClosePrice  Float?                   // Close zone price in ARS
   deliveryFarRadius   Float?                   // Far zone radius in km (e.g. 7.0)

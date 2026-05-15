@@ -35,6 +35,9 @@ export async function GET() {
     isActive: dealer.isActive,
     posEnabled: dealer.posEnabled,
     deliveryEnabled: dealer.deliveryEnabled,
+    pickupEnabled: dealer.pickupEnabled,
+    pickupHours: dealer.pickupHours,
+    deliveryHours: dealer.deliveryHours,
     deliveryCloseRadius: dealer.deliveryCloseRadius,
     deliveryClosePrice: dealer.deliveryClosePrice,
     deliveryFarRadius: dealer.deliveryFarRadius,
@@ -59,7 +62,7 @@ export async function PATCH(request: NextRequest) {
     name, phone, address, latitude, longitude, cuisineType,
     description, logoUrl, coverUrl, openHours,
     mercadoPagoAlias, mercadoPagoCvu, bankInfo, posEnabled,
-    isActive, deliveryEnabled, deliveryCloseRadius, deliveryClosePrice,
+    isActive, deliveryEnabled, pickupEnabled, pickupHours, deliveryHours, deliveryCloseRadius, deliveryClosePrice,
     deliveryFarRadius, deliveryFarPrice, deliveryFee, deliveryTimeMin,
   } = body;
 
@@ -82,6 +85,9 @@ export async function PATCH(request: NextRequest) {
       ...(posEnabled !== undefined && { posEnabled }),
       ...(isActive !== undefined && { isActive }),
       ...(deliveryEnabled !== undefined && { deliveryEnabled }),
+      ...(pickupEnabled !== undefined && { pickupEnabled }),
+      ...(pickupHours !== undefined && { pickupHours }),
+      ...(deliveryHours !== undefined && { deliveryHours }),
       ...(deliveryCloseRadius !== undefined && { deliveryCloseRadius: deliveryCloseRadius !== null ? Number(deliveryCloseRadius) : null }),
       ...(deliveryClosePrice !== undefined && { deliveryClosePrice: deliveryClosePrice !== null ? Number(deliveryClosePrice) : null }),
       ...(deliveryFarRadius !== undefined && { deliveryFarRadius: deliveryFarRadius !== null ? Number(deliveryFarRadius) : null }),

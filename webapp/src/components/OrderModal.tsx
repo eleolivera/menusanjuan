@@ -27,6 +27,8 @@ export function OrderModal({
   restauranteSlug,
   deliveryConfig,
   mercadoPagoAlias,
+  pickupService,
+  deliveryService,
   onClose,
   onRemove,
   onAdd,
@@ -42,6 +44,8 @@ export function OrderModal({
   restauranteSlug: string;
   deliveryConfig?: DeliveryConfig | null;
   mercadoPagoAlias?: string | null;
+  pickupService?: { enabled: boolean; openNow: boolean; available: boolean; nextOpenLabel: string | null } | null;
+  deliveryService?: { enabled: boolean; openNow: boolean; available: boolean; nextOpenLabel: string | null } | null;
   onClose: () => void;
   onRemove: (cartKey: string) => void;
   onAdd: (cartKey: string) => void;
@@ -101,12 +105,19 @@ export function OrderModal({
   }, [step, orderId, orderToken, trackingOrder]);
 
   // Delivery
-  // Default to pickup when the resta has delivery disabled, otherwise delivery.
-  const deliveryEnabledInitial = deliveryConfig?.deliveryEnabled !== false;
-  const [deliveryMethod, setDeliveryMethod] = useState<"delivery" | "pickup">(deliveryEnabledInitial ? "delivery" : "pickup");
+  // Pick a sensible default method depending on what's available right now
+  const deliveryAvailable = deliveryService?.available ?? (deliveryConfig?.deliveryEnabled !== false);
+  const pickupAvailable = pickupService?.available ?? true;
+  const initialMethod: "delivery" | "pickup" =
+    deliveryAvailable ? "delivery" :
+    pickupAvailable ? "pickup" :
+    "delivery";
+  const [deliveryMethod, setDeliveryMethod] = useState<"delivery" | "pickup">(initialMethod);
   const [deliveryResult, setDeliveryResult] = useState<DeliveryZoneResult | null>(null);
 
-  const hasDelivery = deliveryConfig != null && deliveryConfig.deliveryEnabled !== false;
+  // hasDelivery is now derived from the service availability (toggle + hours combined)
+  const hasDelivery = deliveryAvailable;
+  const isAnyOpen = deliveryAvailable || pickupAvailable;
   // No usable pricing = restaurant confirms fee manually
   // Zones without coordinates can't calculate, so that's also "no pricing"
   const hasDeliveryPricing = deliveryConfig != null && (
@@ -408,57 +419,81 @@ _Pedido realizado desde MenuSanJuan_`;
           {step === "method" && (
             <>
               <div className="space-y-3 mb-6">
-                {/* Delivery option (disabled if resta has it off) */}
-                <button
-                  type="button"
-                  disabled={!hasDelivery}
-                  onClick={() => { if (!hasDelivery) return; setDeliveryMethod("delivery"); setDeliveryResult(null); }}
-                  className={`w-full flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
-                    !hasDelivery
-                      ? "border-border/30 bg-surface-alt opacity-50 cursor-not-allowed"
-                      : deliveryMethod === "delivery"
-                        ? "border-primary bg-primary/5"
-                        : "border-border/50 hover:border-primary/30"
-                  }`}
-                >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-2xl">
-                    🛵
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-bold text-text">Delivery</div>
-                    <div className="text-xs text-text-muted">
-                      {hasDelivery
-                        ? "Te lo llevamos a tu dirección"
-                        : "Este restaurante no hace delivery por ahora"}
-                    </div>
-                  </div>
-                  <div className="text-sm font-semibold text-primary shrink-0">
-                    {hasDelivery ? getDeliveryPriceText() : ""}
-                  </div>
-                </button>
+                {/* Delivery option */}
+                {(() => {
+                  const reason = !deliveryService?.enabled
+                    ? "El restaurante no hace delivery por ahora"
+                    : !deliveryService?.openNow
+                      ? `Delivery cerrado${deliveryService.nextOpenLabel ? ` · abre ${deliveryService.nextOpenLabel}` : ""}`
+                      : null;
+                  return (
+                    <button
+                      type="button"
+                      disabled={!deliveryAvailable}
+                      onClick={() => { if (!deliveryAvailable) return; setDeliveryMethod("delivery"); setDeliveryResult(null); }}
+                      className={`w-full flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
+                        !deliveryAvailable
+                          ? "border-border/30 bg-surface-alt opacity-50 cursor-not-allowed"
+                          : deliveryMethod === "delivery"
+                            ? "border-primary bg-primary/5"
+                            : "border-border/50 hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-2xl">🛵</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-bold text-text">Delivery</div>
+                        <div className="text-xs text-text-muted">{reason || "Te lo llevamos a tu dirección"}</div>
+                      </div>
+                      <div className="text-sm font-semibold text-primary shrink-0">
+                        {deliveryAvailable ? getDeliveryPriceText() : ""}
+                      </div>
+                    </button>
+                  );
+                })()}
 
                 {/* Pickup option */}
-                <button
-                  type="button"
-                  onClick={() => { setDeliveryMethod("pickup"); setDeliveryResult(null); setAddress(""); setLatitude(null); setLongitude(null); }}
-                  className={`w-full flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
-                    deliveryMethod === "pickup"
-                      ? "border-primary bg-primary/5"
-                      : "border-border/50 hover:border-primary/30"
-                  }`}
-                >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-2xl">
-                    🏪
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-bold text-text">Retiro en Local</div>
-                    <div className="text-xs text-text-muted">Retirá tu pedido en el restaurante</div>
-                  </div>
-                  <div className="text-sm font-semibold text-emerald-500 shrink-0">
-                    Gratis
-                  </div>
-                </button>
+                {(() => {
+                  const reason = !pickupService?.enabled
+                    ? "El restaurante no acepta retiros por ahora"
+                    : !pickupService?.openNow
+                      ? `Retiro cerrado${pickupService.nextOpenLabel ? ` · abre ${pickupService.nextOpenLabel}` : ""}`
+                      : null;
+                  return (
+                    <button
+                      type="button"
+                      disabled={!pickupAvailable}
+                      onClick={() => { if (!pickupAvailable) return; setDeliveryMethod("pickup"); setDeliveryResult(null); setAddress(""); setLatitude(null); setLongitude(null); }}
+                      className={`w-full flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
+                        !pickupAvailable
+                          ? "border-border/30 bg-surface-alt opacity-50 cursor-not-allowed"
+                          : deliveryMethod === "pickup"
+                            ? "border-primary bg-primary/5"
+                            : "border-border/50 hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-2xl">🏪</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-bold text-text">Retiro en Local</div>
+                        <div className="text-xs text-text-muted">{reason || "Retirá tu pedido en el restaurante"}</div>
+                      </div>
+                      <div className="text-sm font-semibold text-emerald-500 shrink-0">
+                        {pickupAvailable ? "Gratis" : ""}
+                      </div>
+                    </button>
+                  );
+                })()}
               </div>
+
+              {!isAnyOpen && (
+                <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                  <div className="font-semibold mb-0.5">Estamos cerrados ahora</div>
+                  {(pickupService?.nextOpenLabel || deliveryService?.nextOpenLabel) && (
+                    <div>
+                      Abrimos {pickupService?.nextOpenLabel || deliveryService?.nextOpenLabel}. Tu carrito queda guardado — volvé entonces para terminar el pedido.
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <button onClick={() => setStep("cart")} className="flex-1 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-text hover:bg-surface-hover transition-colors">
@@ -466,9 +501,10 @@ _Pedido realizado desde MenuSanJuan_`;
                 </button>
                 <button
                   onClick={() => setStep("info")}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                  disabled={!isAnyOpen}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  Continuar
+                  {isAnyOpen ? "Continuar" : "Cerrado"}
                 </button>
               </div>
             </>

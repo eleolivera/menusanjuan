@@ -9,6 +9,7 @@ import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { useSmartSave } from "@/hooks/useSmartSave";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { MoneyInput } from "@/components/MoneyInput";
+import { ScheduleEditor } from "@/components/ScheduleEditor";
 
 const DAYS = [
   { key: "lun", label: "Lunes" },
@@ -45,7 +46,9 @@ export default function ProfilePage() {
     cuisineType: "", description: "", logoUrl: "", coverUrl: "",
     openHours: JSON.stringify(parseHours(null)),
     mercadoPagoAlias: "", mercadoPagoCvu: "", bankInfo: "", posEnabled: false,
-    deliveryEnabled: true, deliveryCloseRadius: null, deliveryClosePrice: null,
+    deliveryEnabled: true, pickupEnabled: true,
+    pickupHours: null as string | null, deliveryHours: null as string | null,
+    deliveryCloseRadius: null, deliveryClosePrice: null,
     deliveryFarRadius: null, deliveryFarPrice: null, deliveryFee: null, deliveryTimeMin: null,
   });
 
@@ -65,6 +68,9 @@ export default function ProfilePage() {
     bankInfo: { tier: "autosave" as const },
     posEnabled: { tier: "instant" as const },
     deliveryEnabled: { tier: "instant" as const },
+    pickupEnabled: { tier: "instant" as const },
+    pickupHours: { tier: "autosave" as const },
+    deliveryHours: { tier: "autosave" as const },
     deliveryCloseRadius: { tier: "autosave" as const },
     deliveryClosePrice: { tier: "autosave" as const },
     deliveryFarRadius: { tier: "autosave" as const },
@@ -95,6 +101,9 @@ export default function ProfilePage() {
   const bankInfo = values.bankInfo as string;
   const posEnabled = values.posEnabled as boolean;
   const deliveryEnabled = values.deliveryEnabled as boolean;
+  const pickupEnabled = values.pickupEnabled as boolean;
+  const pickupHours = values.pickupHours as string | null;
+  const deliveryHours = values.deliveryHours as string | null;
   const deliveryCloseRadius = values.deliveryCloseRadius as number | null;
   const deliveryClosePrice = values.deliveryClosePrice as number | null;
   const deliveryFarRadius = values.deliveryFarRadius as number | null;
@@ -156,6 +165,9 @@ export default function ProfilePage() {
           bankInfo: d.bankInfo || "",
           posEnabled: d.posEnabled || false,
           deliveryEnabled: d.deliveryEnabled ?? true,
+          pickupEnabled: d.pickupEnabled ?? true,
+          pickupHours: d.pickupHours || null,
+          deliveryHours: d.deliveryHours || null,
           deliveryCloseRadius: d.deliveryCloseRadius,
           deliveryClosePrice: d.deliveryClosePrice,
           deliveryFarRadius: d.deliveryFarRadius,
@@ -332,6 +344,53 @@ export default function ProfilePage() {
           }}
         />
 
+        {/* Servicios disponibles — independiente de los horarios */}
+        <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+          <h2 className="text-sm font-bold text-white mb-1">Servicios que ofrecés</h2>
+          <p className="text-xs text-slate-400 mb-4">
+            Activá / desactivá según querés que el cliente pueda pedir delivery o retiro. Es independiente del horario — los horarios se configuran abajo.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className={`flex items-center justify-between rounded-xl border-2 p-4 cursor-pointer transition-colors ${
+              deliveryEnabled ? "border-primary/50 bg-primary/5" : "border-white/10 bg-white/5"
+            }`}>
+              <div>
+                <div className="text-sm font-bold text-white flex items-center gap-2">🛵 Delivery</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">A domicilio con moto</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={deliveryEnabled}
+                onChange={(e) => setValue("deliveryEnabled", e.target.checked)}
+                className="h-5 w-9 appearance-none rounded-full bg-slate-700 transition-colors checked:bg-primary relative cursor-pointer before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
+              />
+            </label>
+            <label className={`flex items-center justify-between rounded-xl border-2 p-4 cursor-pointer transition-colors ${
+              pickupEnabled ? "border-primary/50 bg-primary/5" : "border-white/10 bg-white/5"
+            }`}>
+              <div>
+                <div className="text-sm font-bold text-white flex items-center gap-2">🏪 Retiro en local</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">Cliente lo busca en tu local</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={pickupEnabled}
+                onChange={(e) => setValue("pickupEnabled", e.target.checked)}
+                className="h-5 w-9 appearance-none rounded-full bg-slate-700 transition-colors checked:bg-primary relative cursor-pointer before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
+              />
+            </label>
+          </div>
+          <div className="mt-2 flex items-center justify-end gap-2 text-[10px] text-slate-500">
+            <SaveIndicator status={statuses.deliveryEnabled} />
+            <SaveIndicator status={statuses.pickupEnabled} />
+          </div>
+          {!deliveryEnabled && !pickupEnabled && (
+            <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+              ⚠️ Tenés ambos servicios apagados. El cliente no va a poder hacer pedidos hasta que actives al menos uno.
+            </div>
+          )}
+        </section>
+
         {/* Delivery Zones — measured from the address above */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
           <div className="flex items-center justify-between mb-4">
@@ -341,16 +400,6 @@ export default function ProfilePage() {
                 La distancia se mide desde <span className="text-primary font-medium">tu dirección de arriba</span> hasta la del cliente
               </p>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-xs text-slate-400">Activo</span>
-              <input
-                type="checkbox"
-                checked={deliveryEnabled}
-                onChange={(e) => setValue("deliveryEnabled", e.target.checked)}
-                className="h-5 w-9 appearance-none rounded-full bg-slate-700 transition-colors checked:bg-primary relative cursor-pointer before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
-              />
-              <SaveIndicator status={statuses.deliveryEnabled} />
-            </label>
           </div>
 
           {(!latitude || !longitude) && deliveryMode === "zones" && (
@@ -488,40 +537,26 @@ export default function ProfilePage() {
           )}
         </section>
 
-        {/* Hours of Operation */}
-        <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
-          <h2 className="text-sm font-bold text-white mb-4">Horarios de Atención</h2>
-          <div className="space-y-2">
-            {DAYS.map((day) => (
-              <div key={day.key} className="flex items-center gap-3">
-                <span className="w-20 text-xs font-medium text-slate-400">{day.label}</span>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!hours[day.key]?.closed}
-                    onChange={(e) => updateHours(day.key, "closed", !e.target.checked)}
-                    className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
-                  />
-                  <span className="text-[11px] text-slate-500">Abierto</span>
-                </label>
-                {!hours[day.key]?.closed && (
-                  <div className="flex items-center gap-2">
-                    <input type="time" value={hours[day.key]?.open || "08:00"}
-                      onChange={(e) => updateHours(day.key, "open", e.target.value)}
-                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none" />
-                    <span className="text-xs text-slate-600">a</span>
-                    <input type="time" value={hours[day.key]?.close || "23:00"}
-                      onChange={(e) => updateHours(day.key, "close", e.target.value)}
-                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none" />
-                  </div>
-                )}
-                {hours[day.key]?.closed && (
-                  <span className="text-xs text-slate-600">Cerrado</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* Horarios por método (delivery + pickup tienen schedules independientes) */}
+        <ScheduleEditor
+          title="Horarios de Delivery"
+          emoji="🛵"
+          value={deliveryHours}
+          onChange={(v) => { setValue("deliveryHours", v); flushField("deliveryHours"); }}
+          copyFromLabel="Retiro"
+          onCopyFromOther={() => { if (pickupHours) { setValue("deliveryHours", pickupHours); flushField("deliveryHours"); } }}
+          statusIndicator={<SaveIndicator status={statuses.deliveryHours} />}
+        />
+
+        <ScheduleEditor
+          title="Horarios de Retiro en local"
+          emoji="🏪"
+          value={pickupHours}
+          onChange={(v) => { setValue("pickupHours", v); flushField("pickupHours"); }}
+          copyFromLabel="Delivery"
+          onCopyFromOther={() => { if (deliveryHours) { setValue("pickupHours", deliveryHours); flushField("pickupHours"); } }}
+          statusIndicator={<SaveIndicator status={statuses.pickupHours} />}
+        />
 
         {/* Payment Info */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">

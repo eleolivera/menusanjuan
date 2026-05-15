@@ -79,12 +79,27 @@ export default async function StorePage({
     },
   };
 
+  const ps = (restaurant as any).pickupService;
+  const ds = (restaurant as any).deliveryService;
+  const allClosed = ps && ds && !ps.available && !ds.available;
+  const nextOpen = ps?.nextOpenLabel || ds?.nextOpenLabel;
+
   return (
     <div className="mesh-gradient min-h-screen">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+
+      {/* Closed banner — both services unavailable */}
+      {allClosed && (
+        <div className="sticky top-0 z-20 bg-amber-100 border-b border-amber-300 px-4 py-2.5 text-center text-sm font-medium text-amber-900">
+          <span>🌙 Estamos cerrados ahora</span>
+          {nextOpen && <span className="text-amber-700"> · abrimos {nextOpen}</span>}
+          <span className="block text-[11px] text-amber-700/80 mt-0.5">Podés armar tu pedido — el carrito se guarda hasta que abramos.</span>
+        </div>
+      )}
+
       {/* Store Header / Cover */}
       <div className={`relative h-48 sm:h-56 overflow-hidden ${!restaurant.coverUrl ? coverGradient(restaurant.name) : "bg-slate-900"}`}>
         {restaurant.coverUrl && (
