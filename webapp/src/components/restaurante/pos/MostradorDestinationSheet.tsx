@@ -206,7 +206,7 @@ export function MostradorDestinationSheet({
 
           {method === "pickup" && (
             <div className="rounded-xl border border-indigo-400/20 bg-indigo-400/5 px-4 py-3 text-xs text-indigo-200">
-              El cliente va a retirar el pedido en el local. Va a cocina sin pago, se cobra cuando viene a buscarlo.
+              El cliente va a retirar el pedido en el local. Va a cocina sin pago, se cobra después.
             </div>
           )}
         </div>
