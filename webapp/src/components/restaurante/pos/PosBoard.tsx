@@ -34,7 +34,9 @@ type Mode = "DINE_IN" | "COUNTER";
 type OpenTable = {
   id: string;
   orderNumber: string;
+  channel: "DINE_IN" | "COUNTER";
   tableNumber: string | null;
+  customerName: string | null;
   total: number;
   items: any[];
   createdAt: string;
@@ -63,7 +65,8 @@ export function PosBoard({
   const [mode, setMode] = useState<Mode>("COUNTER");
   const [view, setView] = useState<View>("ordering"); // counter starts directly in ordering
   const [tableNumber, setTableNumber] = useState("");
-  const [activeOrderId, setActiveOrderId] = useState<string | null>(null); // existing mesa being edited
+  const [mostradorCustomer, setMostradorCustomer] = useState(""); // customer name for new mostrador phone orders
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null); // existing mesa/mostrador being edited
   const [openTables, setOpenTables] = useState<OpenTable[]>([]);
 
   // ─── Cart state ───
@@ -117,9 +120,9 @@ export function PosBoard({
       });
   }, []);
 
-  // ─── Load open tables ───
+  // ─── Load open tables (both DINE_IN and COUNTER unpaid orders) ───
   const fetchOpenTables = useCallback(() => {
-    fetch("/api/restaurante/pos/open-tables")
+    fetch("/api/restaurante/pos/open-tables?channel=ALL")
       .then((r) => r.json())
       .then((tables: OpenTable[]) => setOpenTables(tables))
       .catch(() => {});
@@ -205,10 +208,16 @@ export function PosBoard({
     setCart((prev) => prev.map((l) => l.cartKey === cartKey ? { ...l, priceOverride: undefined, overrideNote: undefined } : l));
   }
 
-  // ─── Mesa actions ───
+  // ─── Mesa / Mostrador actions ───
   function openExistingTable(table: OpenTable) {
     setActiveOrderId(table.id);
-    setTableNumber(table.tableNumber || "");
+    if (table.channel === "COUNTER") {
+      setMode("COUNTER");
+      setMostradorCustomer(table.customerName || "");
+    } else {
+      setMode("DINE_IN");
+      setTableNumber(table.tableNumber || "");
+    }
     setExistingItems(table.items || []);
     setCart([]);
     setView("ordering");
@@ -217,9 +226,11 @@ export function PosBoard({
   function backToTables() {
     setActiveOrderId(null);
     setTableNumber("");
+    setMostradorCustomer("");
     setExistingItems([]);
     setCart([]);
-    setView("tables");
+    // Mesa → back to table list. Mostrador → stay in ordering with fresh cart.
+    if (mode === "DINE_IN") setView("tables");
     fetchOpenTables();
   }
 
@@ -282,6 +293,7 @@ export function PosBoard({
           paymentMethod: payLater ? undefined : paymentMethod,
           cashTendered: payLater ? undefined : cashTendered,
           payLater: !!payLater,
+          customerName: mostradorCustomer.trim() || undefined,
           source: "pos-tablet",
         }),
       });
@@ -289,6 +301,7 @@ export function PosBoard({
         const order = await res.json();
         setShowSuccess(order.orderNumber);
         setCart([]);
+        setMostradorCustomer("");
         setPaying(false);
       } else {
         const d = await res.json().catch(() => ({}));
@@ -431,14 +444,14 @@ export function PosBoard({
                 + Nueva mesa
               </button>
             </div>
-            {openTables.length === 0 ? (
+            {openTables.filter((t) => t.channel === "DINE_IN").length === 0 ? (
               <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center">
                 <p className="text-sm text-slate-500 mb-1">No hay mesas activas</p>
                 <p className="text-[11px] text-slate-600">Tocá "Nueva mesa" para empezar</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {openTables.map((t) => (
+                {openTables.filter((t) => t.channel === "DINE_IN").map((t) => (
                   <button
                     key={t.id}
                     onClick={() => openExistingTable(t)}
@@ -510,6 +523,31 @@ export function PosBoard({
               />
             </div>
 
+            {/* Open mostrador orders — phone orders pending pickup */}
+            {mode === "COUNTER" && !activeOrderId && (() => {
+              const openMostrador = openTables.filter((t) => t.channel === "COUNTER");
+              if (openMostrador.length === 0) return null;
+              return (
+                <div className="shrink-0 px-3 py-2 border-b border-amber-500/20 bg-amber-500/[0.03]">
+                  <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-1.5">
+                    Mostrador abiertos · esperando retiro
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    {openMostrador.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => openExistingTable(t)}
+                        className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-200 hover:bg-amber-500/15 transition-all"
+                      >
+                        <span className="font-bold">{t.customerName || t.orderNumber}</span>
+                        <span className="ml-1.5 text-amber-300/70">{formatARS(t.total)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {!search.trim() && categories.length > 0 && (
               <div className="shrink-0 flex gap-1 overflow-x-auto px-3 py-2 border-b border-white/5">
                 {categories.map((c) => (
@@ -566,11 +604,25 @@ export function PosBoard({
 
           {/* Cart side */}
           <div className="w-72 sm:w-80 shrink-0 flex flex-col bg-slate-900/30">
-            <div className="shrink-0 px-4 py-2 border-b border-white/5">
+            <div className="shrink-0 px-4 py-2 border-b border-white/5 space-y-1.5">
               <h2 className="text-xs font-bold text-white">
-                {mode === "DINE_IN" ? `Mesa ${tableNumber}` : "Pedido"}
+                {mode === "DINE_IN"
+                  ? `Mesa ${tableNumber}`
+                  : activeOrderId
+                    ? `Mostrador · ${mostradorCustomer || "(sin nombre)"}`
+                    : "Mostrador"}
               </h2>
               <p className="text-[10px] text-slate-500">{itemCount + existingItems.length} items totales</p>
+              {/* Customer name input — only for new mostrador (not when editing existing) */}
+              {mode === "COUNTER" && !activeOrderId && (
+                <input
+                  type="text"
+                  value={mostradorCustomer}
+                  onChange={(e) => setMostradorCustomer(e.target.value)}
+                  placeholder="Cliente / referencia (ej: Juan, Mesa 5)"
+                  className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white placeholder:text-slate-500 focus:border-primary focus:outline-none"
+                />
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2" style={{ minHeight: 0 }}>
@@ -655,14 +707,44 @@ export function PosBoard({
                 <span className="text-2xl font-extrabold text-white">{formatARS(grandTotal)}</span>
               </div>
 
-              {mode === "COUNTER" ? (
+              {mode === "COUNTER" && activeOrderId ? (
+                // Existing open mostrador — add items or charge
+                <div className="space-y-2">
+                  <button
+                    onClick={appendToMesa}
+                    disabled={cart.length === 0 || submitting}
+                    className="w-full rounded-xl border border-primary/30 bg-primary/10 py-3 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-30 transition-all"
+                  >
+                    {submitting ? "..." : `+ Agregar ${cart.length} item${cart.length !== 1 ? "s" : ""}`}
+                  </button>
+                  <button
+                    onClick={() => setPaying(true)}
+                    className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all"
+                  >
+                    Cobrar y cerrar · {formatARS(grandTotal)}
+                  </button>
+                  <button
+                    onClick={backToTables}
+                    className="w-full text-[11px] text-slate-500 hover:text-white py-1.5 transition-colors"
+                  >
+                    ← Volver al mostrador
+                  </button>
+                </div>
+              ) : mode === "COUNTER" ? (
                 <div className="space-y-2">
                   <button
                     onClick={() => setPaying(true)}
                     disabled={cart.length === 0}
                     className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg disabled:opacity-30 transition-all"
                   >
-                    Cobrar {formatARS(grandTotal)}
+                    Cobrar ahora · {formatARS(grandTotal)}
+                  </button>
+                  <button
+                    onClick={() => submitMostrador("", undefined, true)}
+                    disabled={cart.length === 0 || submitting}
+                    className="w-full rounded-xl border border-amber-400/30 bg-amber-400/5 py-2.5 text-[11px] font-semibold text-amber-300 hover:bg-amber-400/10 disabled:opacity-30 transition-all"
+                  >
+                    {submitting ? "..." : "📋 Mandar a cocina · cobrar al retirar"}
                   </button>
                   {cart.length > 0 && (
                     <button
