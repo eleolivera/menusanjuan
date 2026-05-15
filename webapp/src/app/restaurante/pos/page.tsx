@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PosBoard } from "@/components/restaurante/pos/PosBoard";
+import type { DeliveryConfig } from "@/lib/delivery";
 
 export default function PosPage() {
   const router = useRouter();
@@ -10,6 +11,7 @@ export default function PosPage() {
   const [restaurantName, setRestaurantName] = useState("");
   const [posEnabled, setPosEnabled] = useState<boolean | null>(null);
   const [tableSuggestions, setTableSuggestions] = useState<string[]>([]);
+  const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfig | null>(null);
   const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export default function PosPage() {
       .then((d) => {
         setPosEnabled(d.posEnabled ?? false);
         setTableSuggestions(d.tableSuggestions || []);
+        setDeliveryConfig(d.deliveryConfig ?? null);
       });
   }, [slug]);
 
@@ -96,6 +99,7 @@ export default function PosPage() {
       restaurantName={restaurantName}
       tableSuggestions={tableSuggestions}
       onSuggestionsUpdate={setTableSuggestions}
+      deliveryConfig={deliveryConfig}
     />
   );
 }

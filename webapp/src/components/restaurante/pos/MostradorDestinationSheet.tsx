@@ -2,17 +2,22 @@
 
 import { useState } from "react";
 import { MoneyInput } from "@/components/MoneyInput";
+import { LocationPicker } from "@/components/LocationPicker";
+import { calculateDeliveryFee, type DeliveryConfig } from "@/lib/delivery";
 
 export type MostradorDestination = {
   deliveryMethod: "pickup" | "delivery";
   customerPhone?: string;
   customerAddress?: string;
   deliveryFee?: number;
+  customerLat?: number | null;
+  customerLng?: number | null;
 };
 
 /**
  * Asks the owner: is this open mostrador order for pickup at counter, or for delivery?
- * If delivery, collects phone + address + delivery fee.
+ * If delivery, opens LocationPicker (fullscreen map flow) to capture the customer's
+ * address; the delivery fee is auto-calculated from the configured zones.
  * Triggered after the owner taps "Mandar a cocina" on a phone order.
  */
 export function MostradorDestinationSheet({
@@ -21,19 +26,55 @@ export function MostradorDestinationSheet({
   onConfirm,
   onCancel,
   submitting = false,
+  deliveryConfig,
 }: {
   customerName: string;
   total: number;
   onConfirm: (data: MostradorDestination) => void;
   onCancel: () => void;
   submitting?: boolean;
+  deliveryConfig: DeliveryConfig | null;
 }) {
   const [method, setMethod] = useState<"pickup" | "delivery">("pickup");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [fee, setFee] = useState<number | null>(null);
+  const [autoZoneLabel, setAutoZoneLabel] = useState<string | null>(null);
+  const [autoDistanceKm, setAutoDistanceKm] = useState<number | null>(null);
+  const [outOfRange, setOutOfRange] = useState(false);
 
-  const canConfirm = method === "pickup" || (address.trim().length > 0);
+  const canConfirm = method === "pickup" || address.trim().length > 0;
+
+  function handleAddressConfirm(addr: string, lat: number, lng: number) {
+    setAddress(addr);
+    setCoords({ lat, lng });
+    setOutOfRange(false);
+    setAutoZoneLabel(null);
+    setAutoDistanceKm(null);
+
+    if (!deliveryConfig) return;
+
+    const result = calculateDeliveryFee(deliveryConfig, lat, lng);
+    if (!result) return;
+
+    setAutoDistanceKm(result.distanceKm);
+
+    if (result.fee == null) {
+      // Out of range — we still keep the address but warn
+      setOutOfRange(true);
+      setFee(null);
+      setAutoZoneLabel(null);
+      return;
+    }
+
+    setFee(result.fee);
+    if (result.zoneIndex != null) {
+      setAutoZoneLabel(`Zona ${result.zoneIndex + 1}`);
+    } else {
+      setAutoZoneLabel("Tarifa fija");
+    }
+  }
 
   function confirm() {
     if (!canConfirm || submitting) return;
@@ -42,12 +83,19 @@ export function MostradorDestinationSheet({
         deliveryMethod: "delivery",
         customerPhone: phone.trim() || undefined,
         customerAddress: address.trim() || undefined,
+        customerLat: coords?.lat ?? null,
+        customerLng: coords?.lng ?? null,
         deliveryFee: fee ?? 0,
       });
     } else {
       onConfirm({ deliveryMethod: "pickup" });
     }
   }
+
+  const hasZonesConfigured =
+    deliveryConfig &&
+    (((deliveryConfig.deliveryZones?.length ?? 0) > 0) ||
+      (deliveryConfig.deliveryFee != null && deliveryConfig.deliveryFee > 0));
 
   return (
     <div
@@ -113,28 +161,46 @@ export function MostradorDestinationSheet({
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-400">
-                  📍 Dirección de entrega
-                </label>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  rows={2}
-                  placeholder="Av. Libertador 1234, depto 2B"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none resize-none"
+
+              {/* Address via LocationPicker — same flow customers use */}
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+                <LocationPicker
+                  addressLabel="📍 Dirección del cliente"
+                  placeholder="Escribí la dirección del cliente..."
+                  geolocateLabel="Marcar en mapa"
+                  initialAddress={address}
+                  initialLat={coords?.lat ?? null}
+                  initialLng={coords?.lng ?? null}
+                  onLocationConfirm={handleAddressConfirm}
                 />
               </div>
-              <MoneyInput
-                label="💰 Envío"
-                value={fee}
-                onChange={setFee}
-                placeholder="2500"
-                darkMode
-              />
-              <p className="text-[11px] text-slate-500">
-                Si no sabés el costo todavía, dejalo vacío y agregalo después desde el tablero.
-              </p>
+
+              {outOfRange && (
+                <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-200">
+                  ⚠️ La dirección está fuera de tu zona de delivery
+                  {autoDistanceKm != null ? ` (${autoDistanceKm.toFixed(1)} km)` : ""}. Podés cobrarle un envío manual si igual querés despachar.
+                </div>
+              )}
+
+              <div>
+                <MoneyInput
+                  label="💰 Envío"
+                  value={fee}
+                  onChange={setFee}
+                  placeholder={hasZonesConfigured ? "Calculado por zona" : "2500"}
+                  darkMode
+                />
+                {autoZoneLabel && autoDistanceKm != null && !outOfRange && (
+                  <p className="text-[11px] text-emerald-300 mt-1">
+                    ✓ {autoZoneLabel} · {autoDistanceKm.toFixed(1)} km — calculado desde tus zonas
+                  </p>
+                )}
+                {!hasZonesConfigured && (
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    No tenés zonas configuradas. Cargá el envío a mano o configurá zonas en Mi Restaurante.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 

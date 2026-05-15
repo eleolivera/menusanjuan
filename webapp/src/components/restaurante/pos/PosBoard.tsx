@@ -10,6 +10,7 @@ import { MostradorDestinationSheet, type MostradorDestination } from "./Mostrado
 import { NumberPad } from "./NumberPad";
 import { formatARS, normalize, timeAgo } from "@/lib/admin-utils";
 import { computeCartTotal } from "@/lib/money";
+import type { DeliveryConfig } from "@/lib/delivery";
 
 function isVideo(url: string) {
   return /\.(mp4|mov|webm)/i.test(url);
@@ -50,11 +51,13 @@ export function PosBoard({
   restaurantName,
   tableSuggestions,
   onSuggestionsUpdate,
+  deliveryConfig,
 }: {
   slug: string;
   restaurantName: string;
   tableSuggestions: string[];
   onSuggestionsUpdate: (s: string[]) => void;
+  deliveryConfig: DeliveryConfig | null;
 }) {
   // ─── Menu state ───
   const [categories, setCategories] = useState<MenuCategoryData[]>([]);
@@ -838,6 +841,7 @@ export function PosBoard({
           customerName={mostradorCustomer.trim()}
           total={grandTotal}
           submitting={submitting}
+          deliveryConfig={deliveryConfig}
           onConfirm={(dest) => submitMostrador("", undefined, true, dest)}
           onCancel={() => { if (!submitting) setDestSheetOpen(false); }}
         />

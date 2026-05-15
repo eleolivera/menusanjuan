@@ -60,8 +60,25 @@ const fullscreenMapOptions: google.maps.MapOptions = {
 
 export function LocationPicker({
   onLocationConfirm,
+  addressLabel = "Dirección de entrega",
+  placeholder = "Escribí tu dirección...",
+  geolocateLabel = "Mi ubicación",
+  initialAddress,
+  initialLat,
+  initialLng,
 }: {
   onLocationConfirm: (address: string, lat: number, lng: number) => void;
+  /** Top label for the address autocomplete field */
+  addressLabel?: string;
+  /** Placeholder text for the address input */
+  placeholder?: string;
+  /** Label shown next to the GPS button — "Mi ubicación" is the default but
+   *  in agent flows it's useful to relabel ("Marcar en el mapa", etc.) */
+  geolocateLabel?: string;
+  /** Pre-fill from an existing address + coords (useful when re-editing) */
+  initialAddress?: string;
+  initialLat?: number | null;
+  initialLng?: number | null;
 }) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
@@ -70,8 +87,10 @@ export function LocationPicker({
 
   // writtenAddress — what shows on the receipt
   // coords — actual lat/lng for delivery
-  const [writtenAddress, setWrittenAddress] = useState("");
-  const [coords, setCoords] = useState(DEFAULT_CENTER);
+  const [writtenAddress, setWrittenAddress] = useState(initialAddress || "");
+  const [coords, setCoords] = useState(
+    initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : DEFAULT_CENTER,
+  );
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [locating, setLocating] = useState(false);
   const [mapTouched, setMapTouched] = useState(false);
@@ -264,7 +283,7 @@ export function LocationPicker({
         {/* Address autocomplete */}
         <div className="relative">
           <label className="mb-1.5 block text-sm font-medium text-text">
-            Dirección de entrega
+            {addressLabel}
           </label>
           <div className="relative">
             <svg
@@ -283,7 +302,7 @@ export function LocationPicker({
                 setIsConfirmed(false);
               }}
               disabled={!ready || isConfirmed}
-              placeholder="Escribí tu dirección..."
+              placeholder={placeholder}
               className="w-full rounded-xl border border-border bg-white px-4 py-3 pl-10 text-base text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors disabled:bg-surface-alt disabled:text-text-secondary"
             />
           </div>
@@ -339,7 +358,7 @@ export function LocationPicker({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v3M12 19v3M2 12h3M19 12h3" />
                 </svg>
               )}
-              Mi ubicación
+              {geolocateLabel}
             </button>
           </div>
         )}
@@ -487,7 +506,7 @@ export function LocationPicker({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v3M12 19v3M2 12h3M19 12h3" />
                 </svg>
               )}
-              Mi ubicación
+              {geolocateLabel}
             </button>
           </div>
 

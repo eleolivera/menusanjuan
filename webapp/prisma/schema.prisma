@@ -120,6 +120,7 @@ model Dealer {
   deliveryClosePrice  Float?                   // Close zone price in ARS
   deliveryFarRadius   Float?                   // Far zone radius in km (e.g. 7.0)
   deliveryFarPrice    Float?                   // Far zone price in ARS
+  deliveryZones       String?                  // JSON: [{radius:number,price:number}, ...] up to 5 zones (sorted asc by radius)
   deliveryFee Float?                           // Legacy flat fee fallback
   deliveryTimeMin Int?                          // Estimated delivery time in minutes
   posEnabled  Boolean  @default(false)         // Show POS / pre-pay tablet UI

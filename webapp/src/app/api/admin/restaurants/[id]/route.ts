@@ -66,9 +66,34 @@ export async function PATCH(
     cuisineType, description, logoUrl, coverUrl,
     isActive, posEnabled, openHours, mercadoPagoAlias, mercadoPagoCvu, bankInfo,
     sourceProfileId, sourceSite, rating, deliveryFee,
-    deliveryEnabled, pickupEnabled, pickupHours, deliveryHours,
+    deliveryEnabled, pickupEnabled, pickupHours, deliveryHours, deliveryZones,
     deliveryCloseRadius, deliveryClosePrice, deliveryFarRadius, deliveryFarPrice,
   } = body;
+
+  // Validate deliveryZones — inline since this route doesn't share imports with profile
+  let zonesJson: string | null | undefined = undefined;
+  if (deliveryZones !== undefined) {
+    if (deliveryZones === null || deliveryZones === "") {
+      zonesJson = null;
+    } else {
+      try {
+        const arr = typeof deliveryZones === "string" ? JSON.parse(deliveryZones) : deliveryZones;
+        if (!Array.isArray(arr)) throw new Error("deliveryZones debe ser array");
+        if (arr.length > 5) throw new Error("Máximo 5 zonas");
+        const cleaned = arr.map((z: any) => {
+          const r = Number(z?.radius), p = Number(z?.price);
+          if (!Number.isFinite(r) || r <= 0 || !Number.isFinite(p) || p < 0) throw new Error("Zona inválida");
+          return { radius: r, price: p };
+        }).sort((a, b) => a.radius - b.radius);
+        for (let i = 1; i < cleaned.length; i++) {
+          if (cleaned[i].radius - cleaned[i - 1].radius < 1) throw new Error(`Zona ${i + 1} debe ser al menos 1km mayor que la anterior`);
+        }
+        zonesJson = cleaned.length > 0 ? JSON.stringify(cleaned) : null;
+      } catch (err) {
+        return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+      }
+    }
+  }
 
   const updated = await prisma.dealer.update({
     where: { id },
@@ -98,6 +123,7 @@ export async function PATCH(
       ...(pickupEnabled !== undefined && { pickupEnabled }),
       ...(pickupHours !== undefined && { pickupHours }),
       ...(deliveryHours !== undefined && { deliveryHours }),
+      ...(zonesJson !== undefined && { deliveryZones: zonesJson }),
       ...(deliveryCloseRadius !== undefined && { deliveryCloseRadius: deliveryCloseRadius === null ? null : Number(deliveryCloseRadius) }),
       ...(deliveryClosePrice !== undefined && { deliveryClosePrice: deliveryClosePrice === null ? null : Number(deliveryClosePrice) }),
       ...(deliveryFarRadius !== undefined && { deliveryFarRadius: deliveryFarRadius === null ? null : Number(deliveryFarRadius) }),

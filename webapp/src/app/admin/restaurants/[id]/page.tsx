@@ -8,6 +8,7 @@ import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
 import { MoneyInput } from "@/components/MoneyInput";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
+import { DeliveryZonesEditor } from "@/components/DeliveryZonesEditor";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -55,10 +56,8 @@ export default function AdminRestaurantDetail() {
   const [pickupEnabled, setPickupEnabled] = useState(true);
   const [pickupHoursJson, setPickupHoursJson] = useState<string | null>(null);
   const [deliveryHoursJson, setDeliveryHoursJson] = useState<string | null>(null);
-  const [deliveryCloseRadius, setDeliveryCloseRadius] = useState("");
-  const [deliveryClosePrice, setDeliveryClosePrice] = useState("");
+  const [deliveryZones, setDeliveryZones] = useState<string | null>(null);
   const [deliveryFarRadius, setDeliveryFarRadius] = useState("");
-  const [deliveryFarPrice, setDeliveryFarPrice] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
 
@@ -129,10 +128,8 @@ export default function AdminRestaurantDetail() {
     setPickupEnabled((d as any).pickupEnabled !== false);
     setPickupHoursJson((d as any).pickupHours || null);
     setDeliveryHoursJson((d as any).deliveryHours || null);
-    setDeliveryCloseRadius(d.deliveryCloseRadius != null ? String(d.deliveryCloseRadius) : "");
-    setDeliveryClosePrice(d.deliveryClosePrice != null ? String(d.deliveryClosePrice) : "");
+    setDeliveryZones((d as any).deliveryZones || null);
     setDeliveryFarRadius(d.deliveryFarRadius != null ? String(d.deliveryFarRadius) : "");
-    setDeliveryFarPrice(d.deliveryFarPrice != null ? String(d.deliveryFarPrice) : "");
     setLoading(false);
   }
 
@@ -141,7 +138,7 @@ export default function AdminRestaurantDetail() {
     await fetch(`/api/admin/restaurants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, isActive, openHours: JSON.stringify(hours), pickupHours: pickupHoursJson, deliveryHours: deliveryHoursJson, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, pickupEnabled, deliveryCloseRadius: deliveryCloseRadius ? Number(deliveryCloseRadius) : null, deliveryClosePrice: deliveryClosePrice ? Number(deliveryClosePrice) : null, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null, deliveryFarPrice: deliveryFarPrice ? Number(deliveryFarPrice) : null }),
+      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, isActive, openHours: JSON.stringify(hours), pickupHours: pickupHoursJson, deliveryHours: deliveryHoursJson, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, pickupEnabled, deliveryZones, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -496,51 +493,38 @@ Probalo y decime qué te parece!`;
 
             {/* Delivery zones */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <label className="text-xs font-semibold text-white block">Zonas de Delivery (radios + precio por distancia)</label>
+              <label className="text-xs font-semibold text-white block">Zonas de Delivery</label>
               {deliveryEnabled && (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] text-slate-500 mb-1">Zona cercana — Radio (km)</label>
-                      <input type="number" min="0.5" step="0.5" value={deliveryCloseRadius} onChange={e => setDeliveryCloseRadius(e.target.value)} placeholder="Ej: 3" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-500 mb-1">Zona cercana — Precio</label>
-                      <MoneyInput
-                        value={deliveryClosePrice === "" ? null : Number(deliveryClosePrice)}
-                        onChange={(v) => setDeliveryClosePrice(v == null ? "" : String(v))}
-                        placeholder="500"
-                        compact
-                        darkMode
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-500 mb-1">Zona lejana — Radio (km)</label>
-                      <input type="number" min="1" step="0.5" value={deliveryFarRadius} onChange={e => setDeliveryFarRadius(e.target.value)} placeholder="Ej: 7" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-500 mb-1">Zona lejana — Precio</label>
-                      <MoneyInput
-                        value={deliveryFarPrice === "" ? null : Number(deliveryFarPrice)}
-                        onChange={(v) => setDeliveryFarPrice(v == null ? "" : String(v))}
-                        placeholder="1000"
-                        compact
-                        darkMode
-                      />
-                    </div>
+                  <DeliveryZonesEditor
+                    value={deliveryZones}
+                    onChange={(json) => setDeliveryZones(json)}
+                    dealerLat={latitude}
+                    dealerLng={longitude}
+                  />
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Tarifa fija (sin zonas) — opcional</label>
+                    <MoneyInput
+                      value={deliveryFee === "" ? null : Number(deliveryFee)}
+                      onChange={(v) => setDeliveryFee(v == null ? "" : String(v))}
+                      placeholder="Vacío = sin tarifa fija"
+                      compact
+                      darkMode
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Si hay zonas, se usan las zonas. La tarifa fija es solo fallback si no hay zonas configuradas.
+                    </p>
                   </div>
-                  {!deliveryCloseRadius && (
-                    <div>
-                      <label className="block text-[10px] text-slate-500 mb-1">Tarifa fija (sin zonas)</label>
-                      <MoneyInput
-                        value={deliveryFee === "" ? null : Number(deliveryFee)}
-                        onChange={(v) => setDeliveryFee(v == null ? "" : String(v))}
-                        placeholder="Gratis si vacío"
-                        compact
-                        darkMode
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Distancia máxima para tarifa fija (km) — opcional</label>
+                    <input
+                      type="number" min="0" step="0.5"
+                      value={deliveryFarRadius}
+                      onChange={e => setDeliveryFarRadius(e.target.value)}
+                      placeholder="Vacío = sin límite"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none"
+                    />
+                  </div>
                 </>
               )}
             </div>

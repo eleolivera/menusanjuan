@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import type { Restaurant } from "@/data/restaurants";
 import type { DeliveryConfig } from "./delivery";
+import { parseDeliveryZones } from "./delivery";
 import { isServiceOpenNow, getNextServiceOpenTime } from "./hours";
 
 export type ServiceAvailability = {
@@ -79,6 +80,7 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
     ownerUserId: dealer.account.userId,
     deliveryConfig: {
       deliveryEnabled: dealer.deliveryEnabled,
+      deliveryZones: parseDeliveryZones(dealer.deliveryZones),
       deliveryCloseRadius: dealer.deliveryCloseRadius,
       deliveryClosePrice: dealer.deliveryClosePrice,
       deliveryFarRadius: dealer.deliveryFarRadius,

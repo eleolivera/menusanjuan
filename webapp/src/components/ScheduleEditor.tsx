@@ -145,35 +145,51 @@ export function ScheduleEditor({
 
               {!isClosed && (
                 <div className="space-y-1.5">
-                  {windows.map((w, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input
-                        type="time"
-                        value={w.open}
-                        onChange={(e) => setWindow(dayKey, idx, "open", e.target.value)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
-                      />
-                      <span className="text-[10px] text-slate-500">a</span>
-                      <input
-                        type="time"
-                        value={w.close}
-                        onChange={(e) => setWindow(dayKey, idx, "close", e.target.value)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
-                      />
-                      {windows.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeWindow(dayKey, idx)}
-                          className="text-slate-500 hover:text-red-400 text-xs px-1"
-                          title="Quitar este horario"
-                        >
-                          ×
-                        </button>
-                      )}
-                      {/* Visual time bar for this window */}
-                      <TimeBar open={w.open} close={w.close} />
-                    </div>
-                  ))}
+                  {windows.map((w, idx) => {
+                    const overnight = isOvernight(w.open, w.close);
+                    const nextDayLabel = overnight ? nextDayName(dayKey) : null;
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={w.open}
+                            onChange={(e) => setWindow(dayKey, idx, "open", e.target.value)}
+                            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+                          />
+                          <span className="text-[10px] text-slate-500">a</span>
+                          <input
+                            type="time"
+                            value={w.close}
+                            onChange={(e) => setWindow(dayKey, idx, "close", e.target.value)}
+                            className={`rounded-lg border bg-white/5 px-2 py-1.5 text-xs text-white focus:outline-none ${
+                              overnight ? "border-indigo-400/50 focus:border-indigo-400" : "border-white/10 focus:border-primary"
+                            }`}
+                          />
+                          {windows.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeWindow(dayKey, idx)}
+                              className="text-slate-500 hover:text-red-400 text-xs px-1"
+                              title="Quitar este horario"
+                            >
+                              ×
+                            </button>
+                          )}
+                          {/* Visual time bar for this window */}
+                          <TimeBar open={w.open} close={w.close} />
+                        </div>
+                        {overnight && (
+                          <div className="ml-1 flex items-center gap-1.5 text-[10px] text-indigo-300">
+                            <span>🌙</span>
+                            <span>
+                              Cierra a las {w.close} del <strong>{nextDayLabel}</strong> — pasada la medianoche
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   {windows.length < 2 && (
                     <button
                       type="button"
@@ -191,10 +207,27 @@ export function ScheduleEditor({
       </div>
 
       <p className="text-[10px] text-slate-500 mt-3">
-        Tip: si cerrás al mediodía y abrís a la noche, podés agregar dos horarios por día.
+        Tip: si cerrás al mediodía y abrís a la noche, podés agregar dos horarios por día. Si cerrás <em>después de medianoche</em> (ej. Viernes 20:00 → 02:00), poné la hora de cierre normal — el horario se entiende como hasta la madrugada del día siguiente.
       </p>
     </section>
   );
+}
+
+function isOvernight(open: string, close: string): boolean {
+  const [oh, om] = open.split(":").map(Number);
+  const [ch, cm] = close.split(":").map(Number);
+  const openMin = (oh || 0) * 60 + (om || 0);
+  const closeMin = (ch || 0) * 60 + (cm || 0);
+  return closeMin > 0 && closeMin <= openMin;
+}
+
+const NEXT_DAY: Record<string, string> = {
+  lun: "Martes", mar: "Miércoles", mie: "Jueves", jue: "Viernes",
+  vie: "Sábado", sab: "Domingo", dom: "Lunes",
+};
+
+function nextDayName(dayKey: string): string {
+  return NEXT_DAY[dayKey] || "día siguiente";
 }
 
 /** Visual bar showing the open window on a 24-hour scale. */
