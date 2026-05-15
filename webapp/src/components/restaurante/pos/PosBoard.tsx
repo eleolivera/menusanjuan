@@ -6,6 +6,7 @@ import type { MenuCategoryData, MenuItemData, OptionGroupData } from "@/data/men
 import { ItemCustomizeSheet, type SelectedOptions } from "@/components/ItemCustomizeSheet";
 import { PosPaymentSheet } from "./PosPaymentSheet";
 import { PosPriceOverrideSheet } from "./PosPriceOverrideSheet";
+import { MostradorDestinationSheet, type MostradorDestination } from "./MostradorDestinationSheet";
 import { NumberPad } from "./NumberPad";
 import { formatARS, normalize, timeAgo } from "@/lib/admin-utils";
 import { computeCartTotal } from "@/lib/money";
@@ -77,6 +78,7 @@ export function PosBoard({
 
   // ─── Submission state ───
   const [paying, setPaying] = useState(false);
+  const [destSheetOpen, setDestSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -278,7 +280,12 @@ export function PosBoard({
   }
 
   /** Mostrador: create order, mark paid, send to kitchen */
-  async function submitMostrador(paymentMethod: string, cashTendered?: number, payLater?: boolean) {
+  async function submitMostrador(
+    paymentMethod: string,
+    cashTendered?: number,
+    payLater?: boolean,
+    destination?: MostradorDestination,
+  ) {
     if (submitting) return;
     if (cart.length === 0) return;
     setSubmitting(true);
@@ -294,6 +301,10 @@ export function PosBoard({
           cashTendered: payLater ? undefined : cashTendered,
           payLater: !!payLater,
           customerName: mostradorCustomer.trim() || undefined,
+          customerPhone: destination?.customerPhone,
+          customerAddress: destination?.customerAddress,
+          deliveryMethod: destination?.deliveryMethod,
+          deliveryFee: destination?.deliveryFee,
           source: "pos-tablet",
         }),
       });
@@ -303,6 +314,7 @@ export function PosBoard({
         setCart([]);
         setMostradorCustomer("");
         setPaying(false);
+        setDestSheetOpen(false);
       } else {
         const d = await res.json().catch(() => ({}));
         setErrorMsg(d.error || "Error al crear pedido");
@@ -740,11 +752,11 @@ export function PosBoard({
                     Cobrar ahora · {formatARS(grandTotal)}
                   </button>
                   <button
-                    onClick={() => submitMostrador("", undefined, true)}
+                    onClick={() => setDestSheetOpen(true)}
                     disabled={cart.length === 0 || submitting}
                     className="w-full rounded-xl border border-amber-400/30 bg-amber-400/5 py-2.5 text-[11px] font-semibold text-amber-300 hover:bg-amber-400/10 disabled:opacity-30 transition-all"
                   >
-                    {submitting ? "..." : "📋 Mandar a cocina · cobrar al retirar"}
+                    {submitting ? "..." : "📋 Mandar a cocina · cobrar después"}
                   </button>
                   {cart.length > 0 && (
                     <button
@@ -817,6 +829,17 @@ export function PosBoard({
             if (mode === "COUNTER") submitMostrador("", undefined, true);
           }}
           onClose={() => { if (!submitting) setPaying(false); }}
+        />
+      )}
+
+      {/* Mostrador destination sheet — "Retiro o Delivery?" after "Mandar a cocina" */}
+      {destSheetOpen && (
+        <MostradorDestinationSheet
+          customerName={mostradorCustomer.trim()}
+          total={grandTotal}
+          submitting={submitting}
+          onConfirm={(dest) => submitMostrador("", undefined, true, dest)}
+          onCancel={() => { if (!submitting) setDestSheetOpen(false); }}
         />
       )}
 

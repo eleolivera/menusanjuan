@@ -41,6 +41,8 @@ export async function POST(request: NextRequest) {
     notes,
     source,
     payLater,
+    deliveryMethod: deliveryMethodFromBody,
+    deliveryFee: deliveryFeeFromBody,
   } = body as {
     items: OrderItem[];
     channel: OrderChannel;
@@ -55,6 +57,8 @@ export async function POST(request: NextRequest) {
     notes?: string;
     source?: string;
     payLater?: boolean;
+    deliveryMethod?: "pickup" | "delivery";
+    deliveryFee?: number;
   };
 
   // ─── Validation ───
@@ -144,8 +148,10 @@ export async function POST(request: NextRequest) {
     items: stampedItems,
     total,
     notes,
-    deliveryMethod: channel === "DINE_IN" ? "dine-in" : "pickup",
-    deliveryFee: 0,
+    deliveryMethod: channel === "DINE_IN"
+      ? "dine-in"
+      : deliveryMethodFromBody === "delivery" ? "delivery" : "pickup",
+    deliveryFee: deliveryFeeFromBody && deliveryFeeFromBody > 0 ? Math.round(deliveryFeeFromBody) : 0,
     channel,
     tableNumber: tableNumber || null,
     paymentMethod: isPrePay ? paymentMethod : null,

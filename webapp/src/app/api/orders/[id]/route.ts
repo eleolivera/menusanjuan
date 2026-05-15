@@ -42,6 +42,21 @@ export async function PATCH(
     return NextResponse.json(order);
   }
 
+  // Owner-only: update deliveryFee retroactively (when delivery wasn't set up at order time)
+  if (body.deliveryFee !== undefined) {
+    const dealer = await getRestauranteFromSession();
+    if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    const existing = await prisma.order.findUnique({ where: { id }, select: { restauranteSlug: true } });
+    if (!existing) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+    if (existing.restauranteSlug !== dealer.slug) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+    const fee = typeof body.deliveryFee === "number" && body.deliveryFee >= 0 ? Math.round(body.deliveryFee) : 0;
+    await prisma.order.update({ where: { id }, data: { deliveryFee: fee } });
+    const fresh = await getOrder(id);
+    return NextResponse.json(fresh);
+  }
+
   // Owner-only: toggle paymentStatus, optionally recording method + cash details
   if (body.paymentStatus === "PAID" || body.paymentStatus === "UNPAID") {
     const dealer = await getRestauranteFromSession();

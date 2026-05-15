@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCollector";
+import { MoneyInput } from "@/components/MoneyInput";
 
 const STATUS_CONFIG: Record<
   OrderStatus,
@@ -57,8 +58,13 @@ export function OrderCard({
   restaurantName: string;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const [collectingPayment, setCollectingPayment] = useState(false);
+  // "charge"  = full PaymentCollector with cash calculator (cobrar ahora, in-person)
+  // "record"  = compact PaymentCollector (registra pago externo, sin calculadora)
+  const [paymentSheet, setPaymentSheet] = useState<null | "charge" | "record">(null);
   const [unmarking, setUnmarking] = useState(false);
+  const [editingFee, setEditingFee] = useState(false);
+  const [feeDraft, setFeeDraft] = useState<number | null>(null);
+  const [savingFee, setSavingFee] = useState(false);
   const config = STATUS_CONFIG[order.status];
   const totalDue = (order.total || 0) + (order.deliveryFee || 0);
   const paidWhen = order.paidAt ? new Date(order.paidAt) : null;
@@ -75,7 +81,7 @@ export function OrderCard({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paymentStatus: "PAID", ...data }),
     });
-    setCollectingPayment(false);
+    setPaymentSheet(null);
     window.location.reload();
   }
 
@@ -92,6 +98,24 @@ export function OrderCard({
       setUnmarking(false);
     }
   }
+
+  async function saveDeliveryFee() {
+    if (feeDraft == null || feeDraft <= 0) return;
+    setSavingFee(true);
+    try {
+      await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryFee: feeDraft }),
+      });
+      setEditingFee(false);
+      window.location.reload();
+    } finally {
+      setSavingFee(false);
+    }
+  }
+
+  const needsDeliveryFee = order.deliveryMethod === "delivery" && (!order.deliveryFee || order.deliveryFee === 0);
   const timeSince = getTimeSince(order.createdAt);
 
   const cleanPhone = order.customerPhone.replace(/[^0-9]/g, "");
@@ -226,6 +250,49 @@ export function OrderCard({
           </div>
         </div>
 
+          {/* Delivery fee warning (when delivery without fee — phone delivery setup retroactively) */}
+          {needsDeliveryFee && !editingFee && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 flex items-center justify-between text-xs">
+              <span className="text-amber-200">
+                <span className="font-semibold">⚠️ Envío sin definir</span>
+                <span className="block text-[10px] text-amber-300/70 mt-0.5">El total no incluye el envío</span>
+              </span>
+              <button
+                onClick={() => { setEditingFee(true); setFeeDraft(null); }}
+                className="rounded-lg bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30 transition-colors shrink-0"
+              >
+                + Agregar envío
+              </button>
+            </div>
+          )}
+          {editingFee && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3 space-y-2">
+              <div className="text-[11px] font-semibold text-amber-200">¿Cuánto le cobrás de envío?</div>
+              <MoneyInput
+                value={feeDraft}
+                onChange={setFeeDraft}
+                placeholder="2500"
+                darkMode
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setEditingFee(false); setFeeDraft(null); }}
+                  disabled={savingFee}
+                  className="flex-1 rounded-lg border border-white/10 py-1.5 text-[11px] text-slate-300 hover:bg-white/5 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveDeliveryFee}
+                  disabled={savingFee || !feeDraft || feeDraft <= 0}
+                  className="flex-1 rounded-lg bg-amber-500 py-1.5 text-[11px] font-bold text-slate-900 hover:bg-amber-400 transition-colors disabled:opacity-30"
+                >
+                  {savingFee ? "..." : "Guardar"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Payment status pill */}
           {order.paymentStatus === "PAID" ? (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 flex items-center justify-between text-xs">
@@ -249,32 +316,40 @@ export function OrderCard({
           )}
 
           {/* Action buttons */}
-          <div className={`grid gap-2 mt-2 ${order.paymentStatus === "UNPAID" ? "grid-cols-2" : "grid-cols-1"}`}>
-            {order.paymentStatus === "UNPAID" && (
+          {order.paymentStatus === "UNPAID" ? (
+            <div className="grid grid-cols-2 gap-2 mt-2">
               <button
-                onClick={() => setCollectingPayment(true)}
+                onClick={() => setPaymentSheet("charge")}
                 className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-3 py-2.5 text-xs font-bold text-white shadow-md shadow-primary/20 hover:shadow-lg transition-all"
               >
                 💰 Cobrar ${totalDue.toLocaleString("es-AR")}
               </button>
-            )}
-            <a
-              href={`/restaurante/order/${order.id}/ticket`}
-              target="_blank"
-              rel="noopener"
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-300 text-center hover:bg-white/10 transition-colors"
-            >
-              🖨️ Imprimir comanda
-            </a>
-          </div>
+              <button
+                onClick={() => setPaymentSheet("record")}
+                className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15 transition-colors"
+              >
+                ✓ Ya pagó (transfer / MP)
+              </button>
+            </div>
+          ) : null}
 
-          {collectingPayment && (
+          <a
+            href={`/restaurante/order/${order.id}/ticket`}
+            target="_blank"
+            rel="noopener"
+            className="block mt-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-300 text-center hover:bg-white/10 transition-colors"
+          >
+            🖨️ Imprimir comanda
+          </a>
+
+          {paymentSheet && (
             <PaymentCollector
               total={totalDue}
               onCollect={collectPayment}
-              onCancel={() => setCollectingPayment(false)}
-              title={`Cobrar pedido ${order.orderNumber}`}
-              confirmLabel="Cobrado"
+              onCancel={() => setPaymentSheet(null)}
+              title={paymentSheet === "charge" ? `Cobrar pedido ${order.orderNumber}` : `Registrar pago · ${order.orderNumber}`}
+              confirmLabel={paymentSheet === "charge" ? "Cobrado" : "Registrar"}
+              compact={paymentSheet === "record"}
             />
           )}
 

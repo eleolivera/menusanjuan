@@ -36,6 +36,7 @@ export function PaymentCollector({
   submitting = false,
   confirmLabel = "Cobrado",
   title = "Cobrar pedido",
+  compact = false,
 }: {
   total: number;
   onCollect: (data: CollectedPayment) => void | Promise<void>;
@@ -44,17 +45,25 @@ export function PaymentCollector({
   submitting?: boolean;
   confirmLabel?: string;
   title?: string;
+  /**
+   * Compact mode: just pick a payment method and confirm — no cash calculator,
+   * no "recibido" / "vuelto". Used for "Ya pagó" flows where the customer already
+   * paid externally (e.g. sent a transfer screenshot) and the owner just needs to
+   * record HOW.
+   */
+  compact?: boolean;
 }) {
-  const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [method, setMethod] = useState<PaymentMethod>(compact ? "transfer" : "cash");
   const [tendered, setTendered] = useState<string>("");
 
   const tenderedNum = Math.max(0, Math.floor(parseInt(tendered, 10) || 0));
   const change = tenderedNum - total;
-  const canConfirm = method !== "cash" || total === 0 || tenderedNum >= total;
+  const showCash = method === "cash" && !compact;
+  const canConfirm = compact || method !== "cash" || total === 0 || tenderedNum >= total;
 
   function handleConfirm() {
     if (!canConfirm || submitting) return;
-    if (method === "cash") {
+    if (method === "cash" && !compact) {
       onCollect({
         paymentMethod: "cash",
         cashTendered: tenderedNum,
@@ -95,8 +104,8 @@ export function PaymentCollector({
         ))}
       </div>
 
-      {/* Cash calculator */}
-      {method === "cash" && (
+      {/* Cash calculator — hidden in compact mode */}
+      {showCash && (
         <div className="space-y-3 animate-fade-in">
           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 flex items-center justify-between">
             <span className="text-[11px] text-slate-500 uppercase tracking-wider">Recibido</span>
@@ -140,22 +149,38 @@ export function PaymentCollector({
         </div>
       )}
 
+      {method === "cash" && compact && (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
+          <p className="text-xs text-slate-400">El cliente pagó en efectivo</p>
+        </div>
+      )}
+
       {method === "card" && (
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
-          <p className="text-xs text-slate-400">Cobrar con tu Posnet o terminal</p>
-          <p className="text-[10px] text-slate-600 mt-1">Tocá "{confirmLabel}" cuando esté cobrado</p>
+          {compact ? (
+            <p className="text-xs text-slate-400">El cliente pagó con tarjeta</p>
+          ) : (
+            <>
+              <p className="text-xs text-slate-400">Cobrar con tu Posnet o terminal</p>
+              <p className="text-[10px] text-slate-600 mt-1">Tocá "{confirmLabel}" cuando esté cobrado</p>
+            </>
+          )}
         </div>
       )}
 
       {method === "transfer" && (
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
-          <p className="text-xs text-slate-400">Confirmá que el cliente hizo la transferencia</p>
+          <p className="text-xs text-slate-400">
+            {compact ? "El cliente envió el comprobante de transferencia" : "Confirmá que el cliente hizo la transferencia"}
+          </p>
         </div>
       )}
 
       {method === "mercadopago" && (
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
-          <p className="text-xs text-slate-400">Cobrar con tu QR de Mercado Pago</p>
+          <p className="text-xs text-slate-400">
+            {compact ? "El cliente pagó por Mercado Pago" : "Cobrar con tu QR de Mercado Pago"}
+          </p>
         </div>
       )}
     </div>
