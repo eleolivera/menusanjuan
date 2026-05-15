@@ -220,9 +220,7 @@ export function MostradorDestinationSheet({
           >
             {submitting
               ? "Procesando..."
-              : method === "delivery"
-                ? "📋 Mandar a cocina · cobrar al entregar"
-                : "📋 Mandar a cocina · cobrar al retirar"}
+              : "📋 Mandar a cocina · cobrar después"}
           </button>
           {method === "delivery" && !address.trim() && (
             <p className="text-[11px] text-amber-300 text-center mt-2">
