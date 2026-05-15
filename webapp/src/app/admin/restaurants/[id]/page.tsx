@@ -9,6 +9,8 @@ import { RestaurantQrCard } from "@/components/RestaurantQrCard";
 import { MoneyInput } from "@/components/MoneyInput";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
 import { DeliveryZonesEditor } from "@/components/DeliveryZonesEditor";
+import { useSmartSave } from "@/hooks/useSmartSave";
+import { SaveIndicator } from "@/components/SaveIndicator";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -34,51 +36,105 @@ export default function AdminRestaurantDetail() {
   const initialTab = (searchParams.get("tab") as "info" | "menu" | "claims" | "owner") || "info";
   const [data, setData] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const [tab, setTab] = useState<"info" | "menu" | "claims" | "owner">(initialTab);
 
-  // Editable fields
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [showMap, setShowMap] = useState(false);
-  const [cuisineType, setCuisineType] = useState("");
-  const [description, setDescription] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
-  const [coverUrl, setCoverUrl] = useState("");
-  const [isActive, setIsActive] = useState(true);
-  const [rating, setRating] = useState("");
-  const [deliveryFee, setDeliveryFee] = useState("");
-  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
-  const [pickupEnabled, setPickupEnabled] = useState(true);
-  const [pickupHoursJson, setPickupHoursJson] = useState<string | null>(null);
-  const [deliveryHoursJson, setDeliveryHoursJson] = useState<string | null>(null);
-  const [deliveryZones, setDeliveryZones] = useState<string | null>(null);
-  const [deliveryFarRadius, setDeliveryFarRadius] = useState("");
+  // Autosave: same pattern as owner profile
+  const [originalData, setOriginalData] = useState<Record<string, any>>({
+    name: "",
+    phone: "",
+    address: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
+    cuisineType: "",
+    description: "",
+    logoUrl: "",
+    coverUrl: "",
+    isActive: true,
+    rating: null as number | null,
+    deliveryFee: null as number | null,
+    deliveryTimeMin: null as number | null,
+    deliveryEnabled: true,
+    pickupEnabled: true,
+    pickupHours: null as string | null,
+    deliveryHours: null as string | null,
+    deliveryZones: null as string | null,
+    deliveryFarRadius: null as number | null,
+    mercadoPagoAlias: "",
+    mercadoPagoCvu: "",
+    bankInfo: "",
+    posEnabled: false,
+  });
+
+  const FIELD_CONFIG = {
+    name: { tier: "autosave" as const },
+    phone: { tier: "autosave" as const },
+    address: { tier: "autosave" as const },
+    latitude: { tier: "autosave" as const },
+    longitude: { tier: "autosave" as const },
+    cuisineType: { tier: "instant" as const },
+    description: { tier: "autosave" as const },
+    logoUrl: { tier: "instant" as const },
+    coverUrl: { tier: "instant" as const },
+    isActive: { tier: "instant" as const },
+    rating: { tier: "autosave" as const },
+    deliveryFee: { tier: "autosave" as const },
+    deliveryTimeMin: { tier: "autosave" as const },
+    deliveryEnabled: { tier: "instant" as const },
+    pickupEnabled: { tier: "instant" as const },
+    pickupHours: { tier: "autosave" as const },
+    deliveryHours: { tier: "autosave" as const },
+    deliveryZones: { tier: "autosave" as const },
+    deliveryFarRadius: { tier: "autosave" as const },
+    mercadoPagoAlias: { tier: "autosave" as const },
+    mercadoPagoCvu: { tier: "autosave" as const },
+    bankInfo: { tier: "autosave" as const },
+    posEnabled: { tier: "instant" as const },
+  };
+
+  const { values, setValue, flushField, statuses } = useSmartSave(
+    originalData,
+    FIELD_CONFIG,
+    { endpoint: `/api/admin/restaurants/${id}`, debounceMs: 1500 },
+  );
+
+  // Convenience accessors
+  const name = values.name as string;
+  const phone = values.phone as string;
+  const address = values.address as string;
+  const latitude = values.latitude as number | null;
+  const longitude = values.longitude as number | null;
+  const cuisineType = values.cuisineType as string;
+  const description = values.description as string;
+  const logoUrl = values.logoUrl as string;
+  const coverUrl = values.coverUrl as string;
+  const isActive = values.isActive as boolean;
+  const rating = values.rating as number | null;
+  const deliveryFee = values.deliveryFee as number | null;
+  const deliveryTimeMin = values.deliveryTimeMin as number | null;
+  const deliveryEnabled = values.deliveryEnabled as boolean;
+  const pickupEnabled = values.pickupEnabled as boolean;
+  const pickupHoursJson = values.pickupHours as string | null;
+  const deliveryHoursJson = values.deliveryHours as string | null;
+  const deliveryZones = values.deliveryZones as string | null;
+  const deliveryFarRadius = values.deliveryFarRadius as number | null;
+  const mercadoPagoAlias = values.mercadoPagoAlias as string;
+  const mercadoPagoCvu = values.mercadoPagoCvu as string;
+  const bankInfo = values.bankInfo as string;
+  const posEnabled = values.posEnabled as boolean;
+  const deliveryMode: "zones" | "flat" = deliveryFee != null && deliveryFee > 0 ? "flat" : "zones";
+
+  function switchDeliveryMode(next: "zones" | "flat") {
+    if (next === "flat") {
+      setValue("deliveryZones", null);
+      setValue("deliveryFee", deliveryFee ?? 1500);
+    } else {
+      setValue("deliveryFee", null);
+    }
+  }
+
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
-
-  // Hours
-  type HoursMap = Record<string, { open: string; close: string; closed: boolean }>;
-  const DAYS = [
-    { key: "lun", label: "Lun" }, { key: "mar", label: "Mar" }, { key: "mie", label: "Mié" },
-    { key: "jue", label: "Jue" }, { key: "vie", label: "Vie" }, { key: "sab", label: "Sáb" }, { key: "dom", label: "Dom" },
-  ];
-  function parseHours(json: string | null): HoursMap {
-    if (!json) {
-      const d: HoursMap = {};
-      DAYS.forEach((day) => { d[day.key] = { open: "08:00", close: "23:00", closed: day.key === "dom" }; });
-      return d;
-    }
-    try { return JSON.parse(json); } catch { return parseHours(null); }
-  }
-  const [hours, setHours] = useState<HoursMap>(parseHours(null));
-  function updateHours(key: string, field: string, value: string | boolean) {
-    setHours((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
-  }
 
   // Owner assignment
   const [assignEmail, setAssignEmail] = useState("");
@@ -117,36 +173,35 @@ export default function AdminRestaurantDetail() {
     if (!res.ok) { router.push("/admin"); return; }
     const d = await res.json();
     setData(d);
-    setName(d.name); setPhone(d.phone); setAddress(d.address || "");
-    setLatitude(d.latitude ?? null); setLongitude(d.longitude ?? null);
-    setCuisineType(d.cuisineType); setDescription(d.description || "");
-    setLogoUrl(d.logoUrl || ""); setCoverUrl(d.coverUrl || "");
-    setIsActive(d.isActive); setHours(parseHours(d.openHours));
-    setRating(d.rating != null ? String(d.rating) : "");
-    setDeliveryFee(d.deliveryFee != null ? String(d.deliveryFee) : "");
-    setDeliveryEnabled(d.deliveryEnabled !== false);
-    setPickupEnabled((d as any).pickupEnabled !== false);
-    setPickupHoursJson((d as any).pickupHours || null);
-    setDeliveryHoursJson((d as any).deliveryHours || null);
-    setDeliveryZones((d as any).deliveryZones || null);
-    setDeliveryFarRadius(d.deliveryFarRadius != null ? String(d.deliveryFarRadius) : "");
+    setOriginalData({
+      name: d.name || "",
+      phone: d.phone || "",
+      address: d.address || "",
+      latitude: d.latitude ?? null,
+      longitude: d.longitude ?? null,
+      cuisineType: d.cuisineType || "",
+      description: d.description || "",
+      logoUrl: d.logoUrl || "",
+      coverUrl: d.coverUrl || "",
+      isActive: d.isActive,
+      rating: d.rating ?? null,
+      deliveryFee: d.deliveryFee ?? null,
+      deliveryTimeMin: d.deliveryTimeMin ?? null,
+      deliveryEnabled: d.deliveryEnabled !== false,
+      pickupEnabled: (d as any).pickupEnabled !== false,
+      pickupHours: (d as any).pickupHours || null,
+      deliveryHours: (d as any).deliveryHours || null,
+      deliveryZones: (d as any).deliveryZones || null,
+      deliveryFarRadius: d.deliveryFarRadius ?? null,
+      mercadoPagoAlias: (d as any).mercadoPagoAlias || "",
+      mercadoPagoCvu: (d as any).mercadoPagoCvu || "",
+      bankInfo: (d as any).bankInfo || "",
+      posEnabled: (d as any).posEnabled || false,
+    });
     setLoading(false);
   }
 
-  async function handleSave() {
-    setSaving(true);
-    await fetch(`/api/admin/restaurants/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, isActive, openHours: JSON.stringify(hours), pickupHours: pickupHoursJson, deliveryHours: deliveryHoursJson, rating: rating ? Number(rating) : null, deliveryFee: deliveryFee ? Number(deliveryFee) : null, deliveryEnabled, pickupEnabled, deliveryZones, deliveryFarRadius: deliveryFarRadius ? Number(deliveryFarRadius) : null }),
-    });
-    setSaving(false); setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    fetchData();
-  }
-
   async function handleImageUpload(file: File, type: "logo" | "cover") {
-    const setter = type === "logo" ? setLogoUrl : setCoverUrl;
     const setUploading = type === "logo" ? setUploadingLogo : setUploadingCover;
     setUploading(true);
     const formData = new FormData();
@@ -156,14 +211,8 @@ export default function AdminRestaurantDetail() {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const d = await res.json();
       if (res.ok) {
-        setter(d.url);
-        // Auto-save to DB
-        await fetch(`/api/admin/restaurants/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [type === "logo" ? "logoUrl" : "coverUrl"]: d.url }),
-        });
-        fetchData();
+        // setValue with "instant" tier autosaves immediately
+        setValue(type === "logo" ? "logoUrl" : "coverUrl", d.url);
       }
     } catch {}
     setUploading(false);
@@ -323,7 +372,7 @@ Probalo y decime qué te parece!`;
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {saved && <span className="text-xs text-emerald-400">Guardado</span>}
+            <span className="text-[10px] text-slate-500">Guardado automático</span>
             <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Ver pública</a>
           </div>
         </div>
@@ -351,216 +400,419 @@ Probalo y decime qué te parece!`;
 
         {/* Info tab */}
         {tab === "info" && (
-          <div className="space-y-4">
-            {/* Cover + Logo */}
+          <div className="space-y-6">
+            {/* Cover + Logo (Facebook-style, click to edit) */}
             <div className="rounded-2xl border border-white/5 overflow-hidden">
               {/* Cover */}
-              <label className="relative block h-36 cursor-pointer group">
+              <label className="relative block h-40 cursor-pointer group">
                 {coverUrl ? (
                   <img src={coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 flex items-center justify-center">
-                    <span className="text-xs text-slate-500">Click para agregar portada</span>
+                    <div className="text-center">
+                      <svg className="h-8 w-8 text-slate-500 mx-auto mb-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                      </svg>
+                      <span className="text-xs text-slate-500">Agregar foto de portada</span>
+                    </div>
                   </div>
                 )}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white bg-black/60 rounded-lg px-3 py-1.5">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 rounded-lg bg-black/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
                     {uploadingCover ? "Subiendo..." : "Cambiar portada"}
-                  </span>
+                  </div>
                 </div>
                 <input type="file" accept="image/*,video/mp4" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "cover"); e.target.value = ""; }} />
               </label>
 
-              {/* Logo */}
+              {/* Logo overlapping the cover */}
               <div className="relative px-4 pb-4 -mt-10">
-                <label className="relative inline-block cursor-pointer group">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-amber-500 text-white text-2xl font-bold shadow-lg border-4 border-slate-950 overflow-hidden">
-                    {logoUrl ? <img src={logoUrl} alt="" className="h-full w-full object-cover" /> : name?.charAt(0) || "R"}
+                <div className="flex items-end gap-4">
+                  <label className="relative group cursor-pointer">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-amber-500 text-white text-2xl font-bold shadow-lg border-4 border-slate-950 overflow-hidden">
+                      {logoUrl ? <img src={logoUrl} alt="" className="h-full w-full object-cover" /> : name?.charAt(0) || "R"}
+                    </div>
+                    <div className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                      <svg className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                      </svg>
+                    </div>
+                    <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "logo"); e.target.value = ""; }} />
+                  </label>
+                  <div className="pb-1">
+                    <div className="text-lg font-bold text-white">{name || "Restaurante"}</div>
+                    <div className="flex items-center gap-2">
+                      {cuisineType && <span className="rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{cuisineType}</span>}
+                      {address && <span className="text-xs text-slate-500">{address}</span>}
+                    </div>
                   </div>
-                  <div className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-white">
-                      {uploadingLogo ? "..." : "Logo"}
-                    </span>
-                  </div>
-                  <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "logo"); e.target.value = ""; }} />
-                </label>
-                <span className="ml-3 text-lg font-bold text-white align-bottom">{name}</span>
+                </div>
               </div>
             </div>
 
-            {/* Fields */}
-            <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-xs text-slate-400 mb-1">Nombre</label><input value={name} onChange={e => setName(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" /></div>
-              <div><PhoneInput value={phone} onChange={setPhone} label="WhatsApp del Restaurante" placeholder="264 555 1234" required darkMode /></div>
-            </div>
-            {/* Location: address + map */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs text-slate-400">Ubicación</label>
-                {latitude && longitude && (
-                  <span className="text-[10px] text-emerald-400">📍 {latitude.toFixed(4)}, {longitude.toFixed(4)}</span>
+            {/* Admin-only quick controls */}
+            <section className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-amber-200">🔧 Controles de admin</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className={`flex items-center justify-between rounded-xl border-2 p-3 cursor-pointer transition-colors ${
+                  isActive ? "border-emerald-400/40 bg-emerald-400/5" : "border-red-500/40 bg-red-500/5"
+                }`}>
+                  <div>
+                    <div className="text-xs font-bold text-white">Activo (visible al público)</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{isActive ? "Aparece en /explorar y se puede pedir" : "Oculto del público"}</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => setValue("isActive", e.target.checked)}
+                    className="h-5 w-9 appearance-none rounded-full bg-slate-700 transition-colors checked:bg-emerald-500 relative cursor-pointer before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
+                  />
+                </label>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <label className="text-xs font-bold text-white block mb-1.5">Rating (1-5 ★)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min="1" max="5" step="0.1"
+                      value={rating ?? ""}
+                      onChange={e => setValue("rating", e.target.value === "" ? null : Number(e.target.value))}
+                      onBlur={() => flushField("rating")}
+                      placeholder="4.5"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+                    />
+                    {rating != null && <div className="flex items-center gap-0.5 shrink-0">{[1,2,3,4,5].map(s => <span key={s} className={`text-sm ${s <= Math.round(rating)  ? "text-amber-400" : "text-slate-700"}`}>★</span>)}</div>}
+                    <SaveIndicator status={statuses.rating} />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Basic Info */}
+            <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+              <h2 className="text-sm font-bold text-white mb-4">Información Básica</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                    Nombre del restaurante <SaveIndicator status={statuses.name} />
+                  </label>
+                  <input type="text" value={name} onChange={(e) => setValue("name", e.target.value)} onBlur={() => flushField("name")}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-400">Email del dueño (solo lectura)</label>
+                  <input type="email" value={data.ownerEmail} disabled
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-500 transition-colors" />
+                </div>
+                <div>
+                  <PhoneInput
+                    value={phone}
+                    onChange={(v) => setValue("phone", v)}
+                    onBlur={() => flushField("phone")}
+                    label="WhatsApp del Restaurante"
+                    placeholder="264 555 1234"
+                    required
+                    darkMode
+                    statusIndicator={<SaveIndicator status={statuses.phone} />}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                    Tipo de cocina <SaveIndicator status={statuses.cuisineType} />
+                  </label>
+                  <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setValue("cuisineType", vals[vals.length - 1] || "")} darkMode />
+                </div>
+                <div>
+                  <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                    Descripción <SaveIndicator status={statuses.description} />
+                  </label>
+                  <textarea value={description} onChange={(e) => setValue("description", e.target.value)} onBlur={() => flushField("description")} rows={3} placeholder="Contá qué hace especial a este restaurante..."
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
+                </div>
+              </div>
+            </section>
+
+            {/* Address + Map */}
+            <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-white">Ubicación</h2>
+                {!showMap && (
+                  <button
+                    onClick={() => setShowMap(true)}
+                    className="text-xs font-medium text-primary hover:underline transition-colors"
+                  >
+                    Editar
+                  </button>
                 )}
               </div>
               {!showMap ? (
-                <div className="flex gap-2">
-                  <div className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white min-h-[42px]">
-                    {address || <span className="text-slate-500">Sin dirección</span>}
+                <div className="flex items-start gap-2">
+                  <svg className="h-4 w-4 mt-0.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                  </svg>
+                  <div>
+                    <div className="text-sm text-slate-300">{address || "Sin dirección — hacé click en Editar"}</div>
+                    {latitude && longitude && (
+                      <div className="text-[10px] text-emerald-400 mt-0.5">📍 {latitude.toFixed(4)}, {longitude.toFixed(4)}</div>
+                    )}
                   </div>
-                  <button onClick={() => setShowMap(true)} className="shrink-0 rounded-xl border border-white/10 px-3 py-2.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">
-                    {latitude ? "Editar" : "Agregar mapa"}
-                  </button>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <>
                   <LocationPicker
+                    initialAddress={address}
+                    initialLat={latitude}
+                    initialLng={longitude}
                     onLocationConfirm={(addr, lat, lng) => {
-                      setAddress(addr);
-                      setLatitude(lat);
-                      setLongitude(lng);
+                      setValue("address", addr);
+                      setValue("latitude", lat);
+                      setValue("longitude", lng);
+                      flushField("address");
+                      flushField("latitude");
+                      flushField("longitude");
                       setShowMap(false);
                     }}
                   />
-                  <button onClick={() => setShowMap(false)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Cancelar</button>
-                </div>
-              )}
-            </div>
-            <div><label className="block text-xs text-slate-400 mb-1">Descripción</label><textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none resize-none" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Rating (1-5 estrellas)</label>
-                <div className="flex items-center gap-2">
-                  <input type="number" min="1" max="5" step="0.1" value={rating} onChange={e => setRating(e.target.value)} placeholder="Ej: 4.5" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none" />
-                  {rating && <div className="flex items-center gap-0.5 shrink-0">{[1,2,3,4,5].map(s => <span key={s} className={`text-sm ${s <= Math.round(Number(rating)) ? "text-amber-400" : "text-slate-700"}`}>★</span>)}</div>}
-                </div>
-              </div>
-            </div>
-            {/* Servicios disponibles (delivery + pickup independientes) */}
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <label className="text-xs font-semibold text-white block">Servicios que ofrece</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDeliveryEnabled(!deliveryEnabled)}
-                  className={`rounded-lg border-2 p-3 text-left transition-colors ${
-                    deliveryEnabled ? "border-primary/50 bg-primary/5" : "border-white/10 bg-slate-900/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">🛵 Delivery</span>
-                    <span className={`text-[10px] ${deliveryEnabled ? "text-emerald-400" : "text-slate-500"}`}>{deliveryEnabled ? "ON" : "OFF"}</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPickupEnabled(!pickupEnabled)}
-                  className={`rounded-lg border-2 p-3 text-left transition-colors ${
-                    pickupEnabled ? "border-primary/50 bg-primary/5" : "border-white/10 bg-slate-900/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">🏪 Retiro</span>
-                    <span className={`text-[10px] ${pickupEnabled ? "text-emerald-400" : "text-slate-500"}`}>{pickupEnabled ? "ON" : "OFF"}</span>
-                  </div>
-                </button>
-              </div>
-              {!deliveryEnabled && !pickupEnabled && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
-                  ⚠️ Ambos apagados — el cliente no puede pedir.
-                </div>
-              )}
-            </div>
-
-            {/* Hours per method */}
-            <div className="space-y-3">
-              <ScheduleEditor
-                title="Horarios de Delivery"
-                emoji="🛵"
-                value={deliveryHoursJson}
-                onChange={(v) => setDeliveryHoursJson(v)}
-                copyFromLabel="Retiro"
-                onCopyFromOther={() => { if (pickupHoursJson) setDeliveryHoursJson(pickupHoursJson); }}
-              />
-              <ScheduleEditor
-                title="Horarios de Retiro"
-                emoji="🏪"
-                value={pickupHoursJson}
-                onChange={(v) => setPickupHoursJson(v)}
-                copyFromLabel="Delivery"
-                onCopyFromOther={() => { if (deliveryHoursJson) setPickupHoursJson(deliveryHoursJson); }}
-              />
-            </div>
-
-            {/* Delivery zones */}
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <label className="text-xs font-semibold text-white block">Zonas de Delivery</label>
-              {deliveryEnabled && (
-                <>
-                  <DeliveryZonesEditor
-                    value={deliveryZones}
-                    onChange={(json) => setDeliveryZones(json)}
-                    dealerLat={latitude}
-                    dealerLng={longitude}
-                  />
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">Tarifa fija (sin zonas) — opcional</label>
-                    <MoneyInput
-                      value={deliveryFee === "" ? null : Number(deliveryFee)}
-                      onChange={(v) => setDeliveryFee(v == null ? "" : String(v))}
-                      placeholder="Vacío = sin tarifa fija"
-                      compact
-                      darkMode
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Si hay zonas, se usan las zonas. La tarifa fija es solo fallback si no hay zonas configuradas.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">Distancia máxima para tarifa fija (km) — opcional</label>
-                    <input
-                      type="number" min="0" step="0.5"
-                      value={deliveryFarRadius}
-                      onChange={e => setDeliveryFarRadius(e.target.value)}
-                      placeholder="Vacío = sin límite"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none"
-                    />
-                  </div>
+                  <button
+                    onClick={() => setShowMap(false)}
+                    className="mt-3 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    Cancelar
+                  </button>
                 </>
               )}
-            </div>
-            <div><label className="block text-xs text-slate-400 mb-1">Tipo de cocina</label>
-              <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setCuisineType(vals[vals.length - 1] || "")} darkMode />
-            </div>
-            {/* Hours */}
-            <div><label className="block text-xs text-slate-400 mb-2">Horarios de Atención</label>
-              <div className="space-y-1.5">
-                {DAYS.map((day) => (
-                  <div key={day.key} className="flex items-center gap-2">
-                    <span className="w-10 text-[11px] font-medium text-slate-400">{day.label}</span>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input type="checkbox" checked={!hours[day.key]?.closed} onChange={(e) => updateHours(day.key, "closed", !e.target.checked)}
-                        className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary h-3.5 w-3.5" />
-                    </label>
-                    {!hours[day.key]?.closed ? (
-                      <div className="flex items-center gap-1.5">
-                        <input type="time" value={hours[day.key]?.open || "08:00"} onChange={(e) => updateHours(day.key, "open", e.target.value)}
-                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white focus:border-primary focus:outline-none" />
-                        <span className="text-[10px] text-slate-600">—</span>
-                        <input type="time" value={hours[day.key]?.close || "23:00"} onChange={(e) => updateHours(day.key, "close", e.target.value)}
-                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white focus:border-primary focus:outline-none" />
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-slate-600">Cerrado</span>
-                    )}
+            </section>
+
+            {/* Servicios disponibles */}
+            <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+              <h2 className="text-sm font-bold text-white mb-1">Servicios que ofrece</h2>
+              <p className="text-xs text-slate-400 mb-4">
+                Activá / desactivá según querés que el cliente pueda pedir delivery o retiro. Es independiente del horario.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className={`flex items-center justify-between rounded-xl border-2 p-4 cursor-pointer transition-colors ${
+                  deliveryEnabled ? "border-primary/50 bg-primary/5" : "border-white/10 bg-white/5"
+                }`}>
+                  <div>
+                    <div className="text-sm font-bold text-white flex items-center gap-2">🛵 Delivery</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">A domicilio con moto</div>
                   </div>
-                ))}
+                  <input
+                    type="checkbox"
+                    checked={deliveryEnabled}
+                    onChange={(e) => setValue("deliveryEnabled", e.target.checked)}
+                    className="h-5 w-9 appearance-none rounded-full bg-slate-700 transition-colors checked:bg-primary relative cursor-pointer before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
+                  />
+                </label>
+                <label className={`flex items-center justify-between rounded-xl border-2 p-4 cursor-pointer transition-colors ${
+                  pickupEnabled ? "border-primary/50 bg-primary/5" : "border-white/10 bg-white/5"
+                }`}>
+                  <div>
+                    <div className="text-sm font-bold text-white flex items-center gap-2">🏪 Retiro en local</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">Cliente lo busca en el local</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={pickupEnabled}
+                    onChange={(e) => setValue("pickupEnabled", e.target.checked)}
+                    className="h-5 w-9 appearance-none rounded-full bg-slate-700 transition-colors checked:bg-primary relative cursor-pointer before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
+                  />
+                </label>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="rounded border-white/20 bg-white/5 text-primary focus:ring-primary" /><span className="text-xs text-slate-400">Activo</span></label>
-            </div>
-            <button onClick={handleSave} disabled={saving} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark transition-colors disabled:opacity-50">{saving ? "Guardando..." : "Guardar"}</button>
-            </div>
+              <div className="mt-2 flex items-center justify-end gap-2 text-[10px] text-slate-500">
+                <SaveIndicator status={statuses.deliveryEnabled} />
+                <SaveIndicator status={statuses.pickupEnabled} />
+              </div>
+              {!deliveryEnabled && !pickupEnabled && (
+                <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  ⚠️ Ambos servicios apagados. El cliente no puede hacer pedidos.
+                </div>
+              )}
+            </section>
+
+            {/* Delivery Zones */}
+            <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm font-bold text-white">Zonas de Delivery</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    La distancia se mide desde <span className="text-primary font-medium">la dirección de arriba</span> hasta la del cliente
+                  </p>
+                </div>
+              </div>
+
+              {(!latitude || !longitude) && deliveryMode === "zones" && (
+                <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                  ⚠️ Necesitás cargar la ubicación arriba para que el cálculo de delivery funcione.
+                </div>
+              )}
+
+              {deliveryEnabled && (
+                <div className="space-y-5">
+                  <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-800/60 border border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => switchDeliveryMode("zones")}
+                      className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${deliveryMode === "zones" ? "bg-primary text-white shadow" : "text-slate-400 hover:text-white"}`}
+                    >
+                      Por zonas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => switchDeliveryMode("flat")}
+                      className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${deliveryMode === "flat" ? "bg-primary text-white shadow" : "text-slate-400 hover:text-white"}`}
+                    >
+                      Precio fijo
+                    </button>
+                  </div>
+
+                  {deliveryMode === "flat" ? (
+                    <div className="space-y-4">
+                      <MoneyInput
+                        label="Costo de envío — el mismo para todos los clientes"
+                        value={deliveryFee ?? null}
+                        onChange={(v) => setValue("deliveryFee", v)}
+                        onBlur={() => flushField("deliveryFee")}
+                        placeholder="2500"
+                        darkMode
+                        statusIndicator={<SaveIndicator status={statuses.deliveryFee} />}
+                      />
+                      <div>
+                        <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                          Distancia máxima (km) — opcional <SaveIndicator status={statuses.deliveryFarRadius} />
+                        </label>
+                        <input
+                          type="number" step="0.5" min="0"
+                          value={deliveryFarRadius ?? ""}
+                          onChange={(e) => setValue("deliveryFarRadius", e.target.value === "" ? null : Number(e.target.value))}
+                          onBlur={() => flushField("deliveryFarRadius")}
+                          placeholder="8.0"
+                          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <DeliveryZonesEditor
+                      value={deliveryZones}
+                      onChange={(json) => { setValue("deliveryZones", json); flushField("deliveryZones"); }}
+                      dealerLat={latitude}
+                      dealerLng={longitude}
+                      statusIndicator={<SaveIndicator status={statuses.deliveryZones} />}
+                    />
+                  )}
+
+                  <div>
+                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                      Tiempo estimado de entrega (minutos) <SaveIndicator status={statuses.deliveryTimeMin} />
+                    </label>
+                    <input
+                      type="number" step="5" min="0"
+                      value={deliveryTimeMin ?? ""}
+                      onChange={(e) => setValue("deliveryTimeMin", e.target.value === "" ? null : Number(e.target.value))}
+                      onBlur={() => flushField("deliveryTimeMin")}
+                      placeholder="45"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* Horarios por método */}
+            <ScheduleEditor
+              title="Horarios de Delivery"
+              emoji="🛵"
+              value={deliveryHoursJson}
+              onChange={(v) => { setValue("deliveryHours", v); flushField("deliveryHours"); }}
+              copyFromLabel="Retiro"
+              onCopyFromOther={() => { if (pickupHoursJson) { setValue("deliveryHours", pickupHoursJson); flushField("deliveryHours"); } }}
+              statusIndicator={<SaveIndicator status={statuses.deliveryHours} />}
+            />
+
+            <ScheduleEditor
+              title="Horarios de Retiro en local"
+              emoji="🏪"
+              value={pickupHoursJson}
+              onChange={(v) => { setValue("pickupHours", v); flushField("pickupHours"); }}
+              copyFromLabel="Delivery"
+              onCopyFromOther={() => { if (deliveryHoursJson) { setValue("pickupHours", deliveryHoursJson); flushField("pickupHours"); } }}
+              statusIndicator={<SaveIndicator status={statuses.pickupHours} />}
+            />
+
+            {/* Métodos de Pago */}
+            <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+              <h2 className="text-sm font-bold text-white mb-4">Métodos de Pago</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                    Alias de Mercado Pago <SaveIndicator status={statuses.mercadoPagoAlias} />
+                  </label>
+                  <input type="text" value={mercadoPagoAlias} onChange={(e) => setValue("mercadoPagoAlias", e.target.value)} onBlur={() => flushField("mercadoPagoAlias")} placeholder="MI.ALIAS.MP"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+                </div>
+                <div>
+                  <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                    CVU <SaveIndicator status={statuses.mercadoPagoCvu} />
+                  </label>
+                  <input type="text" value={mercadoPagoCvu} onChange={(e) => setValue("mercadoPagoCvu", e.target.value)} onBlur={() => flushField("mercadoPagoCvu")} placeholder="0000003100..."
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
+                </div>
+                <div>
+                  <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
+                    Info bancaria (transferencia) <SaveIndicator status={statuses.bankInfo} />
+                  </label>
+                  <textarea value={bankInfo} onChange={(e) => setValue("bankInfo", e.target.value)} onBlur={() => flushField("bankInfo")} rows={2} placeholder="Banco, CBU, titular..."
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
+                </div>
+              </div>
+            </section>
+
+            {/* POS toggle */}
+            <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-lg">$</div>
+                <div className="flex-1">
+                  <h2 className="text-sm font-bold text-white">POS — Pedidos en el local</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Tablet / celular para mesas y mostrador. Pedidos a cocina con el pago ya cobrado.</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-950/50 border border-white/5 p-3 mb-4 space-y-2">
+                <div className="flex items-start gap-2 text-[11px] text-slate-300">
+                  <span className="text-emerald-400">✓</span>
+                  <span>Cobra en efectivo, tarjeta, transferencia o Mercado Pago</span>
+                </div>
+                <div className="flex items-start gap-2 text-[11px] text-slate-300">
+                  <span className="text-emerald-400">✓</span>
+                  <span>Calculadora de vuelto automática para efectivo</span>
+                </div>
+                <div className="flex items-start gap-2 text-[11px] text-slate-300">
+                  <span className="text-emerald-400">✓</span>
+                  <span>Pedidos por mesa o mostrador en el mismo Kanban de cocina</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setValue("posEnabled", !posEnabled)}
+                disabled={statuses.posEnabled === "saving"}
+                className={`w-full flex items-center gap-3 rounded-xl border p-4 transition-all ${
+                  posEnabled ? "border-emerald-400/30 bg-emerald-400/5" : "border-white/10 bg-white/[0.02] hover:bg-white/5"
+                } disabled:opacity-50`}
+              >
+                <div className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-in-out ${posEnabled ? "bg-emerald-500" : "bg-slate-700"}`}>
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-1 ${posEnabled ? "translate-x-6 ml-0.5" : "translate-x-1"}`} />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-bold text-white">{posEnabled ? "POS habilitado" : "Habilitar POS"}</p>
+                  <p className="text-[10px] text-slate-500">
+                    {statuses.posEnabled === "saving" ? "Guardando..." : statuses.posEnabled === "saved" ? "Guardado ✓" : posEnabled ? "Aparece en el menú lateral del dueño" : "Click para activar"}
+                  </p>
+                </div>
+              </button>
+            </section>
           </div>
         )}
 
