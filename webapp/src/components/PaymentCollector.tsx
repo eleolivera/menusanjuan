@@ -54,7 +54,9 @@ export function PaymentCollector({
   compact?: boolean;
 }) {
   const [method, setMethod] = useState<PaymentMethod>(compact ? "transfer" : "cash");
-  const [tendered, setTendered] = useState<string>("");
+  // Default tendered = total so cash mode opens "exacto" (button enabled by default).
+  // User can override via NumberPad or quick-cash chips.
+  const [tendered, setTendered] = useState<string>(compact || total === 0 ? "" : String(total));
 
   const tenderedNum = Math.max(0, Math.floor(parseInt(tendered, 10) || 0));
   const change = tenderedNum - total;
@@ -90,7 +92,9 @@ export function PaymentCollector({
             type="button"
             onClick={() => {
               setMethod(m.value);
-              if (m.value !== "cash") setTendered("");
+              // Reset tendered: cash → default to total (exacto); others → blank
+              if (m.value === "cash" && !compact) setTendered(String(total));
+              else setTendered("");
             }}
             className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
               method === m.value
