@@ -20,10 +20,16 @@ export function KanbanBoard({
   const [dragOverCol, setDragOverCol] = useState<OrderStatus | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   // Default to ALL — don't persist across sessions to avoid silently hiding orders
-  const [channelFilter, setChannelFilter] = useState<string>("ALL");
-  const setFilter = setChannelFilter;
+  const [filter, setFilter] = useState<string>("ALL");
 
-  const filteredOrders = channelFilter === "ALL" ? orders : orders.filter((o) => (o.channel || "ONLINE") === channelFilter);
+  function matchesFilter(o: Order): boolean {
+    if (filter === "ALL") return true;
+    if (filter === "DELIVERY") return o.deliveryMethod === "delivery";
+    if (filter === "PICKUP") return o.deliveryMethod === "pickup";
+    if (filter === "DINE_IN") return o.channel === "DINE_IN";
+    return true;
+  }
+  const filteredOrders = orders.filter(matchesFilter);
 
   function handleDragStart(e: React.DragEvent, orderId: string) {
     e.dataTransfer.setData("text/plain", orderId);
@@ -56,10 +62,10 @@ export function KanbanBoard({
   }
 
   const FILTER_CHIPS = [
-    { value: "ALL", label: "Todos", count: orders.length },
-    { value: "ONLINE", label: "Online", count: orders.filter((o) => (o.channel || "ONLINE") === "ONLINE").length },
-    { value: "DINE_IN", label: "Salon", count: orders.filter((o) => o.channel === "DINE_IN").length },
-    { value: "COUNTER", label: "Mostrador", count: orders.filter((o) => o.channel === "COUNTER").length },
+    { value: "ALL", label: "Todos", emoji: "", count: orders.length },
+    { value: "DELIVERY", label: "Delivery", emoji: "🛵", count: orders.filter((o) => o.deliveryMethod === "delivery").length },
+    { value: "PICKUP", label: "Retiro", emoji: "🏪", count: orders.filter((o) => o.deliveryMethod === "pickup").length },
+    { value: "DINE_IN", label: "Mesa", emoji: "🍽️", count: orders.filter((o) => o.channel === "DINE_IN").length },
   ];
 
   return (
@@ -68,10 +74,12 @@ export function KanbanBoard({
       <div className="shrink-0 flex gap-1.5 mb-2 overflow-x-auto">
         {FILTER_CHIPS.map((c) => (
           <button key={c.value} onClick={() => setFilter(c.value)}
-            className={`shrink-0 rounded-lg px-3 py-1 text-[10px] font-semibold transition-all ${
-              channelFilter === c.value ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"
+            className={`shrink-0 rounded-lg px-3 py-1 text-[10px] font-semibold transition-all flex items-center gap-1 ${
+              filter === c.value ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"
             }`}>
-            {c.label} <span className="opacity-60">({c.count})</span>
+            {c.emoji && <span>{c.emoji}</span>}
+            <span>{c.label}</span>
+            <span className="opacity-60">({c.count})</span>
           </button>
         ))}
       </div>
@@ -109,7 +117,12 @@ export function KanbanBoard({
 
                   const channel = order.channel || "ONLINE";
                   const stripeColor = channel === "DINE_IN" ? "bg-cyan-400" : channel === "COUNTER" ? "bg-purple-400" : "bg-blue-400";
-                  const channelLabel = channel === "DINE_IN" ? `Mesa ${order.tableNumber || ""}` : channel === "COUNTER" ? "Mostrador" : (order.deliveryMethod === "pickup" ? "Retiro" : "Delivery");
+                  // Method-first chip: tells the owner at a glance what to do with this order
+                  const methodChip = channel === "DINE_IN"
+                    ? { emoji: "🍽️", label: `Mesa ${order.tableNumber || ""}`, color: "text-cyan-400 bg-cyan-400/10 border-cyan-400/30" }
+                    : order.deliveryMethod === "delivery"
+                      ? { emoji: "🛵", label: "Delivery", color: "text-orange-300 bg-orange-400/10 border-orange-400/30" }
+                      : { emoji: "🏪", label: "Retiro", color: "text-indigo-300 bg-indigo-400/10 border-indigo-400/30" };
                   // Detect items added after the order was created (mesa updates)
                   const createdMs = new Date(order.createdAt).getTime();
                   const hasUpdates = items.some((it: any) => it.addedAt && new Date(it.addedAt).getTime() > createdMs + 5000);
@@ -128,7 +141,7 @@ export function KanbanBoard({
                     >
                       {/* Channel stripe */}
                       <div className={`absolute left-0 top-0 bottom-0 w-1 ${stripeColor}`} />
-                      <div className="flex items-start justify-between mb-1 ml-1">
+                      <div className="flex items-start justify-between mb-1 ml-1 gap-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-bold text-primary">{order.orderNumber}</span>
                           {order.paymentStatus === "PAID" ? (
@@ -138,15 +151,16 @@ export function KanbanBoard({
                           )}
                           {hasUpdates && <span className="rounded bg-amber-400/15 px-1 text-[8px] font-bold text-amber-400 animate-pulse">ACTUALIZADO</span>}
                         </div>
-                        <span className="text-[10px] text-slate-600">
-                          {hasUpdates ? `+${timeAgo(new Date(lastUpdate).toISOString())}` : timeAgo(order.createdAt)}
+                        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold flex items-center gap-1 ${methodChip.color}`}>
+                          <span>{methodChip.emoji}</span>
+                          <span>{methodChip.label}</span>
                         </span>
                       </div>
                       <p className="text-xs font-medium text-white truncate ml-1">{order.customerName}</p>
                       <p className="text-[10px] text-slate-500 truncate mt-0.5 ml-1">{itemSummary}{more}</p>
                       <div className="flex items-center justify-between mt-1.5 ml-1">
                         <span className="text-xs font-bold text-white">{formatARS(order.total)}</span>
-                        <span className="text-[9px] text-slate-600">{channelLabel}</span>
+                        <span className="text-[9px] text-slate-600">{hasUpdates ? `+${timeAgo(new Date(lastUpdate).toISOString())}` : timeAgo(order.createdAt)}</span>
                       </div>
                     </div>
                   );

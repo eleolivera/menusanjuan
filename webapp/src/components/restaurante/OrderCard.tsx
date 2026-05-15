@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Order, OrderStatus } from "@/lib/orders-store";
+import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCollector";
 
 const STATUS_CONFIG: Record<
   OrderStatus,
@@ -56,7 +57,41 @@ export function OrderCard({
   restaurantName: string;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [collectingPayment, setCollectingPayment] = useState(false);
+  const [unmarking, setUnmarking] = useState(false);
   const config = STATUS_CONFIG[order.status];
+  const totalDue = (order.total || 0) + (order.deliveryFee || 0);
+  const paidWhen = order.paidAt ? new Date(order.paidAt) : null;
+  const paidAgo = paidWhen ? getTimeSince(paidWhen.toISOString()) : null;
+  const methodLabel = order.paymentMethod === "cash" ? "efectivo"
+    : order.paymentMethod === "card" ? "tarjeta"
+    : order.paymentMethod === "transfer" ? "transferencia"
+    : order.paymentMethod === "mercadopago" ? "Mercado Pago"
+    : null;
+
+  async function collectPayment(data: CollectedPayment) {
+    await fetch(`/api/orders/${order.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentStatus: "PAID", ...data }),
+    });
+    setCollectingPayment(false);
+    window.location.reload();
+  }
+
+  async function unmarkPaid() {
+    setUnmarking(true);
+    try {
+      await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentStatus: "UNPAID" }),
+      });
+      window.location.reload();
+    } finally {
+      setUnmarking(false);
+    }
+  }
   const timeSince = getTimeSince(order.createdAt);
 
   const cleanPhone = order.customerPhone.replace(/[^0-9]/g, "");
@@ -191,35 +226,57 @@ export function OrderCard({
           </div>
         </div>
 
-          {/* Payment + ticket actions */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={async () => {
-                const next = order.paymentStatus === "PAID" ? "UNPAID" : "PAID";
-                await fetch(`/api/orders/${order.id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ paymentStatus: next }),
-                });
-                window.location.reload();
-              }}
-              className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                order.paymentStatus === "PAID"
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15"
-                  : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15"
-              }`}
-            >
-              {order.paymentStatus === "PAID" ? "✓ Pagado · marcar sin pagar" : "🔴 Sin pagar · marcar pagado"}
-            </button>
+          {/* Payment status pill */}
+          {order.paymentStatus === "PAID" ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 flex items-center justify-between text-xs">
+              <div className="text-emerald-300">
+                <span className="font-semibold">✓ Pagado</span>
+                {methodLabel && <span className="text-emerald-400/70"> · {methodLabel}</span>}
+                {paidAgo && <span className="text-emerald-400/70"> · {paidAgo}</span>}
+              </div>
+              <button
+                onClick={unmarkPaid}
+                disabled={unmarking}
+                className="text-[10px] text-emerald-400/60 hover:text-emerald-300 underline transition-colors disabled:opacity-50"
+              >
+                {unmarking ? "..." : "desmarcar"}
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 flex items-center text-xs">
+              <span className="text-red-300 font-semibold">🔴 Sin pagar</span>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className={`grid gap-2 mt-2 ${order.paymentStatus === "UNPAID" ? "grid-cols-2" : "grid-cols-1"}`}>
+            {order.paymentStatus === "UNPAID" && (
+              <button
+                onClick={() => setCollectingPayment(true)}
+                className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-3 py-2.5 text-xs font-bold text-white shadow-md shadow-primary/20 hover:shadow-lg transition-all"
+              >
+                💰 Cobrar ${totalDue.toLocaleString("es-AR")}
+              </button>
+            )}
             <a
               href={`/restaurante/order/${order.id}/ticket`}
               target="_blank"
               rel="noopener"
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 text-center hover:bg-white/10 transition-colors"
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-300 text-center hover:bg-white/10 transition-colors"
             >
               🖨️ Imprimir comanda
             </a>
           </div>
+
+          {collectingPayment && (
+            <PaymentCollector
+              total={totalDue}
+              onCollect={collectPayment}
+              onCancel={() => setCollectingPayment(false)}
+              title={`Cobrar pedido ${order.orderNumber}`}
+              confirmLabel="Cobrado"
+            />
+          )}
 
           {/* Status actions */}
           <div className="mt-3 flex gap-2">

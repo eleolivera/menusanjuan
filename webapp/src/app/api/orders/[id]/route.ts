@@ -42,24 +42,32 @@ export async function PATCH(
     return NextResponse.json(order);
   }
 
-  // Owner-only: toggle paymentStatus
+  // Owner-only: toggle paymentStatus, optionally recording method + cash details
   if (body.paymentStatus === "PAID" || body.paymentStatus === "UNPAID") {
     const dealer = await getRestauranteFromSession();
     if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    const existing = await prisma.order.findUnique({ where: { id }, select: { restauranteSlug: true } });
+    const existing = await prisma.order.findUnique({ where: { id }, select: { restauranteSlug: true, total: true, deliveryFee: true } });
     if (!existing) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     if (existing.restauranteSlug !== dealer.slug) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const wantPaid = body.paymentStatus === "PAID";
+    const cashTendered = typeof body.cashTendered === "number" ? Math.round(body.cashTendered) : null;
+    const cashChange = typeof body.cashChange === "number" ? Math.round(body.cashChange) : null;
+
     await prisma.order.update({
       where: { id },
       data: {
         paymentStatus: body.paymentStatus,
         paidAt: wantPaid ? new Date() : null,
         ...(body.paymentMethod && wantPaid ? { paymentMethod: body.paymentMethod } : {}),
+        ...(wantPaid && body.paymentMethod === "cash" && cashTendered != null
+          ? { cashTendered, cashChange }
+          : wantPaid
+            ? {}
+            : { cashTendered: null, cashChange: null }),
       },
     });
     const fresh = await getOrder(id);
