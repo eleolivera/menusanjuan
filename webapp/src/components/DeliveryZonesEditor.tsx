@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { GoogleMap, Circle, useJsApiLoader } from "@react-google-maps/api";
 import { MoneyInput } from "@/components/MoneyInput";
 
@@ -26,18 +26,28 @@ function parse(raw: string | null): Zone[] {
   try {
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr) || arr.length === 0) return [{ radius: 3, price: null }];
-    return arr.map((z) => ({
-      radius: Number(z?.radius) || null,
-      price: Number(z?.price) || null,
-    }));
+    return arr.map((z) => {
+      const r = Number(z?.radius);
+      const p = Number(z?.price);
+      return {
+        radius: Number.isFinite(r) && r > 0 ? r : null,
+        price: Number.isFinite(p) && p >= 0 ? p : null,
+      };
+    });
   } catch {
     return [{ radius: 3, price: null }];
   }
 }
 
+/**
+ * Builds the JSON we hand to the parent. Incomplete zones (missing radius or
+ * price) are dropped before saving — the API validator rejects them otherwise.
+ * The component keeps its own state for in-progress edits so partial zones
+ * stay visible on screen while the user fills them in.
+ */
 function serialize(zones: Zone[]): string {
   const clean = zones
-    .filter((z) => z.radius != null && z.price != null && z.radius > 0)
+    .filter((z) => z.radius != null && z.price != null && z.radius > 0 && z.price >= 0)
     .map((z) => ({ radius: z.radius!, price: z.price! }))
     .sort((a, b) => a.radius - b.radius);
   return JSON.stringify(clean);
@@ -50,7 +60,20 @@ export function DeliveryZonesEditor({
   dealerLng,
   statusIndicator,
 }: Props) {
-  const zones = useMemo(() => parse(value), [value]);
+  // Local state so partial edits (radius set, price still empty) don't get
+  // dropped when serialize() filters out incomplete zones. We only re-sync
+  // from `value` when it changes from outside (not from our own emit echo).
+  const [zones, setZones] = useState<Zone[]>(() => parse(value));
+  const lastEmittedRef = useRef<string | null>(value);
+
+  useEffect(() => {
+    // Server normalizes "[]" → null, so treat both as "no zones saved".
+    const empty = (v: string | null) => v == null || v === "" || v === "[]";
+    if (empty(value) && empty(lastEmittedRef.current)) return;
+    if (value === lastEmittedRef.current) return;
+    setZones(parse(value));
+    lastEmittedRef.current = value ?? null;
+  }, [value]);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
@@ -58,7 +81,10 @@ export function DeliveryZonesEditor({
   });
 
   function emit(next: Zone[]) {
-    onChange(serialize(next));
+    setZones(next);
+    const serialized = serialize(next);
+    lastEmittedRef.current = serialized;
+    onChange(serialized);
   }
 
   function setZone(i: number, patch: Partial<Zone>) {
@@ -74,15 +100,18 @@ export function DeliveryZonesEditor({
   }
 
   function removeZone(i: number) {
-    emit(zones.filter((_, idx) => idx !== i));
+    const next = zones.filter((_, idx) => idx !== i);
+    // Never go below 1 zone — keep an empty default row
+    emit(next.length === 0 ? [{ radius: 3, price: null }] : next);
   }
 
   // Validation per zone (UI-only)
   const validationMsgs: (string | null)[] = zones.map((z, i) => {
-    if (z.radius == null || z.radius <= 0) return "Falta el radio";
+    if (z.radius == null || z.radius <= 0) return "⚠️ Falta el radio";
+    if (z.price == null) return "⚠️ Falta el precio (no se guardará hasta que lo cargues)";
     if (i > 0) {
       const prev = zones[i - 1]?.radius ?? 0;
-      if (z.radius - prev < 1) return `Debe ser al menos 1 km mayor que zona ${i} (${prev} km)`;
+      if (z.radius - prev < 1) return `⚠️ Debe ser al menos 1 km mayor que zona ${i} (${prev} km)`;
     }
     return null;
   });
