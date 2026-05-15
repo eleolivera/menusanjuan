@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { DAY_KEY_ORDER, DAY_KEY_TO_LABEL, emptyWeek, type ServiceWeekHours, type ServiceWindow } from "@/lib/hours";
 
 type Props = {
@@ -144,12 +144,12 @@ export function ScheduleEditor({
               </div>
 
               {!isClosed && (
-                <div className="space-y-1.5">
+                <div className="space-y-3">
                   {windows.map((w, idx) => {
                     const overnight = isOvernight(w.open, w.close);
                     const nextDayLabel = overnight ? nextDayName(dayKey) : null;
                     return (
-                      <div key={idx} className="space-y-1">
+                      <div key={idx} className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <input
                             type="time"
@@ -166,27 +166,32 @@ export function ScheduleEditor({
                               overnight ? "border-indigo-400/50 focus:border-indigo-400" : "border-white/10 focus:border-primary"
                             }`}
                           />
+                          {overnight && (
+                            <span className="text-[10px] text-indigo-300 flex items-center gap-1">
+                              <span>🌙</span>
+                              <span>cierra el {nextDayLabel}</span>
+                            </span>
+                          )}
                           {windows.length > 1 && (
                             <button
                               type="button"
                               onClick={() => removeWindow(dayKey, idx)}
-                              className="text-slate-500 hover:text-red-400 text-xs px-1"
+                              className="ml-auto text-slate-500 hover:text-red-400 text-xs px-1"
                               title="Quitar este horario"
                             >
                               ×
                             </button>
                           )}
-                          {/* Visual time bar for this window */}
-                          <TimeBar open={w.open} close={w.close} />
                         </div>
-                        {overnight && (
-                          <div className="ml-1 flex items-center gap-1.5 text-[10px] text-indigo-300">
-                            <span>🌙</span>
-                            <span>
-                              Cierra a las {w.close} del <strong>{nextDayLabel}</strong> — pasada la medianoche
-                            </span>
-                          </div>
-                        )}
+                        {/* Visual time bar with draggable handles, full width */}
+                        <TimeBar
+                          open={w.open}
+                          close={w.close}
+                          onChange={(o, c) => {
+                            if (o !== w.open) setWindow(dayKey, idx, "open", o);
+                            if (c !== w.close) setWindow(dayKey, idx, "close", c);
+                          }}
+                        />
                       </div>
                     );
                   })}
@@ -230,30 +235,153 @@ function nextDayName(dayKey: string): string {
   return NEXT_DAY[dayKey] || "día siguiente";
 }
 
-/** Visual bar showing the open window on a 24-hour scale. */
-function TimeBar({ open, close }: { open: string; close: string }) {
-  const [oh, om] = open.split(":").map(Number);
-  const [ch, cm] = close.split(":").map(Number);
-  const openMin = (oh || 0) * 60 + (om || 0);
-  let closeMin = (ch || 0) * 60 + (cm || 0);
-  if (closeMin <= openMin) closeMin += 24 * 60;
+/**
+ * Visual range slider for a single open/close window.
+ * Bar represents 0–28h (4am next day max), with a vertical midnight line so
+ * overnight windows visibly continue past it to the right. Handles at both ends
+ * are draggable (snap to 15 min) — typing in the time inputs above also works.
+ */
+function TimeBar({
+  open,
+  close,
+  onChange,
+}: {
+  open: string;
+  close: string;
+  onChange: (open: string, close: string) => void;
+}) {
+  const TOTAL_MIN = 28 * 60; // bar spans 0h → 28h
+  const SNAP_MIN = 15;
+  const MIDNIGHT_MIN = 24 * 60;
+  const midnightPct = (MIDNIGHT_MIN / TOTAL_MIN) * 100;
 
-  const leftPct = (openMin / (24 * 60)) * 100;
-  const widthPct = ((closeMin - openMin) / (24 * 60)) * 100;
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState<"open" | "close" | null>(null);
+
+  const openMin = toMin(open);
+  let closeMin = toMin(close);
+  const overnight = closeMin > 0 && closeMin <= openMin;
+  if (overnight) closeMin += MIDNIGHT_MIN;
+
+  const openPct = (openMin / TOTAL_MIN) * 100;
+  const closePct = (Math.min(closeMin, TOTAL_MIN) / TOTAL_MIN) * 100;
+
+  function minFromClientX(clientX: number): number {
+    const rect = trackRef.current!.getBoundingClientRect();
+    const rel = (clientX - rect.left) / rect.width;
+    const raw = rel * TOTAL_MIN;
+    const snapped = Math.round(raw / SNAP_MIN) * SNAP_MIN;
+    return Math.max(0, Math.min(TOTAL_MIN, snapped));
+  }
+
+  useEffect(() => {
+    if (!dragging) return;
+    function move(e: MouseEvent | TouchEvent) {
+      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const m = minFromClientX(clientX);
+      if (dragging === "open") {
+        // Don't let open jump past close
+        const cAbs = overnight ? toMin(close) + MIDNIGHT_MIN : toMin(close);
+        const newOpen = Math.min(m, Math.max(0, cAbs - SNAP_MIN));
+        onChange(fromMin(newOpen % MIDNIGHT_MIN), close);
+      } else {
+        // close: clamp to >= open + SNAP_MIN, allow past midnight
+        const newClose = Math.max(m, openMin + SNAP_MIN);
+        onChange(open, fromMin(newClose % MIDNIGHT_MIN));
+      }
+      e.preventDefault();
+    }
+    function end() {
+      setDragging(null);
+    }
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", end);
+    document.addEventListener("touchmove", move, { passive: false });
+    document.addEventListener("touchend", end);
+    return () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", end);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", end);
+    };
+  }, [dragging, open, close, openMin, overnight, onChange]);
+
+  // Hour labels along the track — every 4 hours + midnight callout
+  const hourTicks = [0, 4, 8, 12, 16, 20, 24, 28];
 
   return (
-    <div className="flex-1 h-1.5 rounded-full bg-slate-800 relative min-w-[40px] ml-1" title={`${open} → ${close}`}>
-      <div
-        className="absolute top-0 bottom-0 rounded-full bg-gradient-to-r from-primary to-amber-500"
-        style={{ left: `${leftPct}%`, width: `${Math.min(widthPct, 100 - leftPct)}%` }}
-      />
-      {/* Past-midnight portion */}
-      {closeMin > 24 * 60 && (
+    <div className="w-full select-none">
+      {/* Track */}
+      <div ref={trackRef} className="relative h-7" style={{ touchAction: "pan-y" }}>
+        {/* Background track */}
+        <div className="absolute top-1/2 left-0 right-0 h-2 -translate-y-1/2 rounded-full bg-slate-800" />
+
+        {/* Midnight separator */}
         <div
-          className="absolute top-0 bottom-0 rounded-full bg-gradient-to-r from-primary to-amber-500"
-          style={{ left: 0, width: `${((closeMin - 24 * 60) / (24 * 60)) * 100}%` }}
+          className="absolute top-0 bottom-0 w-px bg-slate-500"
+          style={{ left: `${midnightPct}%` }}
+        >
+          <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-medium text-slate-400 whitespace-nowrap">
+            12am
+          </span>
+        </div>
+
+        {/* Selected range */}
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 h-2 ${overnight ? "rounded-l-full" : "rounded-full"} bg-gradient-to-r from-primary to-amber-500`}
+          style={{ left: `${openPct}%`, width: `${Math.max(0, closePct - openPct)}%` }}
         />
-      )}
+
+        {/* Open handle */}
+        <button
+          type="button"
+          aria-label="Hora de apertura"
+          onMouseDown={() => setDragging("open")}
+          onTouchStart={() => setDragging("open")}
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-white border-2 border-primary shadow-md transition-transform ${dragging === "open" ? "scale-125 cursor-grabbing" : "cursor-grab hover:scale-110"}`}
+          style={{ left: `${openPct}%` }}
+        />
+
+        {/* Close handle */}
+        <button
+          type="button"
+          aria-label="Hora de cierre"
+          onMouseDown={() => setDragging("close")}
+          onTouchStart={() => setDragging("close")}
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-white border-2 border-amber-500 shadow-md transition-transform ${dragging === "close" ? "scale-125 cursor-grabbing" : "cursor-grab hover:scale-110"}`}
+          style={{ left: `${closePct}%` }}
+        />
+      </div>
+
+      {/* Hour tick labels */}
+      <div className="relative h-3 mt-0.5">
+        {hourTicks.map((h) => {
+          const pct = (h * 60) / TOTAL_MIN * 100;
+          const label = h === 0 ? "0" : h === 24 ? "" : h > 24 ? `+${h - 24}` : `${h}`;
+          if (!label) return null;
+          return (
+            <span
+              key={h}
+              className="absolute top-0 -translate-x-1/2 text-[8px] text-slate-600"
+              style={{ left: `${pct}%` }}
+            >
+              {label}h
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
+}
+
+function toMin(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function fromMin(min: number): string {
+  const m = ((min % (24 * 60)) + 24 * 60) % (24 * 60);
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
