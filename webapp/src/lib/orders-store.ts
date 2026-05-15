@@ -46,6 +46,8 @@ export type Order = {
   notes: string;
   whatsappSent: boolean;
   customerAccessToken: string | null;
+  driverAccessToken: string | null;
+  deliveredAt: string | null;
   // POS fields
   channel: OrderChannel;
   tableNumber: string | null;
@@ -207,6 +209,8 @@ function mapOrder(dbOrder: any): Order {
     notes: dbOrder.notes || "",
     whatsappSent: dbOrder.whatsappSent,
     customerAccessToken: dbOrder.customerAccessToken || null,
+    driverAccessToken: dbOrder.driverAccessToken || null,
+    deliveredAt: dbOrder.deliveredAt ? dbOrder.deliveredAt.toISOString() : null,
     channel: (dbOrder.channel || "ONLINE") as OrderChannel,
     tableNumber: dbOrder.tableNumber || null,
     paymentMethod: dbOrder.paymentMethod || null,
@@ -252,10 +256,12 @@ export async function createOrder(data: {
     const orderNumber = await nextOrderNumber(data.restauranteSlug, attempt);
     try {
       const accessToken = generateAccessToken();
+      const driverToken = generateAccessToken();
       const dbOrder = await prisma.order.create({
         data: {
           orderNumber,
           customerAccessToken: accessToken,
+          driverAccessToken: driverToken,
           restauranteSlug: data.restauranteSlug,
           customerName: data.customerName,
           customerPhone: data.customerPhone,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { OptionGroupEditor } from "@/components/OptionGroupEditor";
+import { MoneyInput } from "@/components/MoneyInput";
 import { formatARS } from "@/lib/admin-utils";
 
 // ─── Types ───
@@ -356,8 +357,14 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
                 <input value={form.name} onChange={(e) => updateForm("name", e.target.value)} placeholder="Ej: Hamburguesa Completa" autoFocus className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-400">Precio *</label>
-                <input value={form.price} onChange={(e) => updateForm("price", e.target.value)} placeholder="5000" type="number" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                <MoneyInput
+                  label="Precio"
+                  required
+                  value={form.price === "" ? null : Number(form.price)}
+                  onChange={(v) => updateForm("price", v == null ? "" : String(v))}
+                  placeholder="5000"
+                  darkMode
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-400">Descripción (opcional)</label>
@@ -440,8 +447,13 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="mb-1.5 block text-xs font-medium text-slate-400">Precio</label>
-                  <input value={form.price} onChange={(e) => updateForm("price", e.target.value)} type="number" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                  <MoneyInput
+                    label="Precio"
+                    value={form.price === "" ? null : Number(form.price)}
+                    onChange={(v) => updateForm("price", v == null ? "" : String(v))}
+                    placeholder="5000"
+                    darkMode
+                  />
                 </div>
                 <div className="flex-1">
                   <label className="mb-1.5 block text-xs font-medium text-slate-400">Badge</label>

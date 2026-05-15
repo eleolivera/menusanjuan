@@ -267,7 +267,7 @@ export function PosBoard({
   }
 
   /** Mostrador: create order, mark paid, send to kitchen */
-  async function submitMostrador(paymentMethod: string, cashTendered?: number) {
+  async function submitMostrador(paymentMethod: string, cashTendered?: number, payLater?: boolean) {
     if (submitting) return;
     if (cart.length === 0) return;
     setSubmitting(true);
@@ -279,8 +279,9 @@ export function PosBoard({
         body: JSON.stringify({
           items: buildItemsPayload(),
           channel: "COUNTER",
-          paymentMethod,
-          cashTendered,
+          paymentMethod: payLater ? undefined : paymentMethod,
+          cashTendered: payLater ? undefined : cashTendered,
+          payLater: !!payLater,
           source: "pos-tablet",
         }),
       });
@@ -725,9 +726,13 @@ export function PosBoard({
         <PosPaymentSheet
           total={grandTotal}
           submitting={submitting}
+          allowPayLater={mode === "COUNTER"}
           onPay={(method, tendered) => {
             if (mode === "COUNTER") submitMostrador(method, tendered);
             else if (activeOrderId) payMesa(method, tendered);
+          }}
+          onPayLater={() => {
+            if (mode === "COUNTER") submitMostrador("", undefined, true);
           }}
           onClose={() => { if (!submitting) setPaying(false); }}
         />

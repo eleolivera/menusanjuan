@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PhoneInput } from "@/components/PhoneInput";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
+import { MoneyInput } from "@/components/MoneyInput";
 
 // ─── Types ───
 
@@ -61,10 +62,10 @@ export default function BienvenidaPage() {
 
   // Step 3 fields
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
-  const [closeRadius, setCloseRadius] = useState<string>("3");
-  const [closePrice, setClosePrice] = useState<string>("500");
-  const [farRadius, setFarRadius] = useState<string>("7");
-  const [farPrice, setFarPrice] = useState<string>("900");
+  const [closeRadius, setCloseRadius] = useState<string>("");
+  const [closePrice, setClosePrice] = useState<string>("");
+  const [farRadius, setFarRadius] = useState<string>("");
+  const [farPrice, setFarPrice] = useState<string>("");
 
   // Step 5 state
   const [activated, setActivated] = useState(false);
@@ -534,17 +535,13 @@ export default function BienvenidaPage() {
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors"
                           />
                         </div>
-                        <div>
-                          <label className="mb-1 block text-[11px] text-slate-500">Precio envio ($)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="50"
-                            value={closePrice}
-                            onChange={(e) => setClosePrice(e.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors"
-                          />
-                        </div>
+                        <MoneyInput
+                          label="Precio envío"
+                          value={closePrice === "" ? null : Number(closePrice)}
+                          onChange={(v) => setClosePrice(v == null ? "" : String(v))}
+                          placeholder="500"
+                          darkMode
+                        />
                       </div>
                     </div>
 
@@ -566,17 +563,13 @@ export default function BienvenidaPage() {
                             className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors"
                           />
                         </div>
-                        <div>
-                          <label className="mb-1 block text-[11px] text-slate-500">Precio envio ($)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="50"
-                            value={farPrice}
-                            onChange={(e) => setFarPrice(e.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors"
-                          />
-                        </div>
+                        <MoneyInput
+                          label="Precio envío"
+                          value={farPrice === "" ? null : Number(farPrice)}
+                          onChange={(v) => setFarPrice(v == null ? "" : String(v))}
+                          placeholder="900"
+                          darkMode
+                        />
                       </div>
                     </div>
                   </>

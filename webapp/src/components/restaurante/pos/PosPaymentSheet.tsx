@@ -18,26 +18,35 @@ const METHODS: { value: Method; label: string }[] = [
 export function PosPaymentSheet({
   total,
   onPay,
+  onPayLater,
   onClose,
   submitting,
+  allowPayLater = false,
 }: {
   total: number;
   onPay: (method: string, cashTendered?: number) => void;
+  onPayLater?: () => void;
   onClose: () => void;
   submitting: boolean;
+  allowPayLater?: boolean;
 }) {
   const [method, setMethod] = useState<Method>("cash");
   const [tendered, setTendered] = useState<string>("");
+  const [payLater, setPayLater] = useState(false);
 
   // Clamp to non-negative integer pesos (no cents in ARS)
   const tenderedNum = Math.max(0, Math.floor(parseInt(tendered, 10) || 0));
   const change = tenderedNum - total;
   // Cash requires tendered >= total (or total = 0)
-  const canPay = method !== "cash" || total === 0 || tenderedNum >= total;
+  const canPay = payLater || method !== "cash" || total === 0 || tenderedNum >= total;
 
   function handlePay() {
     if (submitting || !canPay) return;
-    onPay(method, method === "cash" ? tenderedNum : undefined);
+    if (payLater) {
+      onPayLater?.();
+    } else {
+      onPay(method, method === "cash" ? tenderedNum : undefined);
+    }
   }
 
   return (
@@ -58,6 +67,29 @@ export function PosPaymentSheet({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3" style={{ minHeight: 0 }}>
+          {/* Pay-later toggle (mostrador only) */}
+          {allowPayLater && (
+            <label className={`flex items-center justify-between rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${
+              payLater ? "border-amber-500/40 bg-amber-500/10" : "border-white/10 bg-white/5 hover:border-white/20"
+            }`}>
+              <div>
+                <div className={`text-sm font-medium ${payLater ? "text-amber-300" : "text-white"}`}>
+                  Cobrar al entregar
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  El pedido sale a cocina sin marcarse pagado. Se cobra al entregar.
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={payLater}
+                onChange={(e) => setPayLater(e.target.checked)}
+                className="h-5 w-9 appearance-none rounded-full bg-slate-700 transition-colors checked:bg-amber-500 relative cursor-pointer before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
+              />
+            </label>
+          )}
+
+          {!payLater && (<>
           {/* Payment method picker */}
           <div className="grid grid-cols-2 gap-2">
             {METHODS.map((m) => (
@@ -133,6 +165,16 @@ export function PosPaymentSheet({
               <p className="text-xs text-slate-400">Cobrar con tu QR de Mercado Pago</p>
             </div>
           )}
+          </>)}
+
+          {payLater && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-center">
+              <p className="text-sm text-amber-200 font-medium">El pedido va a cocina sin pago.</p>
+              <p className="text-[11px] text-amber-300/70 mt-1.5">
+                Vas a poder marcarlo pagado desde el tablero de pedidos o el delivery lo cobra al entregar.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -142,7 +184,7 @@ export function PosPaymentSheet({
             disabled={!canPay || submitting}
             className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3.5 text-base font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg disabled:opacity-30 transition-all"
           >
-            {submitting ? "Procesando..." : "Confirmar y enviar a cocina"}
+            {submitting ? "Procesando..." : payLater ? "Enviar a cocina (cobrar después)" : "Confirmar y enviar a cocina"}
           </button>
         </div>
       </div>

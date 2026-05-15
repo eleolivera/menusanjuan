@@ -314,7 +314,9 @@ model Order {
   source           String?                           // "web" | "pos-tablet" | "pos-mobile"
   whatsappSent     Boolean     @default(false)
   notes            String?
-  customerAccessToken String?                     // 12-char token for anonymous order tracking
+  customerAccessToken String?                     // 12-char token for anonymous customer tracking
+  driverAccessToken   String?  @unique           // 12-char token for the delivery-driver-facing QR page
+  deliveredAt      DateTime?                     // When status flipped to DELIVERED (via driver QR or owner)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 

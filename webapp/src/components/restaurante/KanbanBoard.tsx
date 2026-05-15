@@ -131,7 +131,11 @@ export function KanbanBoard({
                       <div className="flex items-start justify-between mb-1 ml-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-bold text-primary">{order.orderNumber}</span>
-                          {order.paymentStatus === "PAID" && <span className="rounded bg-emerald-400/15 px-1 text-[8px] font-bold text-emerald-400">PAGADO</span>}
+                          {order.paymentStatus === "PAID" ? (
+                            <span className="rounded bg-emerald-400/15 px-1 text-[8px] font-bold text-emerald-400">PAGADO</span>
+                          ) : (
+                            <span className="rounded bg-red-400/15 px-1 text-[8px] font-bold text-red-400">SIN PAGAR</span>
+                          )}
                           {hasUpdates && <span className="rounded bg-amber-400/15 px-1 text-[8px] font-bold text-amber-400 animate-pulse">ACTUALIZADO</span>}
                         </div>
                         <span className="text-[10px] text-slate-600">

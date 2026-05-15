@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { OptionGroupData } from "@/data/menus";
+import { MoneyInput } from "@/components/MoneyInput";
 
 type Preset = {
   id: string;
@@ -410,10 +411,15 @@ function GroupForm({
             <div key={i} className="flex gap-2 items-center">
               <input value={o.name} onChange={(e) => updateOption(i, "name", e.target.value)} placeholder="Nombre"
                 className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-slate-500">+$</span>
-                <input type="number" min={0} value={o.priceDelta} onChange={(e) => updateOption(i, "priceDelta", Number(e.target.value))}
-                  className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white text-right focus:border-primary focus:outline-none" />
+              <div className="w-24">
+                <MoneyInput
+                  value={o.priceDelta || null}
+                  onChange={(v) => updateOption(i, "priceDelta", v ?? 0)}
+                  placeholder="0"
+                  compact
+                  prefix="+$"
+                  darkMode
+                />
               </div>
               {options.length > 1 && (
                 <button type="button" onClick={() => removeOption(i)} className="text-slate-600 hover:text-red-400 text-xs transition-colors">x</button>

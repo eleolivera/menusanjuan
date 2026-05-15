@@ -8,6 +8,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { useSmartSave } from "@/hooks/useSmartSave";
 import { SaveIndicator } from "@/components/SaveIndicator";
+import { MoneyInput } from "@/components/MoneyInput";
 
 const DAYS = [
   { key: "lun", label: "Lunes" },
@@ -379,19 +380,15 @@ export default function ProfilePage() {
 
               {deliveryMode === "flat" ? (
                 <div className="space-y-4">
-                  <div>
-                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
-                      Costo de envío (ARS) — el mismo para todos los clientes <SaveIndicator status={statuses.deliveryFee} />
-                    </label>
-                    <input
-                      type="number" step="100" min="0"
-                      value={deliveryFee ?? ""}
-                      onChange={(e) => setValue("deliveryFee", e.target.value === "" ? null : Number(e.target.value))}
-                      onBlur={() => flushField("deliveryFee")}
-                      placeholder="2500"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                    />
-                  </div>
+                  <MoneyInput
+                    label="Costo de envío — el mismo para todos los clientes"
+                    value={deliveryFee ?? null}
+                    onChange={(v) => setValue("deliveryFee", v)}
+                    onBlur={() => flushField("deliveryFee")}
+                    placeholder="2500"
+                    darkMode
+                    statusIndicator={<SaveIndicator status={statuses.deliveryFee} />}
+                  />
                   <div>
                     <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
                       Distancia máxima (km) — opcional <SaveIndicator status={statuses.deliveryFarRadius} />
@@ -429,19 +426,15 @@ export default function ProfilePage() {
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                     />
                   </div>
-                  <div>
-                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
-                      Precio (ARS) <SaveIndicator status={statuses.deliveryClosePrice} />
-                    </label>
-                    <input
-                      type="number" step="100" min="0"
-                      value={deliveryClosePrice ?? ""}
-                      onChange={(e) => setValue("deliveryClosePrice", e.target.value === "" ? null : Number(e.target.value))}
-                      onBlur={() => flushField("deliveryClosePrice")}
-                      placeholder="1500"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                    />
-                  </div>
+                  <MoneyInput
+                    label="Precio"
+                    value={deliveryClosePrice ?? null}
+                    onChange={(v) => setValue("deliveryClosePrice", v)}
+                    onBlur={() => flushField("deliveryClosePrice")}
+                    placeholder="1500"
+                    darkMode
+                    statusIndicator={<SaveIndicator status={statuses.deliveryClosePrice} />}
+                  />
                 </div>
               </div>
 
@@ -461,19 +454,15 @@ export default function ProfilePage() {
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                     />
                   </div>
-                  <div>
-                    <label className="mb-1.5 flex items-center text-xs font-medium text-slate-400">
-                      Precio (ARS) <SaveIndicator status={statuses.deliveryFarPrice} />
-                    </label>
-                    <input
-                      type="number" step="100" min="0"
-                      value={deliveryFarPrice ?? ""}
-                      onChange={(e) => setValue("deliveryFarPrice", e.target.value === "" ? null : Number(e.target.value))}
-                      onBlur={() => flushField("deliveryFarPrice")}
-                      placeholder="3000"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                    />
-                  </div>
+                  <MoneyInput
+                    label="Precio"
+                    value={deliveryFarPrice ?? null}
+                    onChange={(v) => setValue("deliveryFarPrice", v)}
+                    onBlur={() => flushField("deliveryFarPrice")}
+                    placeholder="3000"
+                    darkMode
+                    statusIndicator={<SaveIndicator status={statuses.deliveryFarPrice} />}
+                  />
                 </div>
               </div>
 

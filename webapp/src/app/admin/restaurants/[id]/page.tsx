@@ -6,6 +6,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 import { LocationPicker } from "@/components/LocationPicker";
 import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
+import { MoneyInput } from "@/components/MoneyInput";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -457,22 +458,40 @@ Probalo y decime qué te parece!`;
                       <input type="number" min="0.5" step="0.5" value={deliveryCloseRadius} onChange={e => setDeliveryCloseRadius(e.target.value)} placeholder="Ej: 3" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-500 mb-1">Zona cercana — Precio ($)</label>
-                      <input type="number" min="0" step="100" value={deliveryClosePrice} onChange={e => setDeliveryClosePrice(e.target.value)} placeholder="Ej: 500" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
+                      <label className="block text-[10px] text-slate-500 mb-1">Zona cercana — Precio</label>
+                      <MoneyInput
+                        value={deliveryClosePrice === "" ? null : Number(deliveryClosePrice)}
+                        onChange={(v) => setDeliveryClosePrice(v == null ? "" : String(v))}
+                        placeholder="500"
+                        compact
+                        darkMode
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] text-slate-500 mb-1">Zona lejana — Radio (km)</label>
                       <input type="number" min="1" step="0.5" value={deliveryFarRadius} onChange={e => setDeliveryFarRadius(e.target.value)} placeholder="Ej: 7" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-500 mb-1">Zona lejana — Precio ($)</label>
-                      <input type="number" min="0" step="100" value={deliveryFarPrice} onChange={e => setDeliveryFarPrice(e.target.value)} placeholder="Ej: 1000" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
+                      <label className="block text-[10px] text-slate-500 mb-1">Zona lejana — Precio</label>
+                      <MoneyInput
+                        value={deliveryFarPrice === "" ? null : Number(deliveryFarPrice)}
+                        onChange={(v) => setDeliveryFarPrice(v == null ? "" : String(v))}
+                        placeholder="1000"
+                        compact
+                        darkMode
+                      />
                     </div>
                   </div>
                   {!deliveryCloseRadius && (
                     <div>
                       <label className="block text-[10px] text-slate-500 mb-1">Tarifa fija (sin zonas)</label>
-                      <input type="number" min="0" step="100" value={deliveryFee} onChange={e => setDeliveryFee(e.target.value)} placeholder="Gratis si vacío" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none" />
+                      <MoneyInput
+                        value={deliveryFee === "" ? null : Number(deliveryFee)}
+                        onChange={(v) => setDeliveryFee(v == null ? "" : String(v))}
+                        placeholder="Gratis si vacío"
+                        compact
+                        darkMode
+                      />
                     </div>
                   )}
                 </>

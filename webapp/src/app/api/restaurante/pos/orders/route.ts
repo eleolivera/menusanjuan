@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     longitude,
     notes,
     source,
+    payLater,
   } = body as {
     items: OrderItem[];
     channel: OrderChannel;
@@ -53,14 +54,16 @@ export async function POST(request: NextRequest) {
     longitude?: number;
     notes?: string;
     source?: string;
+    payLater?: boolean;
   };
 
   // ─── Validation ───
   if (!items?.length) return NextResponse.json({ error: "Sin items" }, { status: 400 });
   if (!channel || !VALID_CHANNELS.includes(channel)) return NextResponse.json({ error: "Canal invalido" }, { status: 400 });
   if (channel === "DINE_IN" && !tableNumber?.trim()) return NextResponse.json({ error: "Falta numero de mesa" }, { status: 400 });
-  // Mesa is post-pay, no payment method needed at creation. Mostrador requires it.
-  if (channel === "COUNTER") {
+  // Mesa is post-pay, no payment method needed at creation.
+  // Mostrador requires a payment method UNLESS payLater is true (cobrar al entregar).
+  if (channel === "COUNTER" && !payLater) {
     if (!paymentMethod || !VALID_PAYMENTS.includes(paymentMethod)) {
       return NextResponse.json({ error: "Metodo de pago invalido" }, { status: 400 });
     }
@@ -128,8 +131,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Mesa = post-pay (UNPAID, kept open for adding items, cobrar later)
-  // Mostrador = pre-pay (PAID immediately)
-  const isPrePay = channel === "COUNTER";
+  // Mostrador = pre-pay (PAID immediately) UNLESS owner chose "cobrar al entregar"
+  const isPrePay = channel === "COUNTER" && !payLater;
 
   const order = await createOrder({
     restauranteSlug: restauranteSlug!,

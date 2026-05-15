@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrder, updateOrderStatus, markWhatsAppSent } from "@/lib/orders-store";
 import type { OrderStatus } from "@/lib/orders-store";
+import { prisma } from "@/lib/prisma";
+import { getRestauranteFromSession } from "@/lib/restaurante-auth";
 
 const VALID_STATUSES: OrderStatus[] = ["GENERATED", "PAID", "PROCESSING", "DELIVERED", "CANCELLED"];
 
@@ -38,6 +40,30 @@ export async function PATCH(
     const order = await updateOrderStatus(id, body.status);
     if (!order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     return NextResponse.json(order);
+  }
+
+  // Owner-only: toggle paymentStatus
+  if (body.paymentStatus === "PAID" || body.paymentStatus === "UNPAID") {
+    const dealer = await getRestauranteFromSession();
+    if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+    const existing = await prisma.order.findUnique({ where: { id }, select: { restauranteSlug: true } });
+    if (!existing) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+    if (existing.restauranteSlug !== dealer.slug) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    const wantPaid = body.paymentStatus === "PAID";
+    await prisma.order.update({
+      where: { id },
+      data: {
+        paymentStatus: body.paymentStatus,
+        paidAt: wantPaid ? new Date() : null,
+        ...(body.paymentMethod && wantPaid ? { paymentMethod: body.paymentMethod } : {}),
+      },
+    });
+    const fresh = await getOrder(id);
+    return NextResponse.json(fresh);
   }
 
   return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 });

@@ -41,6 +41,12 @@ export function calculateDeliveryFee(
   customerLat: number,
   customerLng: number
 ): DeliveryZoneResult | null {
+  // Owner disabled delivery → fall back to "consultá con el restaurante" message.
+  // Without this, leftover pricing fields from a previous config keep charging.
+  if (!config.deliveryEnabled) {
+    return null;
+  }
+
   // Check if any pricing is configured at all
   const hasZones = config.deliveryCloseRadius != null && config.deliveryClosePrice != null;
   const hasFlatFee = config.deliveryFee != null && config.deliveryFee > 0;
