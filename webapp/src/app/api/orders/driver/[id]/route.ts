@@ -48,12 +48,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   });
 }
 
-// PATCH /api/orders/driver/[id]?t=X  body: { action: "mark_delivered" }
+// PATCH /api/orders/driver/[id]?t=X
+// body: { action: "mark_delivered", paymentMethod?, cashTendered? }
+// If paymentMethod is provided, also mark the order as PAID with paidAt = now.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const token = request.nextUrl.searchParams.get("t");
   const body = await request.json().catch(() => ({}));
   const action = body?.action as string | undefined;
+  const paymentMethod = body?.paymentMethod as string | undefined;
+  const cashTendered = typeof body?.cashTendered === "number" ? body.cashTendered : undefined;
 
   if (!id || !token) {
     return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
@@ -61,7 +65,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const order = await prisma.order.findUnique({
     where: { id },
-    select: { id: true, driverAccessToken: true, status: true },
+    select: {
+      id: true, driverAccessToken: true, status: true, paymentStatus: true,
+      total: true, deliveryFee: true,
+    },
   });
 
   if (!order || order.driverAccessToken !== token) {
@@ -69,14 +76,45 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   if (action === "mark_delivered") {
+    const validMethods = ["cash", "card", "transfer", "mercadopago"];
+    const collecting = paymentMethod && validMethods.includes(paymentMethod);
+
+    let cashChange: number | null = null;
+    let cashTenderedNorm: number | null = null;
+    if (collecting && paymentMethod === "cash") {
+      const totalDue = (order.total || 0) + (order.deliveryFee || 0);
+      if (cashTendered != null) {
+        if (cashTendered < totalDue) {
+          return NextResponse.json({ error: "Monto recibido menor al total" }, { status: 400 });
+        }
+        cashTenderedNorm = Math.round(cashTendered);
+        cashChange = Math.max(0, cashTenderedNorm - totalDue);
+      }
+    }
+
     const updated = await prisma.order.update({
       where: { id },
-      data: { status: "DELIVERED", deliveredAt: new Date() },
-      select: { status: true, deliveredAt: true },
+      data: {
+        status: "DELIVERED",
+        deliveredAt: new Date(),
+        ...(collecting && order.paymentStatus !== "PAID"
+          ? {
+              paymentStatus: "PAID",
+              paidAt: new Date(),
+              paymentMethod,
+              ...(paymentMethod === "cash" && cashTenderedNorm != null
+                ? { cashTendered: cashTenderedNorm, cashChange }
+                : {}),
+            }
+          : {}),
+      },
+      select: { status: true, deliveredAt: true, paymentStatus: true, paidAt: true },
     });
     return NextResponse.json({
       status: updated.status,
       deliveredAt: updated.deliveredAt?.toISOString() ?? null,
+      paymentStatus: updated.paymentStatus,
+      paidAt: updated.paidAt?.toISOString() ?? null,
     });
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { NumberPad } from "@/components/restaurante/pos/NumberPad";
 
 type OrderItem = {
   itemId?: string;
@@ -66,7 +67,10 @@ export default function DriverPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [marking, setMarking] = useState(false);
-  const [confirmDelivered, setConfirmDelivered] = useState(false);
+  type ConfirmStep = null | "confirm" | "method" | "cash";
+  const [step, setStep] = useState<ConfirmStep>(null);
+  const [method, setMethod] = useState<"cash" | "card" | "transfer" | "mercadopago">("cash");
+  const [cashTendered, setCashTendered] = useState<string>("");
   const pollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function fetchOrder() {
@@ -102,18 +106,19 @@ export default function DriverPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, token]);
 
-  async function markDelivered() {
+  async function markDelivered(extraPayment?: { paymentMethod: string; cashTendered?: number }) {
     if (!orderId || !token) return;
     setMarking(true);
     try {
       const res = await fetch(`/api/orders/driver/${orderId}?t=${encodeURIComponent(token)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_delivered" }),
+        body: JSON.stringify({ action: "mark_delivered", ...(extraPayment || {}) }),
       });
       if (res.ok) {
         await fetchOrder();
-        setConfirmDelivered(false);
+        setStep(null);
+        setCashTendered("");
       }
     } finally {
       setMarking(false);
@@ -246,32 +251,36 @@ export default function DriverPage() {
           </div>
         </div>
 
-        {/* Action */}
+        {/* Action — multi-step depending on order state */}
         {isDelivered ? (
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
             <div className="text-2xl mb-1">✅</div>
             <div className="text-sm font-bold text-emerald-400">Entregado</div>
             <div className="text-[11px] text-emerald-300/70 mt-1">{timeAgo(order.deliveredAt)}</div>
           </div>
-        ) : confirmDelivered ? (
+        ) : step === null ? (
+          <button
+            onClick={() => {
+              // If paid → simple confirm. If unpaid → method picker.
+              setStep(order.paymentStatus === "PAID" ? "confirm" : "method");
+            }}
+            className="w-full rounded-2xl bg-emerald-500 py-4 text-base font-bold text-white hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+          >
+            🟢 Marcar entregado
+          </button>
+        ) : step === "confirm" ? (
+          // PAID order — just confirm delivery
           <div className="rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 p-4 space-y-3">
-            <div className="text-center text-sm text-emerald-200">
-              ¿Seguro que entregaste este pedido?
-              {order.paymentStatus === "UNPAID" && (
-                <div className="mt-2 text-xs text-amber-200 font-medium">
-                  ⚠️ El pedido figura SIN PAGAR — confirmá que cobraste {formatARS(totalDue)} antes de marcar entregado.
-                </div>
-              )}
-            </div>
+            <div className="text-center text-sm text-emerald-200">¿Seguro que entregaste este pedido?</div>
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => setConfirmDelivered(false)}
+                onClick={() => setStep(null)}
                 className="rounded-xl border border-white/10 py-3 text-sm font-medium text-slate-300 hover:bg-white/5 transition-colors"
               >
                 Cancelar
               </button>
               <button
-                onClick={markDelivered}
+                onClick={() => markDelivered()}
                 disabled={marking}
                 className="rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
               >
@@ -279,14 +288,112 @@ export default function DriverPage() {
               </button>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={() => setConfirmDelivered(true)}
-            className="w-full rounded-2xl bg-emerald-500 py-4 text-base font-bold text-white hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
-          >
-            🟢 Marcar entregado
-          </button>
-        )}
+        ) : step === "method" ? (
+          // UNPAID order — ask how the customer paid
+          <div className="rounded-2xl border border-amber-500/30 bg-slate-900/60 p-4 space-y-3">
+            <div className="text-center">
+              <div className="text-[11px] text-slate-500 uppercase tracking-wider">A cobrar</div>
+              <div className="text-2xl font-extrabold text-amber-400">{formatARS(totalDue)}</div>
+            </div>
+            <div className="text-xs text-slate-400 text-center">¿Cómo te pagó el cliente?</div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { v: "cash", label: "Efectivo", emoji: "💵" },
+                { v: "card", label: "Tarjeta", emoji: "💳" },
+                { v: "transfer", label: "Transferencia", emoji: "🏦" },
+                { v: "mercadopago", label: "Mercado Pago", emoji: "📲" },
+              ].map((m) => (
+                <button
+                  key={m.v}
+                  onClick={() => {
+                    setMethod(m.v as typeof method);
+                    if (m.v === "cash") {
+                      setCashTendered("");
+                      setStep("cash");
+                    } else {
+                      // For non-cash, mark delivered + paid in one go
+                      markDelivered({ paymentMethod: m.v });
+                    }
+                  }}
+                  disabled={marking}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 flex flex-col items-center gap-1"
+                >
+                  <span className="text-xl">{m.emoji}</span>
+                  <span>{m.label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setStep(null)}
+              className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              ← Cancelar
+            </button>
+          </div>
+        ) : step === "cash" ? (
+          // Cash calculator — enter tendered, show change
+          (() => {
+            const tNum = Math.max(0, Math.floor(parseInt(cashTendered, 10) || 0));
+            const change = tNum - totalDue;
+            const canConfirm = tNum >= totalDue;
+            return (
+              <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/60 p-4 space-y-3">
+                <div className="text-center">
+                  <div className="text-[11px] text-slate-500 uppercase tracking-wider">A cobrar</div>
+                  <div className="text-2xl font-extrabold text-white">{formatARS(totalDue)}</div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 uppercase tracking-wider">Recibido</span>
+                  <span className="text-2xl font-bold text-white">{tNum > 0 ? formatARS(tNum) : "$0"}</span>
+                </div>
+                {/* Quick buttons */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => setCashTendered(String(totalDue))}
+                    className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-400/20 transition-colors"
+                  >
+                    Exacto
+                  </button>
+                  {[1000, 2000, 5000, 10000, 20000].filter((v) => v >= totalDue).slice(0, 2).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setCashTendered(String(v))}
+                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-slate-300 hover:bg-white/10 transition-colors"
+                    >
+                      {formatARS(v)}
+                    </button>
+                  ))}
+                </div>
+                <NumberPad value={cashTendered} onChange={setCashTendered} maxLength={7} />
+                {tNum > 0 && (
+                  <div className={`rounded-xl border p-3 text-center ${change >= 0 ? "border-emerald-400/30 bg-emerald-400/10" : "border-red-400/30 bg-red-400/10"}`}>
+                    <p className={`text-[11px] uppercase tracking-wider mb-0.5 ${change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {change >= 0 ? "Vuelto" : "Falta"}
+                    </p>
+                    <p className={`text-2xl font-extrabold ${change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {formatARS(Math.abs(change))}
+                    </p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => setStep("method")}
+                    className="rounded-xl border border-white/10 py-3 text-sm font-medium text-slate-300 hover:bg-white/5 transition-colors"
+                  >
+                    ← Atrás
+                  </button>
+                  <button
+                    onClick={() => markDelivered({ paymentMethod: "cash", cashTendered: tNum })}
+                    disabled={!canConfirm || marking}
+                    className="rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white hover:bg-emerald-600 transition-colors disabled:opacity-30"
+                  >
+                    {marking ? "..." : "Cobrado · entregado"}
+                  </button>
+                </div>
+              </div>
+            );
+          })()
+        ) : null}
 
         <div className="text-center text-[10px] text-slate-600 pt-1">
           MenuSanJuan · Página del repartidor

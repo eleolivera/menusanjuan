@@ -10,9 +10,10 @@ export const ONBOARDING_STAGES: { key: OnboardingStage; label: string; color: st
   { key: "ONBOARDED", label: "Onboardeado", color: "text-emerald-400", bgColor: "bg-emerald-400/10 border-emerald-400/20", description: "Activo y verificado" },
 ];
 
-export const ORDER_STATUSES: { status: "GENERATED" | "PAID" | "PROCESSING" | "DELIVERED" | "CANCELLED"; label: string; color: string; bgColor: string }[] = [
+// PAID is no longer a separate column — payment status is a toggleable pill on every card.
+// Lifecycle is now: GENERATED → PROCESSING → DELIVERED (plus CANCELLED).
+export const ORDER_STATUSES: { status: "GENERATED" | "PROCESSING" | "DELIVERED" | "CANCELLED"; label: string; color: string; bgColor: string }[] = [
   { status: "GENERATED", label: "Nuevo", color: "text-amber-400", bgColor: "bg-amber-400/10 border-amber-400/20" },
-  { status: "PAID", label: "Pagado", color: "text-emerald-400", bgColor: "bg-emerald-400/10 border-emerald-400/20" },
   { status: "PROCESSING", label: "En Cocina", color: "text-blue-400", bgColor: "bg-blue-400/10 border-blue-400/20" },
   { status: "DELIVERED", label: "Entregado", color: "text-slate-400", bgColor: "bg-slate-400/10 border-slate-400/20" },
   { status: "CANCELLED", label: "Cancelado", color: "text-red-400", bgColor: "bg-red-400/10 border-red-400/20" },
