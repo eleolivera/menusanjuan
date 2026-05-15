@@ -101,7 +101,9 @@ export function OrderModal({
   }, [step, orderId, orderToken, trackingOrder]);
 
   // Delivery
-  const [deliveryMethod, setDeliveryMethod] = useState<"delivery" | "pickup">("delivery");
+  // Default to pickup when the resta has delivery disabled, otherwise delivery.
+  const deliveryEnabledInitial = deliveryConfig?.deliveryEnabled !== false;
+  const [deliveryMethod, setDeliveryMethod] = useState<"delivery" | "pickup">(deliveryEnabledInitial ? "delivery" : "pickup");
   const [deliveryResult, setDeliveryResult] = useState<DeliveryZoneResult | null>(null);
 
   const hasDelivery = deliveryConfig != null && deliveryConfig.deliveryEnabled !== false;
@@ -394,7 +396,7 @@ _Pedido realizado desde MenuSanJuan_`;
               </div>
 
               <button
-                onClick={() => hasDelivery ? setStep("method") : setStep("info")}
+                onClick={() => setStep("method")}
                 className="w-full rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all"
               >
                 Continuar
@@ -406,14 +408,17 @@ _Pedido realizado desde MenuSanJuan_`;
           {step === "method" && (
             <>
               <div className="space-y-3 mb-6">
-                {/* Delivery option */}
+                {/* Delivery option (disabled if resta has it off) */}
                 <button
                   type="button"
-                  onClick={() => { setDeliveryMethod("delivery"); setDeliveryResult(null); }}
+                  disabled={!hasDelivery}
+                  onClick={() => { if (!hasDelivery) return; setDeliveryMethod("delivery"); setDeliveryResult(null); }}
                   className={`w-full flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
-                    deliveryMethod === "delivery"
-                      ? "border-primary bg-primary/5"
-                      : "border-border/50 hover:border-primary/30"
+                    !hasDelivery
+                      ? "border-border/30 bg-surface-alt opacity-50 cursor-not-allowed"
+                      : deliveryMethod === "delivery"
+                        ? "border-primary bg-primary/5"
+                        : "border-border/50 hover:border-primary/30"
                   }`}
                 >
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-2xl">
@@ -421,10 +426,14 @@ _Pedido realizado desde MenuSanJuan_`;
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-bold text-text">Delivery</div>
-                    <div className="text-xs text-text-muted">Te lo llevamos a tu dirección</div>
+                    <div className="text-xs text-text-muted">
+                      {hasDelivery
+                        ? "Te lo llevamos a tu dirección"
+                        : "Este restaurante no hace delivery por ahora"}
+                    </div>
                   </div>
                   <div className="text-sm font-semibold text-primary shrink-0">
-                    {getDeliveryPriceText()}
+                    {hasDelivery ? getDeliveryPriceText() : ""}
                   </div>
                 </button>
 
@@ -554,7 +563,7 @@ _Pedido realizado desde MenuSanJuan_`;
               </div>
 
               <div className="flex gap-3">
-                <button onClick={() => setStep(hasDelivery ? "method" : "cart")} className="flex-1 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-text hover:bg-surface-hover transition-colors">
+                <button onClick={() => setStep("method")} className="flex-1 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-text hover:bg-surface-hover transition-colors">
                   Volver
                 </button>
                 <button
