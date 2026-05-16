@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
-// SVG QR (not Canvas) — thermal printers + browser print engines render SVG
-// reliably; Canvas often comes out blank or pixelated on print.
-import { QRCodeSVG } from "qrcode.react";
+import { useEffect, useRef, useState } from "react";
+// We render a hidden QRCodeCanvas, extract its PNG via toDataURL, and display
+// the result as a plain <img>. Thermal-printer drivers (ESC/POS) commonly skip
+// inline <svg> elements — they happily render <img> raster bitmaps. Canvas
+// alone also gets bleached out by some Windows print pipelines. PNG it is.
+import { QRCodeCanvas } from "qrcode.react";
 
 type Item = { name: string; quantity: number; unitPrice: number; optionsDelta?: number; note?: string };
 
@@ -34,12 +36,27 @@ function ars(n: number): string {
 }
 
 export function TicketView({ order, driverUrl }: Props) {
-  // Auto-trigger print if ?autoprint=1
+  const hiddenQrRef = useRef<HTMLDivElement>(null);
+  const [qrPngUrl, setQrPngUrl] = useState<string | null>(null);
+  // Extract the QR canvas as a PNG data URL once mounted
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.search.includes("autoprint")) {
-      setTimeout(() => window.print(), 400);
+    if (!driverUrl) return;
+    const canvas = hiddenQrRef.current?.querySelector("canvas");
+    if (canvas) {
+      setQrPngUrl(canvas.toDataURL("image/png"));
     }
-  }, []);
+  }, [driverUrl]);
+
+  // Auto-trigger print if ?autoprint=1 — but wait until the QR PNG is ready
+  // (or there's no driverUrl at all). Otherwise the print may fire before the
+  // <img> renders and the printer will get a missing QR.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.location.search.includes("autoprint")) return;
+    if (driverUrl && !qrPngUrl) return; // still waiting for QR
+    const t = setTimeout(() => window.print(), 400);
+    return () => clearTimeout(t);
+  }, [qrPngUrl, driverUrl]);
 
   const subtotal = order.items.reduce(
     (s, it) => s + (it.unitPrice + (it.optionsDelta || 0)) * it.quantity,
@@ -54,34 +71,49 @@ export function TicketView({ order, driverUrl }: Props) {
     <div className="min-h-screen bg-slate-200 print:bg-white print:min-h-0">
       <style>{`
         @media print {
-          @page { margin: 0; size: 80mm auto; }
+          /* 58mm thermal paper (printable area ~54mm after side margins). The
+             previous 80mm caused text to wrap onto multiple lines on a 58mm
+             roll. If a resta later has an 80mm printer we can make this a
+             setting. */
+          @page { margin: 0; size: 58mm auto; }
           html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
           /* Force exact colors (otherwise Chrome may bleach backgrounds + the QR) */
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
-          /* Hide the whole document, then re-show only the ticket card.
-             Necessary because /restaurante/layout.tsx wraps every child in the
-             dashboard sidebar (DashboardShell) — without this trick the sidebar
-             would print on the left of the receipt. */
+          /* Hide everything, then re-show only the ticket card. /restaurante/layout.tsx
+             wraps every child in DashboardShell (sidebar) — without this trick
+             the sidebar would print to the left of the receipt. */
           body * { visibility: hidden !important; }
           .ticket, .ticket * { visibility: visible !important; }
 
-          /* Pull the ticket up to the top-left of the page since its container
-             is no longer flowing (everything around it is invisible). */
+          /* Pull the ticket to top-left of the page since its container is no
+             longer in the visual flow. */
           .ticket {
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
-            width: 80mm !important;
-            max-width: 80mm !important;
+            width: 58mm !important;
+            max-width: 58mm !important;
             margin: 0 !important;
-            padding: 4mm !important;
+            padding: 2mm !important;
             box-shadow: none !important;
             border: 0 !important;
             border-radius: 0 !important;
           }
         }
       `}</style>
+
+      {/* Hidden canvas for PNG extraction — offscreen, never visible/printed. */}
+      {driverUrl && (
+        <div
+          ref={hiddenQrRef}
+          aria-hidden
+          style={{ position: "absolute", left: -99999, top: -99999, pointerEvents: "none" }}
+          className="no-print"
+        >
+          <QRCodeCanvas value={driverUrl} size={400} level="H" marginSize={0} />
+        </div>
+      )}
 
       {/* Action bar (hidden on print) */}
       <div className="no-print sticky top-0 bg-slate-900 text-white px-4 py-3 flex items-center justify-between gap-3 z-10">
@@ -184,17 +216,18 @@ export function TicketView({ order, driverUrl }: Props) {
             </div>
           )}
 
-          {/* QR for driver — SVG so thermal printers render it reliably */}
-          {driverUrl && (
+          {/* QR for driver — PNG <img> so thermal printer drivers always render it.
+             We rasterize the hidden canvas via toDataURL — see hiddenQrRef above. */}
+          {driverUrl && qrPngUrl && (
             <div className="mt-3 flex flex-col items-center">
-              <div className="bg-white p-2 border border-black">
-                <QRCodeSVG
-                  value={driverUrl}
-                  size={160}
-                  level="H"
-                  marginSize={0}
-                  bgColor="#ffffff"
-                  fgColor="#000000"
+              <div className="bg-white p-1 border border-black">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrPngUrl}
+                  alt="QR del repartidor"
+                  width={140}
+                  height={140}
+                  style={{ display: "block", imageRendering: "pixelated" }}
                 />
               </div>
               <div className="text-[10px] mt-1 text-center">Escanear → estado actual + marcar entregado</div>
