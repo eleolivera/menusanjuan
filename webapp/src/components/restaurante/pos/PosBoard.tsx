@@ -411,7 +411,7 @@ export function PosBoard({
         body: JSON.stringify({ action: "pay", paymentMethod, cashTendered }),
       });
       if (res.ok) {
-        setShowSuccess(`Mesa ${tableNumber} cobrada`);
+        setShowSuccess(tableNumber ? `Mesa ${tableNumber} cobrada` : "Pedido cobrado");
         setPaying(false);
         backToTables();
       } else {
@@ -818,19 +818,27 @@ export function PosBoard({
         />
       )}
 
-      {/* Payment sheet — pre-pay (mostrador) or post-pay (mesa) */}
+      {/* Payment sheet — pre-pay (new mostrador) or post-pay (existing order, mesa or open mostrador) */}
       {paying && (
         <PosPaymentSheet
           total={grandTotal}
           submitting={submitting}
-          allowPayLater={mode === "COUNTER"}
-          mode={mode === "COUNTER" ? "mostrador" : "mesa"}
+          // Pay-later only makes sense when CREATING a new mostrador (items haven't reached kitchen).
+          // For existing orders, items are already in cocina — there's nothing to "pay later".
+          allowPayLater={mode === "COUNTER" && !activeOrderId}
+          confirmLabel={
+            activeOrderId
+              ? (tableNumber ? "Cobrar y cerrar mesa" : "Cobrar y cerrar pedido")
+              : "Confirmar y enviar a cocina"
+          }
           onPay={(method, tendered) => {
-            if (mode === "COUNTER") submitMostrador(method, tendered);
-            else if (activeOrderId) payMesa(method, tendered);
+            // Existing open order (mesa OR mostrador) → append any new items + mark paid
+            if (activeOrderId) payMesa(method, tendered);
+            // New mostrador → create + pay in one shot
+            else if (mode === "COUNTER") submitMostrador(method, tendered);
           }}
           onPayLater={() => {
-            if (mode === "COUNTER") submitMostrador("", undefined, true);
+            if (mode === "COUNTER" && !activeOrderId) submitMostrador("", undefined, true);
           }}
           onClose={() => { if (!submitting) setPaying(false); }}
         />

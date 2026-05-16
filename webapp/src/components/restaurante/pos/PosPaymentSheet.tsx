@@ -11,7 +11,8 @@ export function PosPaymentSheet({
   onClose,
   submitting,
   allowPayLater = false,
-  mode = "mostrador",
+  confirmLabel = "Confirmar y enviar a cocina",
+  payLaterLabel = "Enviar a cocina (cobrar después)",
 }: {
   total: number;
   onPay: (method: string, cashTendered?: number) => void;
@@ -19,13 +20,12 @@ export function PosPaymentSheet({
   onClose: () => void;
   submitting: boolean;
   allowPayLater?: boolean;
-  /** "mostrador" = pre-pay (items go to kitchen with payment).
-   *  "mesa" = post-pay (items already in kitchen, payment closes the table). */
-  mode?: "mostrador" | "mesa";
+  /** Confirm button label — caller passes context-appropriate copy. */
+  confirmLabel?: string;
+  /** Pay-later button label (only shown when allowPayLater is true). */
+  payLaterLabel?: string;
 }) {
   const [payLater, setPayLater] = useState(false);
-  const confirmLabel = mode === "mesa" ? "Cobrar y cerrar mesa" : "Confirmar y enviar a cocina";
-  const payLaterLabel = mode === "mesa" ? "Cerrar mesa sin cobrar" : "Enviar a cocina (cobrar después)";
 
   function handleCollect(data: CollectedPayment) {
     onPay(data.paymentMethod, data.cashTendered);
