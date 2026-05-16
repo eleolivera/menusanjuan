@@ -11,6 +11,7 @@ import { SaveIndicator } from "@/components/SaveIndicator";
 import { MoneyInput } from "@/components/MoneyInput";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
 import { DeliveryZonesEditor } from "@/components/DeliveryZonesEditor";
+import { PrinterSection } from "@/components/restaurante/PrinterSection";
 
 const DAYS = [
   { key: "lun", label: "Lunes" },
@@ -592,6 +593,9 @@ export default function ProfilePage() {
             </a>
           )}
         </section>
+
+        {/* Local print agent (MenuSanJuanPrint) */}
+        <PrinterSection />
 
         {/* Security section */}
         <SecuritySection email={email} hasPassword={hasPassword} hasGoogle={hasGoogle} onPasswordSet={() => setHasPassword(true)} />
