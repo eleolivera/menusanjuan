@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { QRCodeCanvas } from "qrcode.react";
+// SVG QR (not Canvas) — thermal printers + browser print engines render SVG
+// reliably; Canvas often comes out blank or pixelated on print.
+import { QRCodeSVG } from "qrcode.react";
 
 type Item = { name: string; quantity: number; unitPrice: number; optionsDelta?: number; note?: string };
 
@@ -49,13 +51,26 @@ export function TicketView({ order, driverUrl }: Props) {
   });
 
   return (
-    <div className="min-h-screen bg-slate-200 print:bg-white">
+    <div className="min-h-screen bg-slate-200 print:bg-white print:min-h-0">
       <style>{`
         @media print {
           @page { margin: 0; size: 80mm auto; }
-          body { background: white !important; }
+          /* Strip everything: html/body padding, the outer screen-only chrome */
+          html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
+          /* Force exact colors (otherwise Chrome may bleach backgrounds + the QR) */
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
-          .ticket { box-shadow: none !important; border: 0 !important; max-width: 80mm; }
+          /* Make the ticket the only visible block, no shadow/border/extra padding */
+          .ticket-wrapper { padding: 0 !important; margin: 0 !important; }
+          .ticket {
+            box-shadow: none !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            max-width: 80mm !important;
+            width: 80mm !important;
+            margin: 0 !important;
+            padding: 4mm !important;
+          }
         }
       `}</style>
 
@@ -79,7 +94,7 @@ export function TicketView({ order, driverUrl }: Props) {
       </div>
 
       {/* Ticket — 80mm wide for thermal printer feel */}
-      <div className="mx-auto py-6 px-3">
+      <div className="ticket-wrapper mx-auto py-6 px-3">
         <div className="ticket mx-auto bg-white text-black rounded-md shadow-lg p-4 max-w-[80mm] font-mono text-[12px] leading-tight">
           {/* Header */}
           <div className="text-center mb-2">
@@ -160,11 +175,18 @@ export function TicketView({ order, driverUrl }: Props) {
             </div>
           )}
 
-          {/* QR for driver */}
+          {/* QR for driver — SVG so thermal printers render it reliably */}
           {driverUrl && (
             <div className="mt-3 flex flex-col items-center">
-              <div className="bg-white p-1 border border-black/30">
-                <QRCodeCanvas value={driverUrl} size={120} level="M" includeMargin={false} />
+              <div className="bg-white p-2 border border-black">
+                <QRCodeSVG
+                  value={driverUrl}
+                  size={160}
+                  level="H"
+                  marginSize={0}
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
               </div>
               <div className="text-[10px] mt-1 text-center">Escanear → estado actual + marcar entregado</div>
             </div>
