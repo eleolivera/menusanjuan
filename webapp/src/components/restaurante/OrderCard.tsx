@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCollector";
 import { MoneyInput } from "@/components/MoneyInput";
+import { buildDeliveryInstructions } from "@/lib/delivery-instructions";
 
 const STATUS_CONFIG: Record<
   OrderStatus,
@@ -295,7 +296,7 @@ export function OrderCard({
               📝 {order.notes}
             </div>
           )}
-          <div className="flex gap-2 pt-1">
+          <div className="flex flex-wrap gap-2 pt-1">
             {whatsappUrl && (
               <a
                 href={whatsappUrl}
@@ -315,6 +316,9 @@ export function OrderCard({
               >
                 Maps
               </a>
+            )}
+            {order.deliveryMethod === "delivery" && (
+              <CopyDeliveryButton order={order} restaurantName={restaurantName} variant="subtle" />
             )}
           </div>
         </div>
@@ -485,6 +489,14 @@ export function OrderCard({
                   Imprimiste la comanda <span className="font-mono text-slate-300">{order.orderNumber}</span>. Te recordamos avanzar el pedido a "En cocina" para que aparezca en el siguiente paso del Kanban.
                 </p>
               </div>
+              {order.deliveryMethod === "delivery" && (
+                <div className="rounded-xl border border-indigo-400/20 bg-indigo-400/5 p-3 space-y-2">
+                  <div className="text-[11px] text-indigo-200">
+                    💡 Si lo mandás por <strong>delivery</strong>, copiá las instrucciones para pegarlas en el grupo del repartidor.
+                  </div>
+                  <CopyDeliveryButton order={order} restaurantName={restaurantName} variant="primary" />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -516,4 +528,49 @@ function getTimeSince(dateStr: string): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
   return `${Math.floor(hrs / 24)}d`;
+}
+
+/**
+ * Button that copies a paste-ready delivery instructions block to the
+ * clipboard for forwarding to the resta's WhatsApp delivery group. Used in
+ * two places — the Cliente block (subtle indigo) and the kitchen-prompt
+ * modal (emerald, more prominent).
+ */
+function CopyDeliveryButton({
+  order,
+  restaurantName,
+  variant = "subtle",
+}: {
+  order: Order;
+  restaurantName: string;
+  variant?: "subtle" | "primary";
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    const text = buildDeliveryInstructions(order, restaurantName);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    } catch {
+      // Older browsers / blocked clipboard — fall back to prompt() so the
+      // text is still recoverable
+      window.prompt("Copiá este texto y pegalo en el grupo de WhatsApp:", text);
+    }
+  }
+
+  const subtleClass = "flex items-center gap-1.5 rounded-lg bg-indigo-500/15 px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/25 transition-colors";
+  const primaryClass = "w-full flex items-center justify-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-400/10 px-4 py-2.5 text-sm font-semibold text-indigo-300 hover:bg-indigo-400/15 transition-colors";
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className={variant === "primary" ? primaryClass : subtleClass}
+      title="Copiar al portapapeles para pegar en WhatsApp"
+    >
+      {copied ? "✓ Copiado al portapapeles" : "📋 Instrucciones para delivery"}
+    </button>
+  );
 }
