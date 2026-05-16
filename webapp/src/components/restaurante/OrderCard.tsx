@@ -100,7 +100,7 @@ export function OrderCard({
   }
 
   async function saveDeliveryFee() {
-    if (feeDraft == null || feeDraft <= 0) return;
+    if (feeDraft == null || feeDraft < 0) return;
     setSavingFee(true);
     try {
       await fetch(`/api/orders/${order.id}`, {
@@ -250,24 +250,40 @@ export function OrderCard({
           </div>
         </div>
 
-          {/* Delivery fee warning (when delivery without fee — phone delivery setup retroactively) */}
-          {needsDeliveryFee && !editingFee && (
+          {/* Delivery fee — three states: missing (warning + add), set (display + edit), editing (form) */}
+          {order.deliveryMethod === "delivery" && !editingFee && needsDeliveryFee && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 flex items-center justify-between text-xs">
               <span className="text-amber-200">
-                <span className="font-semibold">⚠️ Envío sin definir</span>
-                <span className="block text-[10px] text-amber-300/70 mt-0.5">El total no incluye el envío</span>
+                <span className="font-semibold">⚠️ Falta cargar el envío</span>
+                <span className="block text-[10px] text-amber-300/70 mt-0.5">No vas a poder cobrar hasta que lo cargues</span>
               </span>
               <button
                 onClick={() => { setEditingFee(true); setFeeDraft(null); }}
                 className="rounded-lg bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30 transition-colors shrink-0"
               >
-                + Agregar envío
+                + Cargar envío
+              </button>
+            </div>
+          )}
+          {order.deliveryMethod === "delivery" && !editingFee && !needsDeliveryFee && (
+            <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 flex items-center justify-between text-xs">
+              <span className="text-slate-400">
+                <span className="text-slate-500">Envío:</span>{" "}
+                <span className="font-semibold text-white">${(order.deliveryFee || 0).toLocaleString("es-AR")}</span>
+              </span>
+              <button
+                onClick={() => { setEditingFee(true); setFeeDraft(order.deliveryFee || null); }}
+                className="text-[11px] text-slate-400 hover:text-primary transition-colors"
+              >
+                Editar
               </button>
             </div>
           )}
           {editingFee && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3 space-y-2">
-              <div className="text-[11px] font-semibold text-amber-200">¿Cuánto le cobrás de envío?</div>
+              <div className="text-[11px] font-semibold text-amber-200">
+                {needsDeliveryFee ? "¿Cuánto le cobrás de envío?" : "Editar envío"}
+              </div>
               <MoneyInput
                 value={feeDraft}
                 onChange={setFeeDraft}
@@ -284,7 +300,7 @@ export function OrderCard({
                 </button>
                 <button
                   onClick={saveDeliveryFee}
-                  disabled={savingFee || !feeDraft || feeDraft <= 0}
+                  disabled={savingFee || feeDraft == null || feeDraft < 0}
                   className="flex-1 rounded-lg bg-amber-500 py-1.5 text-[11px] font-bold text-slate-900 hover:bg-amber-400 transition-colors disabled:opacity-30"
                 >
                   {savingFee ? "..." : "Guardar"}
@@ -317,20 +333,29 @@ export function OrderCard({
 
           {/* Action buttons */}
           {order.paymentStatus === "UNPAID" ? (
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <button
-                onClick={() => setPaymentSheet("charge")}
-                className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-3 py-2.5 text-xs font-bold text-white shadow-md shadow-primary/20 hover:shadow-lg transition-all"
-              >
-                💰 Cobrar ${totalDue.toLocaleString("es-AR")}
-              </button>
-              <button
-                onClick={() => setPaymentSheet("record")}
-                className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15 transition-colors"
-              >
-                ✓ Ya pagó (transfer / MP)
-              </button>
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <button
+                  onClick={() => setPaymentSheet("charge")}
+                  disabled={needsDeliveryFee}
+                  className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-3 py-2.5 text-xs font-bold text-white shadow-md shadow-primary/20 hover:shadow-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
+                >
+                  💰 Cobrar ${totalDue.toLocaleString("es-AR")}
+                </button>
+                <button
+                  onClick={() => setPaymentSheet("record")}
+                  disabled={needsDeliveryFee}
+                  className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  ✓ Ya pagó (transfer / MP)
+                </button>
+              </div>
+              {needsDeliveryFee && (
+                <p className="mt-1.5 text-[10px] text-amber-300 text-center">
+                  ↑ Cargá el envío primero para poder cobrar
+                </p>
+              )}
+            </>
           ) : null}
 
           <a
