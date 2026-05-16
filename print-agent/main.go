@@ -43,6 +43,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, "FATAL: load config:", err)
 		os.Exit(1)
 	}
+	// Env-var override for the backend URL — used during dev to point the
+	// agent at a Vercel preview deploy instead of prod. We persist it so
+	// the user doesn't have to set the env var on every run.
+	if envBase := os.Getenv("MENUSANJUAN_BASE"); envBase != "" && envBase != cfg.BaseURL {
+		cfg.BaseURL = strings.TrimRight(envBase, "/")
+		// Clear any existing API key — pairing codes are scoped to one backend
+		cfg.APIKey = ""
+		cfg.AgentID = ""
+		if err := config.Save(cfg); err != nil {
+			fmt.Fprintln(os.Stderr, "WARN: could not persist new baseUrl:", err)
+		}
+	}
 	if err := log.Init(config.Dir()); err != nil {
 		fmt.Fprintln(os.Stderr, "FATAL: open log:", err)
 		os.Exit(1)
