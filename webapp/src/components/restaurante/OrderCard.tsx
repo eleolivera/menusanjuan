@@ -143,7 +143,7 @@ export function OrderCard({
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-sm font-bold text-white">
-              ${order.total.toLocaleString("es-AR")}
+              ${totalDue.toLocaleString("es-AR")}
             </span>
             <span className="text-xs text-slate-500">{timeSince}</span>
           </div>
@@ -209,10 +209,28 @@ export function OrderCard({
               </div>
             ));
           })()}
-          <div className="flex justify-between pt-2 border-t border-white/5 mt-2 text-base font-bold text-white">
-            <span>Total</span>
-            <span>${order.total.toLocaleString("es-AR")}</span>
-          </div>
+          {/* Totals: show subtotal + envío breakdown when delivery has a fee, otherwise a single Total line */}
+          {order.deliveryMethod === "delivery" && (order.deliveryFee || 0) > 0 ? (
+            <div className="pt-2 border-t border-white/5 mt-2 space-y-1">
+              <div className="flex justify-between text-xs text-slate-400">
+                <span>Subtotal</span>
+                <span>${order.total.toLocaleString("es-AR")}</span>
+              </div>
+              <div className="flex justify-between text-xs text-slate-400">
+                <span>Envío</span>
+                <span>${(order.deliveryFee || 0).toLocaleString("es-AR")}</span>
+              </div>
+              <div className="flex justify-between text-base font-bold text-white pt-1 border-t border-white/5">
+                <span>Total</span>
+                <span>${totalDue.toLocaleString("es-AR")}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-between pt-2 border-t border-white/5 mt-2 text-base font-bold text-white">
+              <span>Total</span>
+              <span>${order.total.toLocaleString("es-AR")}</span>
+            </div>
+          )}
         </div>
 
         {/* Customer */}
