@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-// We render a hidden QRCodeCanvas, extract its PNG via toDataURL, and display
-// the result as a plain <img>. Thermal-printer drivers (ESC/POS) commonly skip
-// inline <svg> elements — they happily render <img> raster bitmaps. Canvas
-// alone also gets bleached out by some Windows print pipelines. PNG it is.
-import { QRCodeCanvas } from "qrcode.react";
+import { useEffect, useState } from "react";
+
+// Build stamp — printed at the bottom of the ticket so we can verify a fresh
+// deploy made it to the printer. Bump whenever shipping a meaningful change.
+const TICKET_BUILD = "v2026-05-15.b";
 
 type Item = { name: string; quantity: number; unitPrice: number; optionsDelta?: number; note?: string };
 
@@ -36,27 +35,25 @@ function ars(n: number): string {
 }
 
 export function TicketView({ order, driverUrl }: Props) {
-  const hiddenQrRef = useRef<HTMLDivElement>(null);
-  const [qrPngUrl, setQrPngUrl] = useState<string | null>(null);
-  // Extract the QR canvas as a PNG data URL once mounted
-  useEffect(() => {
-    if (!driverUrl) return;
-    const canvas = hiddenQrRef.current?.querySelector("canvas");
-    if (canvas) {
-      setQrPngUrl(canvas.toDataURL("image/png"));
-    }
-  }, [driverUrl]);
+  // We fetch the QR as a real HTTP PNG (server-rendered by /api/qr). That URL
+  // goes straight to <img src>, so the thermal driver gets a real fetchable
+  // image — no data: URL, no inline <svg>, both of which some ESC/POS drivers
+  // silently drop during print conversion.
+  const qrSrc = driverUrl
+    ? `/api/qr?data=${encodeURIComponent(driverUrl)}&size=320`
+    : null;
+  const [qrLoaded, setQrLoaded] = useState(!driverUrl);
 
-  // Auto-trigger print if ?autoprint=1 — but wait until the QR PNG is ready
-  // (or there's no driverUrl at all). Otherwise the print may fire before the
-  // <img> renders and the printer will get a missing QR.
+  // Auto-trigger print if ?autoprint=1 — wait for the QR <img> to actually
+  // load (HTTP fetch + decode) before firing print. Otherwise the print may
+  // capture a missing/half-loaded image.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!window.location.search.includes("autoprint")) return;
-    if (driverUrl && !qrPngUrl) return; // still waiting for QR
-    const t = setTimeout(() => window.print(), 400);
+    if (!qrLoaded) return;
+    const t = setTimeout(() => window.print(), 250);
     return () => clearTimeout(t);
-  }, [qrPngUrl, driverUrl]);
+  }, [qrLoaded]);
 
   const subtotal = order.items.reduce(
     (s, it) => s + (it.unitPrice + (it.optionsDelta || 0)) * it.quantity,
@@ -92,28 +89,22 @@ export function TicketView({ order, driverUrl }: Props) {
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
-            width: 58mm !important;
-            max-width: 58mm !important;
+            width: 54mm !important;
+            max-width: 54mm !important;
             margin: 0 !important;
             padding: 2mm !important;
             box-shadow: none !important;
             border: 0 !important;
             border-radius: 0 !important;
+            font-size: 9px !important;
+            line-height: 1.25 !important;
           }
+          .ticket table { width: 100% !important; }
+          /* Prevent text mid-word breaks unless absolutely needed */
+          .ticket * { word-break: keep-all; overflow-wrap: break-word; }
         }
       `}</style>
 
-      {/* Hidden canvas for PNG extraction — offscreen, never visible/printed. */}
-      {driverUrl && (
-        <div
-          ref={hiddenQrRef}
-          aria-hidden
-          style={{ position: "absolute", left: -99999, top: -99999, pointerEvents: "none" }}
-          className="no-print"
-        >
-          <QRCodeCanvas value={driverUrl} size={400} level="H" marginSize={0} />
-        </div>
-      )}
 
       {/* Action bar (hidden on print) */}
       <div className="no-print sticky top-0 bg-slate-900 text-white px-4 py-3 flex items-center justify-between gap-3 z-10">
@@ -134,13 +125,13 @@ export function TicketView({ order, driverUrl }: Props) {
         </div>
       </div>
 
-      {/* Ticket — 80mm wide for thermal printer feel */}
+      {/* Ticket — sized for 58mm thermal paper (printable ~48-54mm depending on driver) */}
       <div className="ticket-wrapper mx-auto py-6 px-3">
-        <div className="ticket mx-auto bg-white text-black rounded-md shadow-lg p-4 max-w-[80mm] font-mono text-[12px] leading-tight">
+        <div className="ticket mx-auto bg-white text-black rounded-md shadow-lg p-3 max-w-[58mm] font-mono text-[10px] leading-snug">
           {/* Header */}
           <div className="text-center mb-2">
-            <div className="font-bold text-[14px]">{order.restaurantName}</div>
-            {order.restaurantPhone && <div className="text-[10px]">{order.restaurantPhone}</div>}
+            <div className="font-bold text-[12px] break-words">{order.restaurantName}</div>
+            {order.restaurantPhone && <div className="text-[9px]">{order.restaurantPhone}</div>}
           </div>
 
           <div className="border-t border-dashed border-black/40 my-2" />
@@ -173,35 +164,44 @@ export function TicketView({ order, driverUrl }: Props) {
 
           <div className="border-t border-dashed border-black/40 my-2" />
 
-          {/* Items */}
-          <div className="space-y-1">
-            {order.items.map((it, i) => (
-              <div key={i}>
-                <div className="flex justify-between">
-                  <span>{it.quantity}× {it.name}</span>
-                  <span>{ars((it.unitPrice + (it.optionsDelta || 0)) * it.quantity)}</span>
-                </div>
-                {it.note && <div className="text-[10px] italic pl-3">→ {it.note}</div>}
-              </div>
-            ))}
-          </div>
+          {/* Items — using <table> so left/right alignment survives the thermal
+             driver's print conversion. Flex/grid often collapse to inline. */}
+          <table className="w-full border-collapse">
+            <tbody>
+              {order.items.map((it, i) => (
+                <tr key={i} className="align-top">
+                  <td className="pr-2 py-0.5">
+                    <div>{it.quantity}x {it.name}</div>
+                    {it.note && <div className="text-[9px] italic pl-3">- {it.note}</div>}
+                  </td>
+                  <td className="text-right whitespace-nowrap py-0.5">
+                    {ars((it.unitPrice + (it.optionsDelta || 0)) * it.quantity)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
           <div className="border-t border-dashed border-black/40 my-2" />
 
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span>{ars(subtotal)}</span>
-          </div>
-          {order.deliveryFee > 0 && (
-            <div className="flex justify-between">
-              <span>Envío</span>
-              <span>{ars(order.deliveryFee)}</span>
-            </div>
-          )}
-          <div className="flex justify-between font-bold text-[14px] mt-1">
-            <span>TOTAL</span>
-            <span>{ars(grandTotal)}</span>
-          </div>
+          <table className="w-full border-collapse">
+            <tbody>
+              <tr>
+                <td>Subtotal</td>
+                <td className="text-right whitespace-nowrap">{ars(subtotal)}</td>
+              </tr>
+              {order.deliveryFee > 0 && (
+                <tr>
+                  <td>Envio</td>
+                  <td className="text-right whitespace-nowrap">{ars(order.deliveryFee)}</td>
+                </tr>
+              )}
+              <tr className="font-bold text-[12px]">
+                <td className="pt-1">TOTAL</td>
+                <td className="text-right whitespace-nowrap pt-1">{ars(grandTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
 
           <div className="border-t border-dashed border-black/40 my-2" />
 
@@ -216,26 +216,32 @@ export function TicketView({ order, driverUrl }: Props) {
             </div>
           )}
 
-          {/* QR for driver — PNG <img> so thermal printer drivers always render it.
-             We rasterize the hidden canvas via toDataURL — see hiddenQrRef above. */}
-          {driverUrl && qrPngUrl && (
+          {/* QR for driver — fetched as a real PNG via /api/qr. Thermal printer
+             drivers fetch the URL like any normal image; no data: URL hijinks. */}
+          {qrSrc && (
             <div className="mt-3 flex flex-col items-center">
               <div className="bg-white p-1 border border-black">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={qrPngUrl}
+                  src={qrSrc}
                   alt="QR del repartidor"
                   width={140}
                   height={140}
+                  onLoad={() => setQrLoaded(true)}
+                  onError={() => setQrLoaded(true)}
                   style={{ display: "block", imageRendering: "pixelated" }}
+                  crossOrigin="anonymous"
                 />
               </div>
-              <div className="text-[10px] mt-1 text-center">Escanear → estado actual + marcar entregado</div>
+              <div className="text-[9px] mt-1 text-center">Escanear: estado actual + marcar entregado</div>
             </div>
           )}
 
           <div className="border-t border-dashed border-black/40 my-2" />
-          <div className="text-center text-[9px]">MenuSanJuan · menusanjuan.com</div>
+          <div className="text-center text-[8px]">MenuSanJuan</div>
+          <div className="text-center text-[8px]">menusanjuan.com</div>
+          {/* Build stamp — confirm latest code is what printed */}
+          <div className="text-center text-[7px] text-black/60 mt-0.5">{TICKET_BUILD}</div>
         </div>
       </div>
     </div>
