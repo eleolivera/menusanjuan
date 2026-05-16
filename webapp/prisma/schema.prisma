@@ -135,11 +135,54 @@ model Dealer {
   dealerCuisines DealerCuisineType[]
   optionPresets OptionPreset[]
   onboardingCard OnboardingCard?
+  printAgents   PrintAgent[]
 
   @@index([slug])
   @@index([cuisineType])
   @@index([isActive])
   @@index([sourceProfileId])
+}
+
+// ─── Print agent (local desktop) ───
+// Each resta can pair a Windows print agent that talks ESC/POS directly to a
+// thermal printer over USB. The agent long-polls /api/print-agent/poll using
+// its API key (Bearer auth). One row per paired agent device.
+model PrintAgent {
+  id          String     @id @default(cuid())
+  dealerId    String
+  dealer      Dealer     @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  // Both null until the agent exchanges its pairing code for an API key
+  apiKeyHash  String?    @unique               // bcrypt hash of the raw key
+  apiKeyHint  String?                          // last 4 chars for display (e.g. "a3f7")
+  name        String     @default("Impresora") // friendly name set by owner
+  status      String     @default("OFFLINE")   // OFFLINE | ONLINE
+  lastSeenAt  DateTime?
+  version     String?                          // agent reports its version on heartbeat
+  hostInfo    String?                          // e.g. "Windows 10 / PC-CAJA"
+  pairingCode String?    @unique               // short code for pairing (cleared after pair)
+  pairingCodeExpiresAt DateTime?
+  pairedAt    DateTime?
+  createdAt   DateTime   @default(now())
+  jobs        PrintJob[]
+
+  @@index([dealerId])
+}
+
+// One row per ticket to be printed. Agent picks up PENDING jobs and acks.
+model PrintJob {
+  id          String     @id @default(cuid())
+  agentId     String
+  agent       PrintAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  orderId     String?                          // null for test prints
+  kind        String     @default("ORDER")     // ORDER | TEST
+  payload     Bytes                            // raw ESC/POS bytes ready for the printer
+  status      String     @default("PENDING")   // PENDING | DELIVERED | FAILED
+  attempts    Int        @default(0)
+  errorMsg    String?
+  createdAt   DateTime   @default(now())
+  deliveredAt DateTime?
+
+  @@index([agentId, status, createdAt])
 }
 
 // ─── Cuisine Types (admin-managed) ───
