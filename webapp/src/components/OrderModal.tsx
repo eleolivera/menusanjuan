@@ -266,7 +266,9 @@ _Pedido realizado desde MenuSanJuan_`;
             note: ci.note || "",
             total: (ci.item.price + ci.optionsDelta) * ci.quantity,
           })),
-          total: grandTotal,
+          // total intentionally omitted — server recomputes from items.
+          // (Previously we sent grandTotal here which included deliveryFee → double-count
+          // when combined with the separate deliveryFee column.)
           deliveryMethod,
           deliveryFee,
           notes,

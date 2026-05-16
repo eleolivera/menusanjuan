@@ -8,16 +8,25 @@ import {
   getAllOrders,
 } from "@/lib/orders-store";
 import { notifyRestaurantOfNewOrder } from "@/lib/order-notification";
+import { computeCartTotal } from "@/lib/money";
 
 // POST — create a new order
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { restauranteSlug, customerName, customerPhone, customerAddress, items, total, notes, latitude, longitude, deliveryMethod, deliveryFee } = body;
+    const { restauranteSlug, customerName, customerPhone, customerAddress, items, notes, latitude, longitude, deliveryMethod, deliveryFee } = body;
 
-    if (!restauranteSlug || !customerName || !customerPhone || !items?.length || !total) {
+    if (!restauranteSlug || !customerName || !customerPhone || !items?.length) {
       return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
+    }
+
+    // ALWAYS recompute total server-side from items — never trust client total.
+    // Previously clients sometimes sent (items + deliveryFee) bundled together as total,
+    // which then double-counted with the separate deliveryFee column.
+    const total = computeCartTotal(items);
+    if (total <= 0) {
+      return NextResponse.json({ error: "Total inválido" }, { status: 400 });
     }
 
     const order = await createOrder({
