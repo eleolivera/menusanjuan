@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 // Build stamp — printed at the bottom of the ticket so we can verify a fresh
 // deploy made it to the printer. Bump whenever shipping a meaningful change.
-const TICKET_BUILD = "v2026-05-15.b";
+const TICKET_BUILD = "v2026-05-16.a";
 
 type Item = { name: string; quantity: number; unitPrice: number; optionsDelta?: number; note?: string };
 
@@ -39,8 +39,10 @@ export function TicketView({ order, driverUrl }: Props) {
   // goes straight to <img src>, so the thermal driver gets a real fetchable
   // image — no data: URL, no inline <svg>, both of which some ESC/POS drivers
   // silently drop during print conversion.
+  // Bigger size (480px source → ~5cm print) + thicker border to give bad
+  // thermal drivers the best chance of actually rendering the image.
   const qrSrc = driverUrl
-    ? `/api/qr?data=${encodeURIComponent(driverUrl)}&size=320`
+    ? `/api/qr?data=${encodeURIComponent(driverUrl)}&size=480&margin=2`
     : null;
   const [qrLoaded, setQrLoaded] = useState(!driverUrl);
 
@@ -217,23 +219,32 @@ export function TicketView({ order, driverUrl }: Props) {
           )}
 
           {/* QR for driver — fetched as a real PNG via /api/qr. Thermal printer
-             drivers fetch the URL like any normal image; no data: URL hijinks. */}
+             drivers fetch the URL like any normal image; no data: URL hijinks.
+             Bigger physical size + thick border gives stubborn drivers the best
+             shot at actually printing it. */}
           {qrSrc && (
             <div className="mt-3 flex flex-col items-center">
-              <div className="bg-white p-1 border border-black">
+              <div className="bg-white p-1.5 border-2 border-black">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={qrSrc}
                   alt="QR del repartidor"
-                  width={140}
-                  height={140}
+                  width={190}
+                  height={190}
                   onLoad={() => setQrLoaded(true)}
                   onError={() => setQrLoaded(true)}
                   style={{ display: "block", imageRendering: "pixelated" }}
                   crossOrigin="anonymous"
                 />
               </div>
-              <div className="text-[9px] mt-1 text-center">Escanear: estado actual + marcar entregado</div>
+              <div className="text-[9px] mt-1 text-center font-bold">Escanear: estado y entrega</div>
+              {/* Fallback URL as plain text — survives even if the printer driver
+                 drops the QR image. Courier can type/copy this into their phone. */}
+              {driverUrl && (
+                <div className="text-[7px] mt-1 text-center break-all leading-tight px-1">
+                  Si no funciona el QR:<br />{driverUrl.replace(/^https?:\/\//, "")}
+                </div>
+              )}
             </div>
           )}
 
