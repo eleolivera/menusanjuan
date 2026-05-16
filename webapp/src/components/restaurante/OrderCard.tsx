@@ -67,17 +67,66 @@ export function OrderCard({
   const [savingFee, setSavingFee] = useState(false);
   const [showKitchenPrompt, setShowKitchenPrompt] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [printToast, setPrintToast] = useState<{ ok: boolean; msg: string } | null>(null);
 
   /**
-   * Print via hidden iframe — no intermediate tab. The iframe loads the ticket
-   * page with ?autoprint=1, TicketView triggers window.print() against its own
-   * document, the OS print dialog comes up directly. After print closes
-   * (afterprint event), we show the "send to kitchen" prompt if applicable.
+   * Print flow — tries the local print agent first, falls back to browser
+   * iframe print if no agent is paired or all agents are offline.
+   *
+   * Agent path:
+   *   POST /api/print-jobs { orderId } → server builds ESC/POS payload,
+   *   enqueues for the dealer's online agent. Agent prints via spooler-RAW
+   *   which bypasses the driver's text-rendering step that was eating QRs.
+   *   No tab opens, no print dialog, no user friction.
+   *
+   * Iframe fallback (no agent / 409):
+   *   Hidden iframe loads the ticket page with ?autoprint=1, TicketView
+   *   triggers window.print(), OS print dialog comes up. Same as before.
+   *
+   * After either path completes (success or fail), show the "mandar a
+   * cocina" prompt if the order is still in GENERATED/PAID.
    */
-  function handlePrint() {
+  function maybeShowKitchenPrompt() {
+    if (order.status === "GENERATED" || order.status === "PAID") {
+      setShowKitchenPrompt(true);
+    }
+  }
+
+  async function handlePrint() {
     if (printing) return;
     setPrinting(true);
+    setPrintToast(null);
 
+    // Try the local agent first
+    try {
+      const res = await fetch("/api/print-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPrintToast({ ok: true, msg: `Enviado a impresora${data.agentName ? ` "${data.agentName}"` : ""}` });
+        setTimeout(() => setPrintToast(null), 4000);
+        maybeShowKitchenPrompt();
+        setPrinting(false);
+        return;
+      }
+      // 409 NO_AGENT → expected when no paired agent. Anything else is logged
+      // but we still try the iframe fallback so the user isn't stuck.
+      if (res.status !== 409) {
+        const d = await res.json().catch(() => ({}));
+        console.warn("print-jobs failed, falling back to browser:", d.error);
+      }
+    } catch (err) {
+      console.warn("print-jobs request failed, falling back to browser:", err);
+    }
+
+    // Fallback: hidden-iframe browser print
+    printViaIframe();
+  }
+
+  function printViaIframe() {
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;";
@@ -95,10 +144,7 @@ export function OrderCard({
       try {
         const cw = iframe.contentWindow;
         cw?.addEventListener("afterprint", () => {
-          // Nudge to advance status for orders that haven't reached the kitchen yet
-          if (order.status === "GENERATED" || order.status === "PAID") {
-            setShowKitchenPrompt(true);
-          }
+          maybeShowKitchenPrompt();
           setTimeout(cleanup, 500);
         });
       } catch {
@@ -435,6 +481,15 @@ export function OrderCard({
           >
             {printing ? "🖨️ Imprimiendo..." : "🖨️ Imprimir comanda"}
           </button>
+          {printToast && (
+            <div className={`mt-1.5 rounded-lg border px-3 py-1.5 text-[11px] ${
+              printToast.ok
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                : "border-red-500/30 bg-red-500/10 text-red-200"
+            }`}>
+              {printToast.ok ? "✓ " : "⚠️ "}{printToast.msg}
+            </div>
+          )}
 
           {paymentSheet && (
             <PaymentCollector
