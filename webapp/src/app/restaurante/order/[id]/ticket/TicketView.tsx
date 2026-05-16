@@ -55,21 +55,30 @@ export function TicketView({ order, driverUrl }: Props) {
       <style>{`
         @media print {
           @page { margin: 0; size: 80mm auto; }
-          /* Strip everything: html/body padding, the outer screen-only chrome */
           html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
           /* Force exact colors (otherwise Chrome may bleach backgrounds + the QR) */
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .no-print { display: none !important; }
-          /* Make the ticket the only visible block, no shadow/border/extra padding */
-          .ticket-wrapper { padding: 0 !important; margin: 0 !important; }
+
+          /* Hide the whole document, then re-show only the ticket card.
+             Necessary because /restaurante/layout.tsx wraps every child in the
+             dashboard sidebar (DashboardShell) — without this trick the sidebar
+             would print on the left of the receipt. */
+          body * { visibility: hidden !important; }
+          .ticket, .ticket * { visibility: visible !important; }
+
+          /* Pull the ticket up to the top-left of the page since its container
+             is no longer flowing (everything around it is invisible). */
           .ticket {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
+            margin: 0 !important;
+            padding: 4mm !important;
             box-shadow: none !important;
             border: 0 !important;
             border-radius: 0 !important;
-            max-width: 80mm !important;
-            width: 80mm !important;
-            margin: 0 !important;
-            padding: 4mm !important;
           }
         }
       `}</style>
