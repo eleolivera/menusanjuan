@@ -1,0 +1,10 @@
+# Built binaries — these are produced by build.sh and signed/published from
+# the webapp/public/download/ directory (later). Don't track them in git.
+MenuSanJuanPrint.exe
+MenuSanJuanPrint-signed.exe
+*.exe.tmp
+
+# Code-signing artifacts — must never be committed
+*.pfx
+*.p12
+cert.*

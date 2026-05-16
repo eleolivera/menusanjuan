@@ -50,12 +50,16 @@ logs to a file) before adding the polished UX bits that need CGO.
 
 ## What the user needs on the PC
 
-- **Go 1.20.x** specifically — download from <https://go.dev/dl/>. Pick
-  `go1.20.14.windows-amd64.msi`. Go 1.21+ dropped Win 7 SP1 support, and many
-  restas still run Win 7/8.
-- After install, verify in PowerShell: `go version` → `go1.20.14 windows/amd64`.
+- **Go (latest stable)** — download from <https://go.dev/dl/>. Pick the
+  `windows-amd64.msi` installer. Verify in PowerShell: `go version`.
+- That's it for v0 (no system tray yet). For Day 4 we'll add MinGW only
+  if needed for CGO bits.
 
-That's it for v0 (no system tray yet). For Day 4 we'll add MinGW + libusb only if needed.
+**Target Windows version: 10 and 11.** Win 7/8 are out of scope for the agent —
+those restas keep using the browser-print fallback (which we've already
+hardened with the URL-as-text safety net under the QR). Modern Go (1.21+)
+dropped Win 7 support and we'd rather have current stdlib + security updates
+than EOL'd Go 1.20.
 
 ## Layout (planned)
 
