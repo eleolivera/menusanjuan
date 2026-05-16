@@ -61,18 +61,17 @@ export function MostradorDestinationSheet({
     setAutoDistanceKm(result.distanceKm);
 
     if (result.fee == null) {
-      // Out of range — we still keep the address but warn
+      // Out of range — keep the address but warn
       setOutOfRange(true);
-      setFee(null);
-      setAutoZoneLabel(null);
       return;
     }
 
-    setFee(result.fee);
+    // Don't auto-fill the fee — the cashier types it themselves each time.
+    // We still surface zone + distance below the input as informational hint.
     if (result.zoneIndex != null) {
-      setAutoZoneLabel(`Zona ${result.zoneIndex + 1}`);
+      setAutoZoneLabel(`Zona ${result.zoneIndex + 1} · sugerido $${result.fee.toLocaleString("es-AR")}`);
     } else {
-      setAutoZoneLabel("Tarifa fija");
+      setAutoZoneLabel(`Tarifa fija sugerida · $${result.fee.toLocaleString("es-AR")}`);
     }
   }
 
@@ -187,12 +186,12 @@ export function MostradorDestinationSheet({
                   label="💰 Envío"
                   value={fee}
                   onChange={setFee}
-                  placeholder={hasZonesConfigured ? "Calculado por zona" : "2500"}
+                  placeholder="2500"
                   darkMode
                 />
                 {autoZoneLabel && autoDistanceKm != null && !outOfRange && (
                   <p className="text-[11px] text-emerald-300 mt-1">
-                    ✓ {autoZoneLabel} · {autoDistanceKm.toFixed(1)} km — calculado desde tus zonas
+                    💡 {autoZoneLabel} · {autoDistanceKm.toFixed(1)} km — cargá el monto que querés cobrar
                   </p>
                 )}
                 {!hasZonesConfigured && (
