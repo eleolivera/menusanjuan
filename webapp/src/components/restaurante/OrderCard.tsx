@@ -15,7 +15,7 @@ const STATUS_CONFIG: Record<
     bg: "bg-amber-500/15",
     text: "text-amber-400",
     next: "PROCESSING",
-    nextLabel: "Enviar a Cocina",
+    nextLabel: "👨‍🍳 Mandar a Cocina",
   },
   PAID: {
     // Legacy status — pre-existing orders may still be here. Treat like GENERATED for new transitions.
@@ -24,7 +24,7 @@ const STATUS_CONFIG: Record<
     bg: "bg-emerald-500/15",
     text: "text-emerald-400",
     next: "PROCESSING",
-    nextLabel: "Enviar a Cocina",
+    nextLabel: "👨‍🍳 Mandar a Cocina",
   },
   PROCESSING: {
     label: "En Cocina",
@@ -65,6 +65,57 @@ export function OrderCard({
   const [editingFee, setEditingFee] = useState(false);
   const [feeDraft, setFeeDraft] = useState<number | null>(null);
   const [savingFee, setSavingFee] = useState(false);
+  const [showKitchenPrompt, setShowKitchenPrompt] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  /**
+   * Print via hidden iframe — no intermediate tab. The iframe loads the ticket
+   * page with ?autoprint=1, TicketView triggers window.print() against its own
+   * document, the OS print dialog comes up directly. After print closes
+   * (afterprint event), we show the "send to kitchen" prompt if applicable.
+   */
+  function handlePrint() {
+    if (printing) return;
+    setPrinting(true);
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;";
+    iframe.src = `/restaurante/order/${order.id}/ticket?autoprint=1`;
+
+    let cleaned = false;
+    function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
+      iframe.remove();
+      setPrinting(false);
+    }
+
+    iframe.onload = () => {
+      try {
+        const cw = iframe.contentWindow;
+        cw?.addEventListener("afterprint", () => {
+          // Nudge to advance status for orders that haven't reached the kitchen yet
+          if (order.status === "GENERATED" || order.status === "PAID") {
+            setShowKitchenPrompt(true);
+          }
+          setTimeout(cleanup, 500);
+        });
+      } catch {
+        // Cross-frame access blocked? unlikely (same-origin), just cleanup later.
+      }
+      // Safety net — if afterprint never fires (some browsers/contexts), cleanup
+      // after 30s so the iframe doesn't pile up.
+      setTimeout(cleanup, 30000);
+    };
+
+    document.body.appendChild(iframe);
+  }
+
+  function confirmKitchen() {
+    onUpdateStatus(order.id, "PROCESSING");
+    setShowKitchenPrompt(false);
+  }
   const config = STATUS_CONFIG[order.status];
   const totalDue = (order.total || 0) + (order.deliveryFee || 0);
   const paidWhen = order.paidAt ? new Date(order.paidAt) : null;
@@ -376,14 +427,14 @@ export function OrderCard({
             </>
           ) : null}
 
-          <a
-            href={`/restaurante/order/${order.id}/ticket?autoprint=1`}
-            target="_blank"
-            rel="noopener"
-            className="block mt-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-300 text-center hover:bg-white/10 transition-colors"
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={printing}
+            className="block w-full mt-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-300 text-center hover:bg-white/10 transition-colors disabled:opacity-50"
           >
-            🖨️ Imprimir comanda
-          </a>
+            {printing ? "🖨️ Imprimiendo..." : "🖨️ Imprimir comanda"}
+          </button>
 
           {paymentSheet && (
             <PaymentCollector
@@ -401,7 +452,7 @@ export function OrderCard({
             {config.next && config.nextLabel && (
               <button
                 onClick={() => onUpdateStatus(order.id, config.next!)}
-                className="flex-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/25 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                className="flex-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-0.5 transition-all ring-1 ring-white/10"
               >
                 {config.nextLabel}
               </button>
@@ -416,6 +467,43 @@ export function OrderCard({
             )}
           </div>
         </div>
+
+        {/* Post-print kitchen prompt — only for orders not yet in the kitchen */}
+        {showKitchenPrompt && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setShowKitchenPrompt(false)}
+          >
+            <div
+              className="rounded-2xl bg-slate-900 border border-white/10 p-6 max-w-sm w-full space-y-4 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="text-5xl mb-2">👨‍🍳</div>
+                <h3 className="text-lg font-bold text-white">¿Mandar a la cocina?</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Imprimiste la comanda <span className="font-mono text-slate-300">{order.orderNumber}</span>. Te recordamos avanzar el pedido a "En cocina" para que aparezca en el siguiente paso del Kanban.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowKitchenPrompt(false)}
+                  className="rounded-xl border border-white/10 py-3 text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors"
+                >
+                  Ahora no
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmKitchen}
+                  className="rounded-xl bg-gradient-to-r from-primary to-amber-500 py-3 text-sm font-bold text-white shadow-md shadow-primary/25 hover:shadow-lg transition-all"
+                >
+                  ✓ Sí, mandar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
