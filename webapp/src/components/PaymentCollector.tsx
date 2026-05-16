@@ -84,9 +84,11 @@ export function PaymentCollector({
         <span className="text-2xl font-extrabold text-white">{formatARS(total)}</span>
       </div>
 
-      {/* Method picker */}
+      {/* Method picker — hide cash in compact mode ("Ya pagó" is for external
+          payments only; cash always goes through Cobrar so we can record the
+          tendered amount + change for cash-drawer reconciliation). */}
       <div className="grid grid-cols-2 gap-2">
-        {METHODS.map((m) => (
+        {METHODS.filter((m) => !(compact && m.value === "cash")).map((m) => (
           <button
             key={m.value}
             type="button"
@@ -150,12 +152,6 @@ export function PaymentCollector({
               </p>
             </div>
           )}
-        </div>
-      )}
-
-      {method === "cash" && compact && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
-          <p className="text-xs text-slate-400">El cliente pagó en efectivo</p>
         </div>
       )}
 
