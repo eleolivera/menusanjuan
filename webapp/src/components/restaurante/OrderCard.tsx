@@ -200,13 +200,19 @@ export function OrderCard({
             <span className="text-xs text-slate-500">{timeSince}</span>
           </div>
         </div>
-        <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500">
+        <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+          {/* Source pill — where the order came from (web / POS / mesa). The
+             customer-placed online flow has zero pre-print cashier action,
+             so this is mostly for the cashier to spot which orders need
+             follow-up (e.g. online orders need a WhatsApp confirm). */}
+          <SourcePill order={order} />
+          <span className="text-slate-600">·</span>
           <span>{order.customerName}</span>
-          <span>·</span>
+          <span className="text-slate-600">·</span>
           <span>{order.items.length} item{order.items.length !== 1 ? "s" : ""}</span>
           {order.whatsappSent && (
             <>
-              <span>·</span>
+              <span className="text-slate-600">·</span>
               <span className="text-green-500">WhatsApp enviado</span>
             </>
           )}
@@ -517,6 +523,36 @@ export function OrderCard({
           </div>
         )}
     </div>
+  );
+}
+
+/**
+ * Visual pill showing where an order came from. Helps the cashier
+ * immediately know if it's a public-site order (needs WhatsApp follow-up,
+ * delivery prep, etc.) or one they typed in themselves via POS.
+ */
+function SourcePill({ order }: { order: Order }) {
+  const channel = order.channel;
+  if (channel === "COUNTER") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+        🖥️ Mostrador
+      </span>
+    );
+  }
+  if (channel === "DINE_IN") {
+    const label = order.tableNumber ? `Mesa ${order.tableNumber}` : "Mesa";
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
+        🍽️ {label}
+      </span>
+    );
+  }
+  // ONLINE (default) — customer placed it via the public store
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
+      🌐 Online
+    </span>
   );
 }
 
