@@ -15,7 +15,20 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { restauranteSlug, customerName, customerPhone, customerAddress, items, notes, latitude, longitude, deliveryMethod, deliveryFee } = body;
+    const {
+      restauranteSlug,
+      customerName,
+      customerPhone,
+      customerAddress,
+      items,
+      notes,
+      latitude,
+      longitude,
+      deliveryMethod,
+      deliveryFee,
+      paymentIntent: rawPaymentIntent,
+      paymentReceiptUrl: rawReceiptUrl,
+    } = body;
 
     if (!restauranteSlug || !customerName || !customerPhone || !items?.length) {
       return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
@@ -29,6 +42,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Total inválido" }, { status: 400 });
     }
 
+    // Sanitize paymentIntent / paymentReceiptUrl — both are optional, but if the
+    // client uploads a comprobante at checkout we record the intent it claims
+    // to pay with so the cashier can compare against the receipt later.
+    const VALID_INTENTS = ["cash", "transfer", "mercadopago"] as const;
+    const paymentIntent = VALID_INTENTS.includes(rawPaymentIntent) ? rawPaymentIntent : null;
+    // Only accept receipt URLs from our own R2 bucket (prevents abuse).
+    const paymentReceiptUrl =
+      typeof rawReceiptUrl === "string" &&
+      rawReceiptUrl.startsWith("https://images.menusanjuan.com/")
+        ? rawReceiptUrl
+        : null;
+    const paymentStatus = paymentReceiptUrl ? "PAID_UNVERIFIED" : "UNPAID";
+
     const order = await createOrder({
       restauranteSlug,
       customerName,
@@ -41,6 +67,9 @@ export async function POST(request: NextRequest) {
       notes: notes || "",
       deliveryMethod: deliveryMethod || "delivery",
       deliveryFee: deliveryFee || 0,
+      paymentIntent,
+      paymentReceiptUrl,
+      paymentStatus,
     });
 
     // Fire-and-forget email notification to restaurant owner

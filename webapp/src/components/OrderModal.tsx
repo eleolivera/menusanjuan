@@ -9,6 +9,9 @@ import { formatForWhatsApp } from "@/lib/phone";
 import { type DeliveryConfig, calculateDeliveryFee, type DeliveryZoneResult } from "@/lib/delivery";
 import { OrderStatusStepper } from "./OrderStatusStepper";
 import { saveOrderRef } from "@/lib/order-tracker";
+import { ComprobanteUploader } from "./ComprobanteUploader";
+
+type PaymentIntent = "cash" | "transfer" | "mercadopago";
 
 type CartItem = {
   item: MenuItemData;
@@ -27,6 +30,8 @@ export function OrderModal({
   restauranteSlug,
   deliveryConfig,
   mercadoPagoAlias,
+  mercadoPagoCvu,
+  bankInfo,
   pickupService,
   deliveryService,
   onClose,
@@ -44,6 +49,8 @@ export function OrderModal({
   restauranteSlug: string;
   deliveryConfig?: DeliveryConfig | null;
   mercadoPagoAlias?: string | null;
+  mercadoPagoCvu?: string | null;
+  bankInfo?: string | null;
   pickupService?: { enabled: boolean; openNow: boolean; available: boolean; nextOpenLabel: string | null } | null;
   deliveryService?: { enabled: boolean; openNow: boolean; available: boolean; nextOpenLabel: string | null } | null;
   onClose: () => void;
@@ -79,6 +86,22 @@ export function OrderModal({
   const [trackingStatus, setTrackingStatus] = useState<string>("GENERATED");
   const [trackingData, setTrackingData] = useState<any>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Payment intent — what the customer SAYS they'll pay with at checkout.
+  // Stays nullable until they pick; cash is the default fallback so existing
+  // copy still works for users who don't engage with the picker.
+  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent>("cash");
+  // Optional pre-order comprobante URL when the customer uploads at checkout.
+  const [checkoutReceiptUrl, setCheckoutReceiptUrl] = useState<string | null>(null);
+  const [copiedAlias, setCopiedAlias] = useState(false);
+
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAlias(true);
+      setTimeout(() => setCopiedAlias(false), 1500);
+    } catch {}
+  }
 
   // Poll for order status when in tracking mode
   useEffect(() => {
@@ -170,7 +193,10 @@ export function OrderModal({
       .join("\n");
   }
 
-  function buildWhatsAppMessageFor(orderNum: string, cartItems: CartItem[]): string {
+  // Building the WhatsApp message after the order is created — we use orderIdForLink
+  // + token to embed a /pagar link when the customer picked transfer/MP and didn't
+  // upload at checkout.
+  function buildWhatsAppMessageFor(orderNum: string, cartItems: CartItem[], opts?: { orderIdForLink?: string; tokenForLink?: string; receiptUploadedAtCheckout?: boolean }): string {
     const itemLines = formatItemLines(cartItems);
     const methodLabel = deliveryMethod === "pickup" ? "Retiro en local" : "Delivery";
     let deliveryLine = "";
@@ -184,11 +210,34 @@ export function OrderModal({
 
     const subtotal = cartItems.reduce((s, ci) => s + (ci.item.price + ci.optionsDelta) * ci.quantity, 0);
 
+    // Payment-intent line — what the customer chose
+    const intentLabel =
+      paymentIntent === "cash" ? "💵 Efectivo al entregar"
+      : paymentIntent === "transfer" ? "🏦 Transferencia"
+      : "📲 Mercado Pago";
+    const intentLine = `\n💳 *Forma de pago:* ${intentLabel}`;
+
     // Mercado Pago alias only when the resta is fully configured.
     // Skip the alias on the "Por confirmar" delivery state — the resta isn't ready yet.
-    const showAlias = !!mercadoPagoAlias && !(deliveryMethod === "delivery" && !hasDeliveryPricing);
-    const paymentLine = showAlias
-      ? `\n💸 *Transferencia / Mercado Pago:* alias \`${mercadoPagoAlias}\` (mandá el comprobante después)`
+    const wantsTransferOrMP = paymentIntent === "transfer" || paymentIntent === "mercadopago";
+    const showAlias = !!mercadoPagoAlias && wantsTransferOrMP && !(deliveryMethod === "delivery" && !hasDeliveryPricing);
+    const aliasLine = showAlias
+      ? `\n💸 *Alias para transferir:* \`${mercadoPagoAlias}\``
+      : "";
+
+    // /pagar link — only when MP/transfer + no receipt uploaded yet + we have a finalized total
+    const finalizedTotal = !(deliveryMethod === "delivery" && !hasDeliveryPricing);
+    const showPagarLink =
+      wantsTransferOrMP &&
+      !opts?.receiptUploadedAtCheckout &&
+      finalizedTotal &&
+      opts?.orderIdForLink &&
+      opts?.tokenForLink;
+    const pagarLine = showPagarLink
+      ? `\n🧾 *Mandar el comprobante:* https://menusanjuan.com/pagar/${opts!.orderIdForLink}?t=${opts!.tokenForLink}`
+      : "";
+    const receiptUploadedLine = opts?.receiptUploadedAtCheckout
+      ? "\n✅ *Comprobante adjuntado al pedido* (esperando validación del restaurante)"
       : "";
 
     return `🍽️ *Nuevo Pedido — ${restaurantName}*
@@ -205,13 +254,13 @@ ${itemLines}
 📦 *Entrega:* ${methodLabel}
 ${deliveryMethod === "delivery" && address ? `📍 *Dirección:* ${address}` : ""}
 ${deliveryMethod === "delivery" && latitude && longitude ? `📌 *Mapa:* https://www.google.com/maps?q=${latitude},${longitude}` : ""}
-${notes ? `📝 *Notas:* ${notes}` : ""}${paymentLine}
+${notes ? `📝 *Notas:* ${notes}` : ""}${intentLine}${aliasLine}${pagarLine}${receiptUploadedLine}
 ━━━━━━━━━━━━━━━━━━
 _Pedido realizado desde MenuSanJuan_`;
   }
 
-  function buildWhatsAppMessage(orderNum: string) {
-    return encodeURIComponent(buildWhatsAppMessageFor(orderNum, items));
+  function buildWhatsAppMessage(orderNum: string, opts?: { orderIdForLink?: string; tokenForLink?: string; receiptUploadedAtCheckout?: boolean }) {
+    return encodeURIComponent(buildWhatsAppMessageFor(orderNum, items, opts));
   }
 
   // Rebuild from tracking data (persisted order) — used when cart has been cleared and snapshot is gone
@@ -272,6 +321,8 @@ _Pedido realizado desde MenuSanJuan_`;
           deliveryMethod,
           deliveryFee,
           notes,
+          paymentIntent,
+          paymentReceiptUrl: checkoutReceiptUrl,
         }),
       });
 
@@ -293,7 +344,11 @@ _Pedido realizado desde MenuSanJuan_`;
       }
 
       const cleanPhone = formatForWhatsApp(restaurantPhone) || restaurantPhone.replace(/[^0-9]/g, "");
-      const message = buildWhatsAppMessage(order.orderNumber);
+      const message = buildWhatsAppMessage(order.orderNumber, {
+        orderIdForLink: order.id,
+        tokenForLink: order.customerAccessToken,
+        receiptUploadedAtCheckout: !!checkoutReceiptUrl,
+      });
       const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
 
       setStep("tracking");
@@ -699,6 +754,105 @@ _Pedido realizado desde MenuSanJuan_`;
                 </div>
               </div>
 
+              {/* Payment intent picker */}
+              <div className="rounded-xl border border-border/50 bg-surface-alt p-4 mb-4">
+                <div className="text-xs font-bold text-primary uppercase tracking-wider mb-3">¿Cómo vas a pagar?</div>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {([
+                    { value: "cash" as const, emoji: "💵", label: "Efectivo" },
+                    { value: "transfer" as const, emoji: "🏦", label: "Transferencia" },
+                    { value: "mercadopago" as const, emoji: "📲", label: "Mercado Pago" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setPaymentIntent(opt.value);
+                        if (opt.value === "cash") setCheckoutReceiptUrl(null);
+                      }}
+                      className={`rounded-xl border-2 px-2 py-3 text-center transition-all ${
+                        paymentIntent === opt.value
+                          ? "border-primary bg-primary/5"
+                          : "border-border/50 hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="text-2xl mb-0.5">{opt.emoji}</div>
+                      <div className="text-[11px] font-semibold text-text leading-tight">{opt.label}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {(paymentIntent === "transfer" || paymentIntent === "mercadopago") && (
+                  <div className="mt-3 space-y-3">
+                    {/* Alias / CVU / bank info display */}
+                    {(mercadoPagoAlias || mercadoPagoCvu || bankInfo) ? (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">
+                          Datos para transferir
+                        </div>
+                        {mercadoPagoAlias && (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[10px] text-emerald-700/70">Alias</div>
+                              <div className="text-sm font-mono font-bold text-emerald-900 truncate">{mercadoPagoAlias}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(mercadoPagoAlias)}
+                              className="shrink-0 rounded-lg border border-emerald-400 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                            >
+                              {copiedAlias ? "✓ Copiado" : "Copiar"}
+                            </button>
+                          </div>
+                        )}
+                        {mercadoPagoCvu && (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[10px] text-emerald-700/70">CVU / CBU</div>
+                              <div className="text-xs font-mono font-bold text-emerald-900 truncate">{mercadoPagoCvu}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(mercadoPagoCvu)}
+                              className="shrink-0 rounded-lg border border-emerald-400 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                            >
+                              Copiar
+                            </button>
+                          </div>
+                        )}
+                        {bankInfo && (
+                          <div className="text-[11px] text-emerald-900 leading-relaxed whitespace-pre-wrap">
+                            {bankInfo}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
+                        El restaurante te va a pasar los datos para transferir por WhatsApp.
+                      </div>
+                    )}
+
+                    {/* Comprobante uploader — only when the total is finalized */}
+                    {!(deliveryMethod === "delivery" && !hasDeliveryPricing) && (
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5">
+                          Comprobante (opcional)
+                        </div>
+                        <ComprobanteUploader
+                          mode="checkout"
+                          initialUrl={checkoutReceiptUrl}
+                          onUploaded={(url) => setCheckoutReceiptUrl(url)}
+                          onClear={() => setCheckoutReceiptUrl(null)}
+                        />
+                        <div className="text-[10px] text-text-muted mt-1.5">
+                          Si ya transferiste, subí la captura ahora. Si no, lo podés hacer después desde el link que te llega por WhatsApp.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3">
                 <button onClick={() => setStep("info")} className="flex-1 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-text hover:bg-surface-hover transition-colors">
                   Volver
@@ -781,8 +935,14 @@ _Pedido realizado desde MenuSanJuan_`;
                     // Prefer cart items if still present; otherwise use snapshot or tracking data
                     const itemsForMessage = items.length > 0 ? items : sentItemsSnapshot;
                     let msg: string;
+                    const oidForLink = trackingOrder?.orderId || orderId;
+                    const tokForLink = trackingOrder?.token || orderToken;
                     if (num && itemsForMessage.length > 0) {
-                      msg = encodeURIComponent(buildWhatsAppMessageFor(num, itemsForMessage));
+                      msg = encodeURIComponent(buildWhatsAppMessageFor(num, itemsForMessage, {
+                        orderIdForLink: oidForLink,
+                        tokenForLink: tokForLink,
+                        receiptUploadedAtCheckout: !!checkoutReceiptUrl,
+                      }));
                     } else if (num && trackingData?.items) {
                       // Rebuild from tracking data (persisted in DB)
                       msg = encodeURIComponent(buildWhatsAppFromTracking(num, trackingData));

@@ -4,8 +4,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { getAllOrderRefs } from "@/lib/order-tracker";
 import { OrderStatusStepper } from "@/components/OrderStatusStepper";
+import { ComprobanteUploader } from "@/components/ComprobanteUploader";
 
 type OrderStatus = "GENERATED" | "PAID" | "PROCESSING" | "DELIVERED" | "CANCELLED";
+type PaymentStatus = "UNPAID" | "PAID_UNVERIFIED" | "PAID";
 
 type TrackedOrder = {
   orderId: string;
@@ -20,6 +22,10 @@ type TrackedOrder = {
   total?: number;
   items?: any[];
   deliveryMethod?: string;
+  deliveryFee?: number;
+  paymentStatus?: PaymentStatus;
+  paymentIntent?: string | null;
+  paymentReceiptUrl?: string | null;
 };
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -58,6 +64,10 @@ export default function MisPedidosPage() {
               total: data.total,
               items: data.items,
               deliveryMethod: data.deliveryMethod,
+              deliveryFee: data.deliveryFee,
+              paymentStatus: data.paymentStatus as PaymentStatus,
+              paymentIntent: data.paymentIntent,
+              paymentReceiptUrl: data.paymentReceiptUrl,
             };
           }
         } catch {}
@@ -126,7 +136,7 @@ export default function MisPedidosPage() {
                 <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-3">En curso</h2>
                 <div className="space-y-3">
                   {pending.map((order) => (
-                    <OrderCard key={order.orderId} order={order} expanded={expanded === order.orderId} onToggle={() => setExpanded(expanded === order.orderId ? null : order.orderId)} />
+                    <OrderCard key={order.orderId} order={order} expanded={expanded === order.orderId} onToggle={() => setExpanded(expanded === order.orderId ? null : order.orderId)} onRefresh={() => fetchOrders()} />
                   ))}
                 </div>
               </div>
@@ -138,7 +148,7 @@ export default function MisPedidosPage() {
                 <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-3">Anteriores</h2>
                 <div className="space-y-3">
                   {completed.map((order) => (
-                    <OrderCard key={order.orderId} order={order} expanded={expanded === order.orderId} onToggle={() => setExpanded(expanded === order.orderId ? null : order.orderId)} />
+                    <OrderCard key={order.orderId} order={order} expanded={expanded === order.orderId} onToggle={() => setExpanded(expanded === order.orderId ? null : order.orderId)} onRefresh={() => fetchOrders()} />
                   ))}
                 </div>
               </div>
@@ -150,9 +160,24 @@ export default function MisPedidosPage() {
   );
 }
 
-function OrderCard({ order, expanded, onToggle }: { order: TrackedOrder; expanded: boolean; onToggle: () => void }) {
+function OrderCard({ order, expanded, onToggle, onRefresh }: { order: TrackedOrder; expanded: boolean; onToggle: () => void; onRefresh: () => void }) {
   const isPending = order.status && !["DELIVERED", "CANCELLED"].includes(order.status);
   const timeAgo = getTimeAgo(order.placedAt);
+
+  // Comprobante eligibility: customer picked transfer/MP at checkout, total is
+  // finalized (delivery fee known or pickup), and payment isn't already PAID
+  // (cashier validated). PAID_UNVERIFIED still allows replacement uploads.
+  const wantsTransferOrMP = order.paymentIntent === "transfer" || order.paymentIntent === "mercadopago";
+  const totalFinalized = order.deliveryMethod === "pickup" || (order.deliveryFee != null && order.deliveryFee > 0) || order.deliveryMethod !== "delivery";
+  const canUploadReceipt =
+    wantsTransferOrMP &&
+    totalFinalized &&
+    order.paymentStatus !== "PAID" &&
+    isPending;
+  const paymentBadge =
+    order.paymentStatus === "PAID" ? { label: "Pagado", cls: "bg-emerald-50 text-emerald-700" } :
+    order.paymentStatus === "PAID_UNVERIFIED" ? { label: "Validando…", cls: "bg-amber-50 text-amber-700" } :
+    null;
 
   return (
     <div className={`rounded-2xl border bg-white shadow-sm transition-all ${isPending ? "border-primary/20" : "border-border/50"}`}>
@@ -183,17 +208,24 @@ function OrderCard({ order, expanded, onToggle }: { order: TrackedOrder; expande
           </div>
         </div>
 
-        {/* Status badge */}
-        {order.status && (
-          <span className={`shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-bold ${
-            order.status === "DELIVERED" ? "bg-emerald-50 text-emerald-700" :
-            order.status === "CANCELLED" ? "bg-red-50 text-red-700" :
-            order.status === "PROCESSING" ? "bg-amber-50 text-amber-700" :
-            "bg-primary/10 text-primary"
-          }`}>
-            {STATUS_LABELS[order.status]}
-          </span>
-        )}
+        {/* Status + payment badges */}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {order.status && (
+            <span className={`rounded-lg px-2.5 py-1 text-[10px] font-bold ${
+              order.status === "DELIVERED" ? "bg-emerald-50 text-emerald-700" :
+              order.status === "CANCELLED" ? "bg-red-50 text-red-700" :
+              order.status === "PROCESSING" ? "bg-amber-50 text-amber-700" :
+              "bg-primary/10 text-primary"
+            }`}>
+              {STATUS_LABELS[order.status]}
+            </span>
+          )}
+          {paymentBadge && (
+            <span className={`rounded-lg px-2 py-0.5 text-[9px] font-bold ${paymentBadge.cls}`}>
+              {paymentBadge.label}
+            </span>
+          )}
+        </div>
       </button>
 
       {/* Expanded view */}
@@ -215,6 +247,37 @@ function OrderCard({ order, expanded, onToggle }: { order: TrackedOrder; expande
                   <span className="font-medium text-text">${item.total?.toLocaleString("es-AR")}</span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Comprobante uploader — only when transfer/MP + total finalized + not PAID */}
+          {canUploadReceipt && (
+            <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 mb-2">
+                {order.paymentStatus === "PAID_UNVERIFIED" ? "Comprobante enviado" : "¿Ya transferiste?"}
+              </div>
+              {order.paymentStatus === "PAID_UNVERIFIED" && order.paymentReceiptUrl ? (
+                <div className="space-y-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={order.paymentReceiptUrl} alt="Comprobante" className="w-full max-h-48 rounded-lg object-contain bg-black/5" />
+                  <div className="text-[11px] text-emerald-700">
+                    El restaurante está revisando tu comprobante. Lo vas a ver acá cuando lo confirmen.
+                  </div>
+                  <Link
+                    href={`/pagar/${order.orderId}?t=${order.token}`}
+                    className="block text-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                  >
+                    Reemplazar comprobante
+                  </Link>
+                </div>
+              ) : (
+                <ComprobanteUploader
+                  mode="post-order"
+                  orderId={order.orderId}
+                  customerAccessToken={order.token}
+                  onUploaded={() => onRefresh()}
+                />
+              )}
             </div>
           )}
 

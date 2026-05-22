@@ -5,6 +5,7 @@ import type { Order, OrderStatus } from "@/lib/orders-store";
 import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCollector";
 import { MoneyInput } from "@/components/MoneyInput";
 import { buildDeliveryInstructions } from "@/lib/delivery-instructions";
+import { ReceiptValidationModal } from "./ReceiptValidationModal";
 
 const STATUS_CONFIG: Record<
   OrderStatus,
@@ -68,6 +69,7 @@ export function OrderCard({
   const [savingFee, setSavingFee] = useState(false);
   const [showKitchenPrompt, setShowKitchenPrompt] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   /**
    * Print via hidden iframe — no intermediate tab. The iframe loads the ticket
@@ -404,6 +406,24 @@ export function OrderCard({
                 {unmarking ? "..." : "desmarcar"}
               </button>
             </div>
+          ) : order.paymentStatus === "PAID_UNVERIFIED" ? (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 space-y-2">
+              <div className="flex items-start gap-2">
+                <span className="text-base shrink-0">📎</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-amber-200">Comprobante recibido</div>
+                  <div className="text-[11px] text-amber-300/80">
+                    El cliente subió un comprobante. Revisalo para validar el pago.
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReceiptModal(true)}
+                className="w-full rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-900 hover:bg-amber-400 transition-colors"
+              >
+                Ver y validar →
+              </button>
+            </div>
           ) : (
             <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 flex items-center text-xs">
               <span className="text-red-300 font-semibold">🔴 Sin pagar</span>
@@ -477,6 +497,15 @@ export function OrderCard({
             )}
           </div>
         </div>
+
+        {/* Receipt validation modal — opens when cashier clicks "Ver y validar" */}
+        {showReceiptModal && (
+          <ReceiptValidationModal
+            order={order}
+            onClose={() => setShowReceiptModal(false)}
+            onDone={() => { setShowReceiptModal(false); window.location.reload(); }}
+          />
+        )}
 
         {/* Post-print kitchen prompt — only for orders not yet in the kitchen */}
         {showKitchenPrompt && (

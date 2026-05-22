@@ -15,7 +15,15 @@ export async function GET(request: NextRequest) {
     where: { id },
     include: {
       dealer: {
-        select: { name: true, phone: true, slug: true, logoUrl: true },
+        select: {
+          name: true,
+          phone: true,
+          slug: true,
+          logoUrl: true,
+          mercadoPagoAlias: true,
+          mercadoPagoCvu: true,
+          bankInfo: true,
+        },
       },
     },
   });
@@ -39,6 +47,15 @@ export async function GET(request: NextRequest) {
     deliveryFee: order.deliveryFee,
     notes: order.notes,
     whatsappSent: order.whatsappSent,
+    // Payment state — surfaced so /mis-pedidos and /pagar can show the right UX
+    paymentStatus: order.paymentStatus,
+    paymentIntent: order.paymentIntent,
+    paymentReceiptUrl: order.paymentReceiptUrl,
+    paymentReceiptAt: order.paymentReceiptAt ? order.paymentReceiptAt.toISOString() : null,
+    // Resta payment details — needed on /pagar so the customer can copy alias/CVU
+    mercadoPagoAlias: order.dealer?.mercadoPagoAlias || null,
+    mercadoPagoCvu: order.dealer?.mercadoPagoCvu || null,
+    bankInfo: order.dealer?.bankInfo || null,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
   });

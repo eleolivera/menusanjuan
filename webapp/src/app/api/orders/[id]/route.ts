@@ -57,32 +57,55 @@ export async function PATCH(
     return NextResponse.json(fresh);
   }
 
-  // Owner-only: toggle paymentStatus, optionally recording method + cash details
-  if (body.paymentStatus === "PAID" || body.paymentStatus === "UNPAID") {
+  // Owner-only: toggle paymentStatus, optionally recording method + cash details.
+  // Accepts: "PAID", "UNPAID", "PAID_UNVERIFIED" (rare — usually only the
+  // customer-authed /receipt endpoint moves into PAID_UNVERIFIED, but we allow
+  // it here for completeness).
+  if (
+    body.paymentStatus === "PAID" ||
+    body.paymentStatus === "UNPAID" ||
+    body.paymentStatus === "PAID_UNVERIFIED"
+  ) {
     const dealer = await getRestauranteFromSession();
     if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    const existing = await prisma.order.findUnique({ where: { id }, select: { restauranteSlug: true, total: true, deliveryFee: true } });
+    const existing = await prisma.order.findUnique({
+      where: { id },
+      select: { restauranteSlug: true, total: true, deliveryFee: true, paymentIntent: true },
+    });
     if (!existing) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     if (existing.restauranteSlug !== dealer.slug) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const wantPaid = body.paymentStatus === "PAID";
+    const wantUnpaid = body.paymentStatus === "UNPAID";
     const cashTendered = typeof body.cashTendered === "number" ? Math.round(body.cashTendered) : null;
     const cashChange = typeof body.cashChange === "number" ? Math.round(body.cashChange) : null;
+
+    // Cashier rejects a comprobante: revert UNPAID + clear the receipt so the
+    // customer can re-upload. Detected by passing `clearReceipt: true` together
+    // with paymentStatus: "UNPAID". We keep paymentIntent so the customer's
+    // re-upload UX shows the same "transfer / MP" context.
+    const clearReceipt = wantUnpaid && body.clearReceipt === true;
+
+    // Choose paymentMethod: explicit > fall back to paymentIntent when validating
+    const finalPaymentMethod =
+      body.paymentMethod ||
+      (wantPaid && existing.paymentIntent ? existing.paymentIntent : null);
 
     await prisma.order.update({
       where: { id },
       data: {
         paymentStatus: body.paymentStatus,
         paidAt: wantPaid ? new Date() : null,
-        ...(body.paymentMethod && wantPaid ? { paymentMethod: body.paymentMethod } : {}),
-        ...(wantPaid && body.paymentMethod === "cash" && cashTendered != null
+        ...(finalPaymentMethod && wantPaid ? { paymentMethod: finalPaymentMethod } : {}),
+        ...(wantPaid && finalPaymentMethod === "cash" && cashTendered != null
           ? { cashTendered, cashChange }
           : wantPaid
             ? {}
             : { cashTendered: null, cashChange: null }),
+        ...(clearReceipt ? { paymentReceiptUrl: null, paymentReceiptAt: null } : {}),
       },
     });
     const fresh = await getOrder(id);

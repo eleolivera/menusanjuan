@@ -12,7 +12,12 @@ export type OrderStatus = "GENERATED" | "PAID" | "PROCESSING" | "DELIVERED" | "C
 
 export type OrderChannel = "ONLINE" | "DINE_IN" | "COUNTER";
 export type PaymentMethod = "cash" | "card" | "transfer" | "mercadopago";
-export type PaymentStatus = "UNPAID" | "PAID";
+// PAID_UNVERIFIED: customer uploaded a comprobante; awaiting cashier validation.
+export type PaymentStatus = "UNPAID" | "PAID_UNVERIFIED" | "PAID";
+// What the customer indicated at checkout they planned to pay with. Stays
+// stable even if a paymentReceiptUrl is uploaded later. paymentMethod is the
+// final, cashier-confirmed value at payment time.
+export type PaymentIntent = "cash" | "transfer" | "mercadopago";
 
 export type OrderItem = {
   menuItemId: string;
@@ -53,9 +58,12 @@ export type Order = {
   tableNumber: string | null;
   paymentMethod: PaymentMethod | null;
   paymentStatus: PaymentStatus;
+  paymentIntent: PaymentIntent | null;
   paidAt: string | null;
   cashTendered: number | null;
   cashChange: number | null;
+  paymentReceiptUrl: string | null;
+  paymentReceiptAt: string | null;
   source: string | null;
   createdAt: string;
   updatedAt: string;
@@ -215,9 +223,12 @@ function mapOrder(dbOrder: any): Order {
     tableNumber: dbOrder.tableNumber || null,
     paymentMethod: dbOrder.paymentMethod || null,
     paymentStatus: (dbOrder.paymentStatus || "UNPAID") as PaymentStatus,
+    paymentIntent: (dbOrder.paymentIntent as PaymentIntent | null) || null,
     paidAt: dbOrder.paidAt ? dbOrder.paidAt.toISOString() : null,
     cashTendered: dbOrder.cashTendered,
     cashChange: dbOrder.cashChange,
+    paymentReceiptUrl: dbOrder.paymentReceiptUrl || null,
+    paymentReceiptAt: dbOrder.paymentReceiptAt ? dbOrder.paymentReceiptAt.toISOString() : null,
     source: dbOrder.source || null,
     createdAt: dbOrder.createdAt.toISOString(),
     updatedAt: dbOrder.updatedAt.toISOString(),
@@ -243,8 +254,10 @@ export async function createOrder(data: {
   tableNumber?: string | null;
   paymentMethod?: PaymentMethod | null;
   paymentStatus?: PaymentStatus;
+  paymentIntent?: PaymentIntent | null;
   cashTendered?: number | null;
   cashChange?: number | null;
+  paymentReceiptUrl?: string | null;
   source?: string | null;
   initialStatus?: OrderStatus; // For POS to skip GENERATED
 }): Promise<Order> {
@@ -277,9 +290,15 @@ export async function createOrder(data: {
           tableNumber: data.tableNumber ?? null,
           paymentMethod: data.paymentMethod ?? null,
           paymentStatus: data.paymentStatus ?? "UNPAID",
+          paymentIntent: data.paymentIntent ?? null,
           paidAt: data.paymentStatus === "PAID" ? new Date() : null,
           cashTendered: data.cashTendered ?? null,
           cashChange: data.cashChange ?? null,
+          // If the customer uploaded a comprobante at checkout-time, persist
+          // it + timestamp now. paymentStatus is the caller's responsibility
+          // (caller should set PAID_UNVERIFIED when paymentReceiptUrl is set).
+          paymentReceiptUrl: data.paymentReceiptUrl ?? null,
+          paymentReceiptAt: data.paymentReceiptUrl ? new Date() : null,
           source: data.source ?? "web",
           ...(data.initialStatus ? { status: data.initialStatus as PrismaOrderStatus } : {}),
         },

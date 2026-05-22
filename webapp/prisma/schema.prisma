@@ -352,10 +352,13 @@ model Order {
   deliveryMethod   String      @default("delivery")  // "delivery" | "pickup"
   deliveryFee      Float       @default(0)            // Delivery fee charged in ARS
   paymentMethod    String?                           // "cash" | "card" | "transfer" | "mercadopago"
-  paymentStatus    String      @default("UNPAID")    // "UNPAID" | "PAID"
+  paymentStatus    String      @default("UNPAID")    // "UNPAID" | "PAID_UNVERIFIED" | "PAID"
+  paymentIntent    String?                           // What the customer SAID at checkout: "transfer" | "mercadopago" | "cash"
   paidAt           DateTime?
   cashTendered     Float?                            // For change calculation
   cashChange       Float?
+  paymentReceiptUrl String?                          // R2 URL of the customer-uploaded comprobante image
+  paymentReceiptAt  DateTime?                        // When the customer uploaded the comprobante (null if none yet)
   channel          String      @default("ONLINE")    // "ONLINE" | "DINE_IN" | "COUNTER"
   tableNumber      String?                           // "Mesa 12" / "Barra 3" — free text
   source           String?                           // "web" | "pos-tablet" | "pos-mobile"

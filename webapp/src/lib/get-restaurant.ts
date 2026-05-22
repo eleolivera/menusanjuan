@@ -18,6 +18,8 @@ export type RestaurantWithDealerId = Restaurant & {
   ownerUserId: string | null;
   deliveryConfig: DeliveryConfig;
   mercadoPagoAlias: string | null;
+  mercadoPagoCvu: string | null;
+  bankInfo: string | null;
   pickupService: ServiceAvailability;
   deliveryService: ServiceAvailability;
 };
@@ -90,6 +92,8 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
       longitude: dealer.longitude,
     },
     mercadoPagoAlias: dealer.mercadoPagoAlias,
+    mercadoPagoCvu: dealer.mercadoPagoCvu,
+    bankInfo: dealer.bankInfo,
     pickupService,
     deliveryService,
   };
