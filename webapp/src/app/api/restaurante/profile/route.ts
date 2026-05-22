@@ -79,6 +79,7 @@ export async function GET() {
     deliveryFarPrice: dealer.deliveryFarPrice,
     deliveryFee: dealer.deliveryFee,
     deliveryTimeMin: dealer.deliveryTimeMin,
+    closedUntil: dealer.closedUntil ? dealer.closedUntil.toISOString() : null,
     email: user.email,
     hasPassword,
     hasGoogle: googleLinked > 0,

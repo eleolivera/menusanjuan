@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import { KanbanBoard } from "@/components/restaurante/KanbanBoard";
+import { CloseShopButton } from "@/components/restaurante/CloseShopButton";
 
 // Get today's date in AR timezone as YYYY-MM-DD
 function getArDateString(offset = 0): string {
@@ -164,8 +165,9 @@ export default function RestauranteDashboard() {
               </p>
             </div>
 
-            {/* Date Navigator */}
+            {/* Date Navigator + early-close button */}
             <div className="flex items-center gap-2">
+              <CloseShopButton />
               {/* Back */}
               <button
                 onClick={goBack}

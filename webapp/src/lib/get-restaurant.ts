@@ -7,8 +7,10 @@ import { isServiceOpenNow, getNextServiceOpenTime } from "./hours";
 export type ServiceAvailability = {
   enabled: boolean;       // The owner's intent (toggle)
   openNow: boolean;       // Whether the schedule says open right now
-  available: boolean;     // enabled && openNow (use this for "can the customer pick this method?")
+  available: boolean;     // enabled && openNow && !manualClosed (use this for "can the customer pick this method?")
   nextOpenLabel: string | null;
+  manualClosed: boolean;  // True if owner manually closed early (closedUntil > now)
+  closedUntilLabel: string | null; // Human label of when the manual close lifts
 };
 
 export type RestaurantWithDealerId = Restaurant & {
@@ -45,17 +47,35 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
   const pickupNextOpen = getNextServiceOpenTime(pickupHoursRaw);
   const deliveryNextOpen = getNextServiceOpenTime(deliveryHoursRaw);
 
+  // Owner-triggered manual early-close. closedUntil is stored as a timestamp
+  // (typically next morning 5am AR). If now < closedUntil → resta is closed
+  // regardless of what the schedule says. Survives midnight rollover by design.
+  const now = new Date();
+  const manualClosed = !!(dealer.closedUntil && dealer.closedUntil.getTime() > now.getTime());
+  const closedUntilLabel = dealer.closedUntil
+    ? dealer.closedUntil.toLocaleString("es-AR", {
+        timeZone: "America/Argentina/Buenos_Aires",
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
   const pickupService: ServiceAvailability = {
     enabled: dealer.pickupEnabled,
     openNow: pickupOpenNow,
-    available: dealer.pickupEnabled && pickupOpenNow,
+    available: dealer.pickupEnabled && pickupOpenNow && !manualClosed,
     nextOpenLabel: pickupNextOpen,
+    manualClosed,
+    closedUntilLabel,
   };
   const deliveryService: ServiceAvailability = {
     enabled: dealer.deliveryEnabled,
     openNow: deliveryOpenNow,
-    available: dealer.deliveryEnabled && deliveryOpenNow,
+    available: dealer.deliveryEnabled && deliveryOpenNow && !manualClosed,
     nextOpenLabel: deliveryNextOpen,
+    manualClosed,
+    closedUntilLabel,
   };
 
   // Restaurant is "open" if either service is available
