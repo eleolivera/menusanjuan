@@ -117,6 +117,7 @@ model Dealer {
   deliveryEnabled    Boolean  @default(true)   // Whether restaurant offers delivery
   pickupEnabled      Boolean  @default(true)   // Whether restaurant accepts in-person pickup
   closedUntil        DateTime?                 // Manual early-close: closed until this timestamp regardless of schedule (e.g. ran out of food). Set to "next morning 5am AR" so the close survives midnight rollover.
+  lastSeenUpdate     String?                   // ID of the most recent "Novedades" entry the owner acknowledged. Compared against changelog.ts to decide if the modal pops up.
   deliveryCloseRadius Float?                   // Close zone radius in km (e.g. 3.0)
   deliveryClosePrice  Float?                   // Close zone price in ARS
   deliveryFarRadius   Float?                   // Far zone radius in km (e.g. 7.0)
