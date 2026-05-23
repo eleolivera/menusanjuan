@@ -35,22 +35,32 @@ export function useSmartSave<T extends Record<string, any>>(
     return s;
   });
   const originalRef = useRef<T>({ ...original });
+  // Synchronous mirror of `values`. setValue updates this BEFORE scheduling the
+  // React state update, so callers that fire setValue + flushField in the same
+  // tick (DeliveryZonesEditor does this) see the new value, not the previous
+  // render's stale state. Without this, flushField was reading the old value,
+  // declaring "not dirty", and silently dropping the save.
+  const valuesRef = useRef<T>({ ...original });
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const debounceMs = options.debounceMs ?? 1500;
+
+  // Keep valuesRef in sync with React state for any "normal" state path.
+  valuesRef.current = values;
 
   // Sync original when it changes (e.g. after initial load)
   useEffect(() => {
     originalRef.current = { ...original };
+    valuesRef.current = { ...original };
     setValues({ ...original });
   }, [JSON.stringify(original)]);
 
   function isDirty(field: keyof T): boolean {
-    return JSON.stringify(values[field]) !== JSON.stringify(originalRef.current[field]);
+    return JSON.stringify(valuesRef.current[field]) !== JSON.stringify(originalRef.current[field]);
   }
 
   function isAnyDirtyExplicit(): boolean {
     return Object.keys(fields).some(
-      (k) => fields[k as keyof T].tier === "explicit" && JSON.stringify(values[k as keyof T]) !== JSON.stringify(originalRef.current[k as keyof T])
+      (k) => fields[k as keyof T].tier === "explicit" && JSON.stringify(valuesRef.current[k as keyof T]) !== JSON.stringify(originalRef.current[k as keyof T])
     );
   }
 
@@ -65,7 +75,7 @@ export function useSmartSave<T extends Record<string, any>>(
     const body: Record<string, any> = {};
     for (const f of dirty) {
       const config = fields[f];
-      body[f as string] = config.serialize ? config.serialize(values[f]) : values[f];
+      body[f as string] = config.serialize ? config.serialize(valuesRef.current[f]) : valuesRef.current[f];
     }
 
     try {
@@ -78,7 +88,7 @@ export function useSmartSave<T extends Record<string, any>>(
       if (res.ok) {
         // Update original to current (no longer dirty)
         for (const f of dirty) {
-          (originalRef.current as any)[f] = values[f];
+          (originalRef.current as any)[f] = valuesRef.current[f];
           setStatus(f as string, "saved");
         }
         // Clear "saved" after 2s
@@ -100,7 +110,7 @@ export function useSmartSave<T extends Record<string, any>>(
   }
 
   function isDirtyField(field: keyof T): boolean {
-    return JSON.stringify(values[field]) !== JSON.stringify(originalRef.current[field]);
+    return JSON.stringify(valuesRef.current[field]) !== JSON.stringify(originalRef.current[field]);
   }
 
   function setStatus(field: string, status: FieldStatus) {
@@ -108,6 +118,10 @@ export function useSmartSave<T extends Record<string, any>>(
   }
 
   const setValue = useCallback((field: keyof T, value: any) => {
+    // Update the synchronous mirror BEFORE the React state update so any code
+    // that runs in the same tick (e.g. flushField called right after setValue)
+    // sees the new value instead of the previous render's stale state.
+    valuesRef.current = { ...valuesRef.current, [field]: value };
     setValues((prev) => ({ ...prev, [field]: value }));
 
     const config = fields[field];
