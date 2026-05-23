@@ -31,22 +31,39 @@ export function MoneyInput({
   compact?: boolean;
   prefix?: string;
 }) {
-  const [text, setText] = useState<string>(value != null ? String(value) : "");
+  /** Format a number into es-AR style with thousand separators (1.500). For
+   * decimals we show the user's typed precision; for ints we omit trailing zeros. */
+  function format(n: number): string {
+    if (!Number.isFinite(n)) return "";
+    return n.toLocaleString("es-AR", {
+      minimumFractionDigits: allowDecimals && !Number.isInteger(n) ? 2 : 0,
+      maximumFractionDigits: allowDecimals ? 2 : 0,
+    });
+  }
+
+  // Two display modes:
+  //   - focused: raw digits ("6000") — easy to edit, no cursor jumps from re-formatting
+  //   - blurred: formatted ("6.000") — what owners are used to seeing on receipts
+  // We toggle between them on focus/blur so editing is intuitive but the at-rest
+  // display matches the rest of the app's es-AR currency formatting.
+  const [text, setText] = useState<string>(value != null ? format(value) : "");
   const focusedRef = useRef(false);
 
   // Sync from external when value changes (e.g. async load) — but only when NOT focused,
   // so we don't fight the user mid-typing.
   useEffect(() => {
     if (focusedRef.current) return;
-    const next = value != null ? String(value) : "";
+    const next = value != null ? format(value) : "";
     if (next !== text) setText(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   function handleChange(s: string) {
     // Allow digits and (optionally) one decimal separator. Normalize comma → dot.
+    // Dots are stripped because they're thousand separators in es-AR, NOT the
+    // decimal separator. allowDecimals uses comma; we normalize to dot internally.
     let cleaned = allowDecimals
-      ? s.replace(/[^\d.,]/g, "").replace(",", ".")
+      ? s.replace(/[^\d,.]/g, "").replace(/\./g, "").replace(",", ".")
       : s.replace(/\D/g, "");
 
     // Collapse multiple decimal points to the first one
@@ -64,6 +81,8 @@ export function MoneyInput({
       cleaned = cleaned.replace(/^0+(?=\d)/, "");
     }
 
+    // While focused, keep raw digits in the input so the cursor doesn't jump
+    // around as the user types.
     setText(cleaned);
 
     if (cleaned === "" || cleaned === ".") {
@@ -74,10 +93,18 @@ export function MoneyInput({
     }
   }
 
-  // ARS thousand-separator preview hint shown on the right
-  const previewHint = value != null && value !== 0
-    ? value.toLocaleString("es-AR", { minimumFractionDigits: allowDecimals && !Number.isInteger(value) ? 2 : 0 })
-    : null;
+  function onFocusInput() {
+    focusedRef.current = true;
+    // Switch from formatted display ("6.000") to raw digits ("6000") for editing
+    if (value != null) setText(String(value));
+  }
+
+  function onBlurInput() {
+    focusedRef.current = false;
+    // Reformat to es-AR thousand-separator style so the at-rest view is consistent
+    if (value != null) setText(format(value));
+    onBlur?.();
+  }
 
   const inputBase = darkMode
     ? "border border-white/10 bg-white/5 text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -98,17 +125,12 @@ export function MoneyInput({
           inputMode={allowDecimals ? "decimal" : "numeric"}
           value={text}
           onChange={(e) => handleChange(e.target.value)}
-          onFocus={() => { focusedRef.current = true; }}
-          onBlur={() => { focusedRef.current = false; onBlur?.(); }}
+          onFocus={onFocusInput}
+          onBlur={onBlurInput}
           placeholder={placeholder}
           disabled={disabled}
           className={`w-full ${compact ? "pl-6 pr-2 py-1.5 text-xs rounded-lg" : "pl-7 pr-3 py-3 text-sm rounded-xl"} transition-colors ${inputBase} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         />
-        {previewHint && !compact && (
-          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none ${darkMode ? "text-slate-500" : "text-text-muted"}`}>
-            {previewHint}
-          </span>
-        )}
       </div>
     </div>
   );
