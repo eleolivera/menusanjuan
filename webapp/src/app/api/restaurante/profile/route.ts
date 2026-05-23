@@ -17,7 +17,7 @@ function validateAndStringifyZones(input: unknown): string | null {
   }
   if (!Array.isArray(arr)) throw new Error("deliveryZones: debe ser un array");
   if (arr.length === 0) return null;
-  if (arr.length > 5) throw new Error("deliveryZones: máximo 5 zonas");
+  if (arr.length > 7) throw new Error("deliveryZones: máximo 7 zonas");
   const cleaned: { radius: number; price: number }[] = [];
   for (const z of arr) {
     if (!z || typeof z !== "object") throw new Error("deliveryZones: zona inválida");

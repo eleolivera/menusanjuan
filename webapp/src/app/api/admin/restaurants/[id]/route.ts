@@ -79,7 +79,7 @@ export async function PATCH(
       try {
         const arr = typeof deliveryZones === "string" ? JSON.parse(deliveryZones) : deliveryZones;
         if (!Array.isArray(arr)) throw new Error("deliveryZones debe ser array");
-        if (arr.length > 5) throw new Error("Máximo 5 zonas");
+        if (arr.length > 7) throw new Error("Máximo 7 zonas");
         const cleaned = arr.map((z: any) => {
           const r = Number(z?.radius), p = Number(z?.price);
           if (!Number.isFinite(r) || r <= 0 || !Number.isFinite(p) || p < 0) throw new Error("Zona inválida");

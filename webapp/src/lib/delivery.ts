@@ -52,7 +52,7 @@ export function parseDeliveryZones(raw: string | null | undefined): DeliveryZone
       .filter((z) => z && typeof z.radius === "number" && typeof z.price === "number" && z.radius > 0)
       .map((z) => ({ radius: Number(z.radius), price: Number(z.price) }))
       .sort((a, b) => a.radius - b.radius);
-    return zones.slice(0, 5);
+    return zones.slice(0, 7);
   } catch {
     return [];
   }

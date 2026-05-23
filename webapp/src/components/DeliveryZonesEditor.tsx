@@ -5,8 +5,8 @@ import { GoogleMap, Circle, useJsApiLoader } from "@react-google-maps/api";
 import { MoneyInput } from "@/components/MoneyInput";
 
 const LIBRARIES: ("places")[] = ["places"];
-const ZONE_COLORS = ["#f97316", "#ec4899", "#8b5cf6", "#3b82f6", "#10b981"];
-const MAX_ZONES = 5;
+const ZONE_COLORS = ["#f97316", "#ec4899", "#8b5cf6", "#3b82f6", "#10b981", "#eab308", "#ef4444"];
+const MAX_ZONES = 7;
 
 type Zone = { radius: number | null; price: number | null };
 
