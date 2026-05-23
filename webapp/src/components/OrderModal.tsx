@@ -141,9 +141,11 @@ export function OrderModal({
   // hasDelivery is now derived from the service availability (toggle + hours combined)
   const hasDelivery = deliveryAvailable;
   const isAnyOpen = deliveryAvailable || pickupAvailable;
-  // No usable pricing = restaurant confirms fee manually
-  // Zones without coordinates can't calculate, so that's also "no pricing"
-  const hasDeliveryPricing = deliveryConfig != null && (
+  // No usable pricing = restaurant confirms fee manually. Three ways to land here:
+  //   1. owner has explicitly opted out of auto-pricing (deliveryPricingEnabled=false)
+  //   2. owner enabled pricing but didn't set zones / flat fee
+  //   3. zones exist but resta has no coordinates (haversine can't compute)
+  const hasDeliveryPricing = deliveryConfig != null && deliveryConfig.deliveryPricingEnabled !== false && (
     (deliveryConfig.deliveryClosePrice != null && deliveryConfig.latitude != null && deliveryConfig.longitude != null) ||
     (deliveryConfig.deliveryFee != null && deliveryConfig.deliveryFee > 0)
   );

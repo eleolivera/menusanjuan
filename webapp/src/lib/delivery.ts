@@ -29,6 +29,8 @@ export type DeliveryZoneResult = {
 
 export type DeliveryConfig = {
   deliveryEnabled: boolean;
+  /** Owner toggle: when false, no auto-pricing — the resta tells the customer the cost manually via WhatsApp. The public site shows "Costo a confirmar". */
+  deliveryPricingEnabled: boolean;
   /** New: array of zones, up to 5, sorted asc by radius. Preferred over close/far. */
   deliveryZones?: DeliveryZone[] | null;
   deliveryCloseRadius: number | null; // legacy
@@ -64,6 +66,11 @@ export function calculateDeliveryFee(
   customerLng: number
 ): DeliveryZoneResult | null {
   if (!config.deliveryEnabled) {
+    return null;
+  }
+  // Owner explicitly opted out of auto-pricing — short-circuit and let the UI
+  // fall through to "Costo a confirmar" regardless of any saved zones/flat fee.
+  if (!config.deliveryPricingEnabled) {
     return null;
   }
 

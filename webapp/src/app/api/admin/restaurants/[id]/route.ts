@@ -66,7 +66,7 @@ export async function PATCH(
     cuisineType, description, logoUrl, coverUrl,
     isActive, posEnabled, openHours, mercadoPagoAlias, mercadoPagoCvu, bankInfo,
     sourceProfileId, sourceSite, rating, deliveryFee, deliveryTimeMin,
-    deliveryEnabled, pickupEnabled, pickupHours, deliveryHours, deliveryZones,
+    deliveryEnabled, deliveryPricingEnabled, pickupEnabled, pickupHours, deliveryHours, deliveryZones,
     deliveryCloseRadius, deliveryClosePrice, deliveryFarRadius, deliveryFarPrice,
   } = body;
 
@@ -121,6 +121,7 @@ export async function PATCH(
       ...(deliveryFee !== undefined && { deliveryFee: deliveryFee === null ? null : Number(deliveryFee) }),
       ...(deliveryTimeMin !== undefined && { deliveryTimeMin: deliveryTimeMin === null ? null : Number(deliveryTimeMin) }),
       ...(deliveryEnabled !== undefined && { deliveryEnabled }),
+      ...(deliveryPricingEnabled !== undefined && { deliveryPricingEnabled }),
       ...(pickupEnabled !== undefined && { pickupEnabled }),
       ...(pickupHours !== undefined && { pickupHours }),
       ...(deliveryHours !== undefined && { deliveryHours }),

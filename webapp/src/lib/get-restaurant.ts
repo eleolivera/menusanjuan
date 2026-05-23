@@ -102,6 +102,7 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
     ownerUserId: dealer.account.userId,
     deliveryConfig: {
       deliveryEnabled: dealer.deliveryEnabled,
+      deliveryPricingEnabled: dealer.deliveryPricingEnabled,
       deliveryZones: parseDeliveryZones(dealer.deliveryZones),
       deliveryCloseRadius: dealer.deliveryCloseRadius,
       deliveryClosePrice: dealer.deliveryClosePrice,

@@ -115,6 +115,7 @@ model Dealer {
   bankInfo    String?
   rating      Float?                           // Star rating (1.0-5.0), admin-set
   deliveryEnabled    Boolean  @default(true)   // Whether restaurant offers delivery
+  deliveryPricingEnabled Boolean @default(false) // Whether to auto-charge a delivery fee. When false, the public site shows "Costo a confirmar" and the resta negotiates by WhatsApp. When true, the zones / flat-fee UI is exposed.
   pickupEnabled      Boolean  @default(true)   // Whether restaurant accepts in-person pickup
   closedUntil        DateTime?                 // Manual early-close: closed until this timestamp regardless of schedule (e.g. ran out of food). Set to "next morning 5am AR" so the close survives midnight rollover.
   lastSeenUpdate     String?                   // ID of the most recent "Novedades" entry the owner acknowledged. Compared against changelog.ts to decide if the modal pops up.

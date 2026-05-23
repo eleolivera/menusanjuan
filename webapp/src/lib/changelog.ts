@@ -23,6 +23,23 @@ export type OwnerUpdate = {
 
 export const OWNER_UPDATES: OwnerUpdate[] = [
   {
+    id: "2026-05-22-delivery-pricing-toggle",
+    date: "22 de mayo, 2026",
+    emoji: "🛵",
+    title: "Costo de delivery — ahora es opcional configurarlo",
+    body: [
+      "Mejoramos el panel de perfil para que sea más claro cómo cobrás el envío.",
+      "",
+      "• Hay un nuevo toggle: 'Cobrar envío automáticamente'.",
+      "• Si lo dejás APAGADO (default), el cliente ve 'Costo de envío a confirmar' al armar el pedido, y vos le pasás el precio por WhatsApp.",
+      "• Si lo prendés, aparecen las opciones de 'Por zonas' o 'Precio fijo' como antes.",
+      "",
+      "Las restas que ya tenían zonas o precio configurado mantienen el toggle prendido — no cambia nada para vos. Las nuevas arrancan apagado para que no tengan que tocar nada hasta que quieran.",
+      "",
+      "Lo encontrás en Mi Restaurante → Costo de Delivery.",
+    ].join("\n"),
+  },
+  {
     id: "2026-05-22-notas-ticket-fix",
     date: "22 de mayo, 2026",
     emoji: "🛠️",

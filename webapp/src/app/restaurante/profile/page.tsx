@@ -48,6 +48,7 @@ export default function ProfilePage() {
     openHours: JSON.stringify(parseHours(null)),
     mercadoPagoAlias: "", mercadoPagoCvu: "", bankInfo: "", posEnabled: false,
     deliveryEnabled: true, pickupEnabled: true,
+    deliveryPricingEnabled: false,
     pickupHours: null as string | null, deliveryHours: null as string | null,
     deliveryZones: null as string | null,
     deliveryCloseRadius: null, deliveryClosePrice: null,
@@ -70,6 +71,7 @@ export default function ProfilePage() {
     bankInfo: { tier: "autosave" as const },
     posEnabled: { tier: "instant" as const },
     deliveryEnabled: { tier: "instant" as const },
+    deliveryPricingEnabled: { tier: "instant" as const },
     pickupEnabled: { tier: "instant" as const },
     pickupHours: { tier: "autosave" as const },
     deliveryHours: { tier: "autosave" as const },
@@ -104,6 +106,7 @@ export default function ProfilePage() {
   const bankInfo = values.bankInfo as string;
   const posEnabled = values.posEnabled as boolean;
   const deliveryEnabled = values.deliveryEnabled as boolean;
+  const deliveryPricingEnabled = values.deliveryPricingEnabled as boolean;
   const pickupEnabled = values.pickupEnabled as boolean;
   const pickupHours = values.pickupHours as string | null;
   const deliveryHours = values.deliveryHours as string | null;
@@ -166,6 +169,7 @@ export default function ProfilePage() {
           bankInfo: d.bankInfo || "",
           posEnabled: d.posEnabled || false,
           deliveryEnabled: d.deliveryEnabled ?? true,
+          deliveryPricingEnabled: d.deliveryPricingEnabled ?? false,
           pickupEnabled: d.pickupEnabled ?? true,
           pickupHours: d.pickupHours || null,
           deliveryHours: d.deliveryHours || null,
@@ -393,24 +397,58 @@ export default function ProfilePage() {
           )}
         </section>
 
-        {/* Delivery Zones — measured from the address above */}
+        {/* Delivery pricing — wrapped behind a toggle so restas that prefer to
+            negotiate the fee per-order via WhatsApp don't have to fill anything in. */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-bold text-white">Zonas de Delivery</h2>
+              <h2 className="text-sm font-bold text-white">Costo de Delivery</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                La distancia se mide desde <span className="text-primary font-medium">tu dirección de arriba</span> hasta la del cliente
+                Definí cómo cobrás el envío a los clientes.
               </p>
             </div>
           </div>
 
-          {(!latitude || !longitude) && deliveryMode === "zones" && (
-            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-              ⚠️ Necesitás cargar tu ubicación arriba (con el mapa) para que el cálculo de delivery funcione. Sin coordenadas, los clientes verán "Costo de envío a confirmar".
+          {/* Pricing-enabled toggle (only meaningful when delivery itself is on) */}
+          {deliveryEnabled ? (
+            <div className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-slate-800/40 p-4">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-white">Cobrar envío automáticamente</div>
+                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                  {deliveryPricingEnabled
+                    ? "El sistema calcula el costo solo y se lo muestra al cliente al armar el pedido."
+                    : "El cliente va a ver \"Costo de envío a confirmar\" y vos le pasás el precio por WhatsApp. Ideal para arrancar."}
+                </p>
+                <SaveIndicator status={statuses.deliveryPricingEnabled} />
+              </div>
+              <button
+                type="button"
+                onClick={() => setValue("deliveryPricingEnabled", !deliveryPricingEnabled)}
+                className={`shrink-0 relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  deliveryPricingEnabled ? "bg-primary" : "bg-white/10"
+                }`}
+                aria-pressed={deliveryPricingEnabled}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                    deliveryPricingEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-slate-800/30 p-4 text-xs text-slate-400">
+              El delivery está desactivado arriba. Activalo para configurar el costo.
             </div>
           )}
 
-          {deliveryEnabled && (
+          {(!latitude || !longitude) && deliveryEnabled && deliveryPricingEnabled && deliveryMode === "zones" && (
+            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+              ⚠️ Necesitás cargar tu ubicación arriba (con el mapa) para que el cálculo por zonas funcione. Sin coordenadas, los clientes verán "Costo de envío a confirmar".
+            </div>
+          )}
+
+          {deliveryEnabled && deliveryPricingEnabled && (
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-800/60 border border-white/5">
                 <button

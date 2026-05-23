@@ -19,6 +19,7 @@ export async function GET() {
       longitude: true,
       address: true,
       deliveryEnabled: true,
+      deliveryPricingEnabled: true,
       deliveryZones: true,
       deliveryCloseRadius: true,
       deliveryClosePrice: true,
@@ -36,6 +37,7 @@ export async function GET() {
     address: fullDealer?.address ?? null,
     deliveryConfig: {
       deliveryEnabled: fullDealer?.deliveryEnabled ?? false,
+      deliveryPricingEnabled: fullDealer?.deliveryPricingEnabled ?? false,
       deliveryZones: parseDeliveryZones(fullDealer?.deliveryZones ?? null),
       deliveryCloseRadius: fullDealer?.deliveryCloseRadius ?? null,
       deliveryClosePrice: fullDealer?.deliveryClosePrice ?? null,
