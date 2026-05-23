@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 
 // Build stamp — printed at the bottom of the ticket so we can verify a fresh
 // deploy made it to the printer. Bump whenever shipping a meaningful change.
-const TICKET_BUILD = "v2026-05-16.a";
+const TICKET_BUILD = "v2026-05-22.a";
 
-type Item = { name: string; quantity: number; unitPrice: number; optionsDelta?: number; note?: string };
+type Item = { name: string; quantity: number; unitPrice: number; optionsDelta?: number; note?: string; overrideNote?: string; selectedOptions?: { group: string; choices: { name: string }[] }[] };
 
 type Props = {
   order: {
@@ -174,7 +174,13 @@ export function TicketView({ order, driverUrl }: Props) {
                 <tr key={i} className="align-top">
                   <td className="pr-2 py-0.5">
                     <div>{it.quantity}x {it.name}</div>
-                    {it.note && <div className="text-[9px] italic pl-3">- {it.note}</div>}
+                    {it.selectedOptions && it.selectedOptions.length > 0 && (
+                      <div className="text-[9px] pl-3">
+                        {it.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                      </div>
+                    )}
+                    {it.note && <div className="text-[10px] font-bold pl-3">&gt; {it.note}</div>}
+                    {it.overrideNote && <div className="text-[9px] italic pl-3">- {it.overrideNote}</div>}
                   </td>
                   <td className="text-right whitespace-nowrap py-0.5">
                     {ars((it.unitPrice + (it.optionsDelta || 0)) * it.quantity)}

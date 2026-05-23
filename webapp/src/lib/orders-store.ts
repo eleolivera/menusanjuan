@@ -25,6 +25,7 @@ export type OrderItem = {
   quantity: number;
   unitPrice: number;
   total: number;
+  note?: string;          // Per-item kitchen note (e.g. "sin cebolla"). Prints on the ticket and shows in OrderCard.
   priceOverride?: number; // POS: cashier-set price (can be 0 = free)
   overrideNote?: string;  // Required when priceOverride is set
   selectedOptions?: { group: string; choices: { name: string; priceDelta: number }[]; delta: number }[];

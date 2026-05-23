@@ -27,6 +27,7 @@ export type PosCartLine = {
   quantity: number;
   selectedOptions: SelectedOptions;
   optionsDelta: number;
+  note?: string;              // Per-item kitchen note (e.g. "sin cebolla") — prints on the ticket
   priceOverride?: number;
   overrideNote?: string;
 };
@@ -180,12 +181,20 @@ export function PosBoard({
     }
   }
 
-  function addCustomized(item: MenuItemData, quantity: number, selectedOptions: SelectedOptions, optionsDelta: number) {
+  function addCustomized(item: MenuItemData, quantity: number, selectedOptions: SelectedOptions, optionsDelta: number, note?: string) {
+    const trimmedNote = note?.trim() || undefined;
     setCart((prev) => {
       const optionsKey = JSON.stringify(selectedOptions);
-      const existing = prev.find((l) => l.item.id === item.id && l.priceOverride === undefined && JSON.stringify(l.selectedOptions) === optionsKey);
+      // Only fold into an existing line when the kitchen note matches too —
+      // otherwise different notes would silently get merged and dropped.
+      const existing = prev.find((l) =>
+        l.item.id === item.id &&
+        l.priceOverride === undefined &&
+        JSON.stringify(l.selectedOptions) === optionsKey &&
+        (l.note || undefined) === trimmedNote
+      );
       if (existing) return prev.map((l) => l.cartKey === existing.cartKey ? { ...l, quantity: l.quantity + quantity } : l);
-      return [...prev, { cartKey: newCartKey(), item, quantity, selectedOptions, optionsDelta }];
+      return [...prev, { cartKey: newCartKey(), item, quantity, selectedOptions, optionsDelta, note: trimmedNote }];
     });
     setCustomizing(null);
   }
@@ -275,6 +284,7 @@ export function PosBoard({
         unitPrice: line.item.price,
         optionsDelta: line.optionsDelta,
         selectedOptions: line.selectedOptions,
+        note: line.note,                // Per-item kitchen note — printed on the ticket
         priceOverride: line.priceOverride,
         overrideNote: line.overrideNote,
         total: Math.round(linePrice * line.quantity),
@@ -674,6 +684,9 @@ export function PosBoard({
                           {line.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
                         </p>
                       )}
+                      {line.note && (
+                        <p className="text-[9px] text-amber-300 italic mb-1">📝 {line.note}</p>
+                      )}
                       {isOverridden && line.overrideNote && (
                         <p className="text-[9px] text-amber-400 mb-1">{line.overrideNote}</p>
                       )}
@@ -804,7 +817,7 @@ export function PosBoard({
       {customizing && (
         <ItemCustomizeSheet
           item={customizing}
-          onAdd={(qty, opts, delta) => addCustomized(customizing, qty, opts, delta)}
+          onAdd={(qty, opts, delta, note) => addCustomized(customizing, qty, opts, delta, note)}
           onClose={() => setCustomizing(null)}
         />
       )}

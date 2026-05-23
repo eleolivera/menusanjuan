@@ -23,6 +23,22 @@ export type OwnerUpdate = {
 
 export const OWNER_UPDATES: OwnerUpdate[] = [
   {
+    id: "2026-05-22-notas-ticket-fix",
+    date: "22 de mayo, 2026",
+    emoji: "🛠️",
+    title: "Arreglado: las notas de los items vuelven a imprimirse",
+    body: [
+      "Bug que detectamos hoy: cuando agregabas un item por POS con una nota (ej. 'sin cebolla'), la nota se perdía y no salía impresa en la comanda.",
+      "",
+      "Ya está corregido:",
+      "• Las notas por item ahora se guardan correctamente desde POS.",
+      "• Aparecen tanto en el carrito del POS como en la comanda impresa.",
+      "• La versión del ticket subió a v2026-05-22.a — vas a verla al pie de la próxima impresión.",
+      "",
+      "Si imprimís una comanda nueva con notas y no aparecen, refrescá el navegador (Ctrl+F5).",
+    ].join("\n"),
+  },
+  {
     id: "2026-05-22-comprobantes-cerrar-ahora",
     date: "22 de mayo, 2026",
     emoji: "✨",
