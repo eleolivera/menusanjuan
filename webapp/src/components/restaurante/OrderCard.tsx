@@ -430,6 +430,22 @@ export function OrderCard({
             </div>
           )}
 
+          {/* Always-on receipt viewer — discreet link rendered whenever the
+             order has a comprobante on file, regardless of payment status. The
+             loud amber "Ver y validar" pill above is the call-to-action for
+             pending validation; this button is for audit / dispute / "marqué
+             validado por error" cases after the order has already been
+             validated or even unmarked. */}
+          {order.paymentReceiptUrl && order.paymentStatus !== "PAID_UNVERIFIED" && (
+            <button
+              type="button"
+              onClick={() => setShowReceiptModal(true)}
+              className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-3 py-1.5 text-[11px] text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors text-left"
+            >
+              📎 Ver comprobante
+            </button>
+          )}
+
           {/* Action buttons */}
           {order.paymentStatus === "UNPAID" ? (
             <>

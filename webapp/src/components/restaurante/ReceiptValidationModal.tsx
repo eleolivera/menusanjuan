@@ -4,15 +4,15 @@ import { useState } from "react";
 import type { Order } from "@/lib/orders-store";
 
 /**
- * Cashier-side modal — shown when the customer has uploaded a comprobante (the
- * order is in paymentStatus="PAID_UNVERIFIED"). The cashier:
- *   1. Sees the full receipt image
- *   2. Sees the totals (subtotal, envío, total) side-by-side so they can compare
- *      against the amount on the image
- *   3. Either:
- *       - "Validar pago"   → PATCH paymentStatus="PAID" + paymentMethod=intent
- *       - "Rechazar"       → PATCH paymentStatus="UNPAID" + clearReceipt=true
- *         (customer can re-upload from /pagar or /mis-pedidos)
+ * Cashier-side modal — opens whenever the order has a `paymentReceiptUrl` on
+ * file, regardless of `paymentStatus`. The footer adapts to the current state:
+ *   - PAID_UNVERIFIED → [✗ Rechazar] + [✓ Validar pago] (the original CTA flow)
+ *   - PAID            → header shows "Pagado · validado hace X" + a single
+ *                       [Marcar sin pagar] button for the "validé por error" case
+ *                       (does NOT clear the receipt so it stays viewable for audit)
+ *   - UNPAID          → header "Comprobante anterior" + single [Cerrar] button
+ *                       (data-state shouldn't happen normally since Rechazar
+ *                       clears the URL, but we handle it for SQL-level edge cases)
  */
 export function ReceiptValidationModal({
   order,
@@ -23,7 +23,7 @@ export function ReceiptValidationModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [busy, setBusy] = useState<"validate" | "reject" | null>(null);
+  const [busy, setBusy] = useState<"validate" | "reject" | "unmark" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const subtotal = order.total || 0;
@@ -39,6 +39,33 @@ export function ReceiptValidationModal({
     ? new Date(order.paymentReceiptAt)
     : null;
   const ago = uploadedAt ? getTimeAgo(uploadedAt) : null;
+  const paidAtDate = order.paidAt ? new Date(order.paidAt) : null;
+  const paidAgo = paidAtDate ? getTimeAgo(paidAtDate) : null;
+
+  const isPending = order.paymentStatus === "PAID_UNVERIFIED";
+  const isPaid = order.paymentStatus === "PAID";
+
+  // Mark an already-validated payment as unpaid WITHOUT clearing the receipt URL.
+  // Cashier flow: they hit "Validar" by mistake; this is the undo. Receipt stays
+  // viewable so the modal keeps working for further audit.
+  async function unmarkPaid() {
+    if (!confirm("¿Marcar este pedido como sin pagar? El comprobante se mantiene para que lo puedas seguir viendo.")) return;
+    setBusy("unmark");
+    setError(null);
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        // Intentionally NO clearReceipt — we want the image to remain available.
+        body: JSON.stringify({ paymentStatus: "UNPAID" }),
+      });
+      if (!res.ok) throw new Error("Error al cambiar el estado");
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(null);
+    }
+  }
 
   async function validate() {
     setBusy("validate");
@@ -93,11 +120,19 @@ export function ReceiptValidationModal({
         className="rounded-2xl bg-slate-900 border border-white/10 max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header — title + sub-line change based on state so the modal is
+           clearly self-describing whether you're validating, auditing, or
+           looking at a rejected old receipt. */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-slate-900 px-5 py-3.5">
           <div>
-            <h2 className="text-sm font-bold text-white">Validar comprobante</h2>
-            <p className="text-[11px] text-slate-400">Pedido {order.orderNumber}</p>
+            <h2 className="text-sm font-bold text-white">
+              {isPending ? "Validar comprobante" : isPaid ? "Comprobante validado" : "Comprobante anterior"}
+            </h2>
+            <p className="text-[11px] text-slate-400">
+              Pedido {order.orderNumber}
+              {isPaid && paidAgo && <span className="text-emerald-400/70"> · ✓ pagado hace {paidAgo}</span>}
+              {!isPending && !isPaid && <span className="text-red-300/70"> · sin pagar</span>}
+            </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 transition-colors">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -173,28 +208,68 @@ export function ReceiptValidationModal({
             </div>
           )}
 
-          {/* Actions */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <button
-              type="button"
-              onClick={reject}
-              disabled={busy !== null}
-              className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50"
-            >
-              {busy === "reject" ? "..." : "✗ Rechazar"}
-            </button>
-            <button
-              type="button"
-              onClick={validate}
-              disabled={busy !== null}
-              className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-md shadow-emerald-500/30 hover:shadow-lg transition-all disabled:opacity-50"
-            >
-              {busy === "validate" ? "..." : `✓ Validar pago ${"$" + total.toLocaleString("es-AR")}`}
-            </button>
-          </div>
-          <p className="text-[10px] text-slate-500 text-center">
-            Rechazar limpia el comprobante y el cliente puede subir otro. Validar lo marca como pagado y bloquea cambios.
-          </p>
+          {/* Actions — branch by state */}
+          {isPending ? (
+            <>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={reject}
+                  disabled={busy !== null}
+                  className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                >
+                  {busy === "reject" ? "..." : "✗ Rechazar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={validate}
+                  disabled={busy !== null}
+                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-md shadow-emerald-500/30 hover:shadow-lg transition-all disabled:opacity-50"
+                >
+                  {busy === "validate" ? "..." : `✓ Validar pago ${"$" + total.toLocaleString("es-AR")}`}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 text-center">
+                Rechazar limpia el comprobante y el cliente puede subir otro. Validar lo marca como pagado y bloquea cambios.
+              </p>
+            </>
+          ) : isPaid ? (
+            <>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  onClick={unmarkPaid}
+                  disabled={busy !== null}
+                  className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                >
+                  {busy === "unmark" ? "..." : "Marcar sin pagar"}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 text-center">
+                Si validaste por error podés marcarlo como sin pagar. El comprobante se mantiene para que lo puedas seguir consultando.
+              </p>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors"
+              >
+                Cerrar
+              </button>
+              <p className="text-[10px] text-slate-500 text-center">
+                Este comprobante está guardado para consulta. Si el cliente subió otro nuevo, lo vas a ver en el pedido actual.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
