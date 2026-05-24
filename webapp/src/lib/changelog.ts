@@ -23,6 +23,27 @@ export type OwnerUpdate = {
 
 export const OWNER_UPDATES: OwnerUpdate[] = [
   {
+    id: "2026-05-24-explicit-save-zones-horarios",
+    date: "24 de mayo, 2026",
+    emoji: "💾",
+    title: "Zonas y horarios ahora se guardan con un botón",
+    body: [
+      "Cambiamos cómo se guardan las zonas de delivery y los horarios. Antes se guardaban solos a medida que tipeabas, y eso causaba algún bug raro (por ejemplo, te quedaba un \"$600\" en una zona cuando vos quisiste poner \"$6.000\"). Ahora es así:",
+      "",
+      "📍 Zonas de delivery + Horarios de delivery + Horarios de retiro",
+      "",
+      "• Por default vas a ver un resumen rápido (cantidad de zonas, rango de precios, días abiertos).",
+      "• Para cambiar algo: tocás \"✏️ Editar zonas\" o \"✏️ Editar horarios\".",
+      "• Modificás lo que quieras — nada se guarda hasta que toques el botón verde \"Guardar\".",
+      "• Si te arrepentís: tocá \"Cancelar\" y vuelve a como estaba.",
+      "• Si tratás de cerrar la pestaña con cambios sin guardar, el navegador te avisa.",
+      "",
+      "El resto de los campos (nombre, alias MP, teléfono, etc.) siguen guardándose solos al salir del campo como antes — eso ya funcionaba bien.",
+      "",
+      "Lo encontrás todo en Mi Restaurante.",
+    ].join("\n"),
+  },
+  {
     id: "2026-05-22-delivery-pricing-toggle",
     date: "22 de mayo, 2026",
     emoji: "🛵",

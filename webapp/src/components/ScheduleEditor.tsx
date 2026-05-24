@@ -385,3 +385,66 @@ function fromMin(min: number): string {
   const mm = m % 60;
   return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
+
+/**
+ * Read-only summary of a week schedule. Used as the view-mode rendering for
+ * the Tier 3 explicit-save pattern — owner sees this until they click
+ * "Editar horarios". Groups consecutive days with identical hours so it
+ * reads naturally ("Lun a Vie · 10:00–14:00 · 20:00–00:30").
+ */
+export function ScheduleSummary({ value, emoji }: { value: string | null; emoji?: string }) {
+  const week = parse(value);
+  const openDays = DAY_KEY_ORDER.filter((k) => (week[k] || []).length > 0);
+
+  if (openDays.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
+        <div className="text-2xl mb-2">{emoji || "📅"}</div>
+        <p className="text-sm text-slate-300 font-medium">Sin horarios configurados</p>
+        <p className="text-xs text-slate-500 mt-1">
+          Tocá &quot;Editar horarios&quot; para definir cuándo estás abierto.
+        </p>
+      </div>
+    );
+  }
+
+  // Group consecutive days that share identical windows
+  type Group = { days: string[]; windows: ServiceWindow[] };
+  const groups: Group[] = [];
+  for (const day of DAY_KEY_ORDER) {
+    const windows = week[day] || [];
+    const last = groups[groups.length - 1];
+    const sameAsLast = last && JSON.stringify(last.windows) === JSON.stringify(windows);
+    if (sameAsLast) {
+      last.days.push(day);
+    } else {
+      groups.push({ days: [day], windows });
+    }
+  }
+  const visible = groups.filter((g) => g.windows.length > 0);
+
+  function dayRange(days: string[]): string {
+    if (days.length === 1) return DAY_KEY_TO_LABEL[days[0]];
+    const first = DAY_KEY_TO_LABEL[days[0]];
+    const last = DAY_KEY_TO_LABEL[days[days.length - 1]];
+    return `${first} a ${last}`;
+  }
+
+  return (
+    <div className="rounded-lg border border-white/5 bg-white/[0.02] divide-y divide-white/5">
+      {visible.map((g, i) => (
+        <div key={i} className="flex items-center gap-3 px-3 py-2 text-xs">
+          <span className="text-slate-300 font-medium min-w-[110px]">{dayRange(g.days)}</span>
+          <span className="text-slate-400">
+            {g.windows.map((w, j) => (
+              <span key={j}>
+                {j > 0 && <span className="text-slate-600"> · </span>}
+                {w.open}–{w.close}
+              </span>
+            ))}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}

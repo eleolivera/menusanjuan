@@ -188,11 +188,34 @@ export function useSmartSave<T extends Record<string, any>>(
     return patchFields(explicitFields);
   }, [fields, options.endpoint, values]);
 
+  /** Save a specific subset of fields (used by Tier 3 per-section save buttons).
+   * Lets one "Guardar zonas" button commit only its zones without also
+   * pushing dirty schedule edits the user hasn't decided to commit yet. */
+  const saveFields = useCallback((fieldNames: (keyof T)[]) => {
+    return patchFields(fieldNames);
+  }, [fields, options.endpoint]);
+
+  /** Revert a field to its last-saved value (used by Tier 3 Cancel buttons).
+   * Reads from `originalRef` which always tracks the most recent server-confirmed
+   * value, so this is the safe "undo all unsaved edits to this field" action. */
+  const revertField = useCallback((field: keyof T) => {
+    const original = originalRef.current[field];
+    valuesRef.current = { ...valuesRef.current, [field]: original };
+    setValues((prev) => ({ ...prev, [field]: original }));
+    // Also clear any pending autosave timer so it doesn't fire later
+    if (debounceTimers.current[field as string]) {
+      clearTimeout(debounceTimers.current[field as string]);
+      delete debounceTimers.current[field as string];
+    }
+  }, []);
+
   return {
     values,
     setValue,
     flushField,
     saveAll,
+    saveFields,
+    revertField,
     statuses,
     isDirty,
     hasUnsavedExplicit: isAnyDirtyExplicit(),

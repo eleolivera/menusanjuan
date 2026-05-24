@@ -258,3 +258,65 @@ export function DeliveryZonesEditor({
     </div>
   );
 }
+
+/**
+ * Read-only summary of zones. Used as the view-mode rendering for the
+ * Tier 3 explicit-save pattern — owner sees this until they click "Editar".
+ * Keeps the visual continuity with the editor (same color dots, same shape).
+ */
+export function ZonesSummary({ value }: { value: string | null }) {
+  const zones = parse(value).filter((z) => z.radius != null && z.price != null);
+
+  if (zones.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
+        <div className="text-2xl mb-2">📍</div>
+        <p className="text-sm text-slate-300 font-medium">Todavía no configuraste zonas</p>
+        <p className="text-xs text-slate-500 mt-1">
+          Tocá &quot;Editar zonas&quot; para definir cuánto cobrás por distancia.
+        </p>
+      </div>
+    );
+  }
+
+  const prices = zones.map((z) => z.price!);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const farthest = Math.max(...zones.map((z) => z.radius!));
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-center">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">Zonas</div>
+          <div className="text-sm font-bold text-white mt-0.5">{zones.length}</div>
+        </div>
+        <div className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-center">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">Alcance</div>
+          <div className="text-sm font-bold text-white mt-0.5">{farthest} km</div>
+        </div>
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-center">
+          <div className="text-[10px] uppercase tracking-wider text-emerald-300/70">Rango</div>
+          <div className="text-sm font-bold text-emerald-300 mt-0.5">
+            {min === max
+              ? `$${min.toLocaleString("es-AR")}`
+              : `$${min.toLocaleString("es-AR")} – $${max.toLocaleString("es-AR")}`}
+          </div>
+        </div>
+      </div>
+      <div className="rounded-lg border border-white/5 bg-white/[0.02] divide-y divide-white/5">
+        {zones.map((z, i) => (
+          <div key={i} className="flex items-center gap-2.5 px-3 py-2 text-xs">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+              style={{ background: ZONE_COLORS[i % ZONE_COLORS.length] }}
+            />
+            <span className="text-slate-300 font-medium">Zona {i + 1}</span>
+            <span className="text-slate-500">hasta {z.radius} km</span>
+            <span className="ml-auto font-semibold text-white">${z.price!.toLocaleString("es-AR")}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -9,8 +9,9 @@ import { CuisineMultiSelect } from "@/components/CuisineMultiSelect";
 import { useSmartSave } from "@/hooks/useSmartSave";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { MoneyInput } from "@/components/MoneyInput";
-import { ScheduleEditor } from "@/components/ScheduleEditor";
-import { DeliveryZonesEditor } from "@/components/DeliveryZonesEditor";
+import { ScheduleEditor, ScheduleSummary } from "@/components/ScheduleEditor";
+import { DeliveryZonesEditor, ZonesSummary } from "@/components/DeliveryZonesEditor";
+import { ProfileSection, ProfileSectionFooter, SectionStatus } from "@/components/restaurante/ProfileSection";
 
 const DAYS = [
   { key: "lun", label: "Lunes" },
@@ -73,9 +74,12 @@ export default function ProfilePage() {
     deliveryEnabled: { tier: "instant" as const },
     deliveryPricingEnabled: { tier: "instant" as const },
     pickupEnabled: { tier: "instant" as const },
-    pickupHours: { tier: "autosave" as const },
-    deliveryHours: { tier: "autosave" as const },
-    deliveryZones: { tier: "autosave" as const },
+    // Tier 3 — explicit save. Complex structured editors that should commit
+    // atomically (zones + schedules). User clicks "Guardar" inside the section
+    // footer to commit; "Cancelar" reverts. No per-keystroke writes.
+    pickupHours: { tier: "explicit" as const },
+    deliveryHours: { tier: "explicit" as const },
+    deliveryZones: { tier: "explicit" as const },
     deliveryCloseRadius: { tier: "autosave" as const },
     deliveryClosePrice: { tier: "autosave" as const },
     deliveryFarRadius: { tier: "autosave" as const },
@@ -84,11 +88,44 @@ export default function ProfilePage() {
     deliveryTimeMin: { tier: "autosave" as const },
   };
 
-  const { values, setValue, flushField, statuses } = useSmartSave(
+  const { values, setValue, flushField, saveFields, revertField, statuses } = useSmartSave(
     originalData,
     FIELD_CONFIG,
     { endpoint: "/api/restaurante/profile", debounceMs: 1500 },
   );
+
+  // Tier 3 sections — each has its own view/edit toggle state. Default: view mode.
+  const [editingZones, setEditingZones] = useState(false);
+  const [editingDeliveryHours, setEditingDeliveryHours] = useState(false);
+  const [editingPickupHours, setEditingPickupHours] = useState(false);
+
+  // Per-section dirty helpers — compare current value vs the last-saved original.
+  const isFieldDirty = (field: string): boolean => {
+    return JSON.stringify(values[field]) !== JSON.stringify(originalData[field]);
+  };
+  const isFieldSaving = (field: string): boolean => statuses[field] === "saving";
+
+  // Generic helpers for explicit Tier 3 sections — same shape for every one.
+  async function saveSection(field: string, exitEdit: () => void) {
+    if (!isFieldDirty(field)) { exitEdit(); return; }
+    await saveFields([field]);
+    exitEdit();
+  }
+  function cancelSection(field: string, exitEdit: () => void) {
+    revertField(field);
+    exitEdit();
+  }
+
+  // beforeunload guard — warn if user tries to close/reload with unsaved Tier 3 changes
+  useEffect(() => {
+    const explicitFields = ["deliveryZones", "deliveryHours", "pickupHours"];
+    const anyDirty = explicitFields.some(isFieldDirty);
+    if (!anyDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.deliveryZones, values.deliveryHours, values.pickupHours]);
 
   // Convenience accessors
   const name = values.name as string;
@@ -499,13 +536,54 @@ export default function ProfilePage() {
                   </div>
                 </div>
               ) : (
-                <DeliveryZonesEditor
-                  value={deliveryZones}
-                  onChange={(json) => { setValue("deliveryZones", json); flushField("deliveryZones"); }}
-                  dealerLat={latitude}
-                  dealerLng={longitude}
-                  statusIndicator={<SaveIndicator status={statuses.deliveryZones} />}
-                />
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/5">
+                    <div className="min-w-0">
+                      <h3 className="text-xs font-semibold text-white uppercase tracking-wider">Zonas de delivery</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {editingZones
+                          ? "Editá los radios y precios. Los cambios se guardan cuando tocás \"Guardar zonas\"."
+                          : "Cobrás distinto según la distancia."}
+                      </p>
+                    </div>
+                    {!editingZones ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingZones(true)}
+                        className="shrink-0 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        ✏️ Editar zonas
+                      </button>
+                    ) : (
+                      <div className="shrink-0">
+                        <SectionStatus dirty={isFieldDirty("deliveryZones")} saving={isFieldSaving("deliveryZones")} />
+                      </div>
+                    )}
+                  </div>
+                  <div className={`p-4 ${isFieldSaving("deliveryZones") ? "opacity-50 pointer-events-none" : ""}`}>
+                    {editingZones ? (
+                      <DeliveryZonesEditor
+                        value={deliveryZones}
+                        onChange={(json) => setValue("deliveryZones", json)}
+                        dealerLat={latitude}
+                        dealerLng={longitude}
+                      />
+                    ) : (
+                      <ZonesSummary value={deliveryZones} />
+                    )}
+                  </div>
+                  {editingZones && (
+                    <div className="border-t border-white/5 bg-white/[0.015] px-4 py-3">
+                      <ProfileSectionFooter
+                        dirty={isFieldDirty("deliveryZones")}
+                        saving={isFieldSaving("deliveryZones")}
+                        onCancel={() => cancelSection("deliveryZones", () => setEditingZones(false))}
+                        onSave={() => saveSection("deliveryZones", () => setEditingZones(false))}
+                        saveLabel="Guardar zonas"
+                      />
+                    </div>
+                  )}
+                </div>
               )}
 
               <div>
@@ -525,26 +603,93 @@ export default function ProfilePage() {
           )}
         </section>
 
-        {/* Horarios por método (delivery + pickup tienen schedules independientes) */}
-        <ScheduleEditor
+        {/* Horarios por método — Tier 3 (explicit save). View mode shows
+           grouped summary; Edit mode reveals the per-day window editor + Save/Cancel. */}
+        <ProfileSection
           title="Horarios de Delivery"
-          emoji="🛵"
-          value={deliveryHours}
-          onChange={(v) => { setValue("deliveryHours", v); flushField("deliveryHours"); }}
-          copyFromLabel="Retiro"
-          onCopyFromOther={() => { if (pickupHours) { setValue("deliveryHours", pickupHours); flushField("deliveryHours"); } }}
-          statusIndicator={<SaveIndicator status={statuses.deliveryHours} />}
-        />
+          subtitle={editingDeliveryHours
+            ? "Editá los horarios. Los cambios se guardan cuando tocás \"Guardar horarios\"."
+            : "Cuándo hacés delivery durante la semana."}
+          status={editingDeliveryHours
+            ? <SectionStatus dirty={isFieldDirty("deliveryHours")} saving={isFieldSaving("deliveryHours")} />
+            : (
+              <button
+                type="button"
+                onClick={() => setEditingDeliveryHours(true)}
+                className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+              >
+                ✏️ Editar horarios
+              </button>
+            )
+          }
+          footer={editingDeliveryHours ? (
+            <ProfileSectionFooter
+              dirty={isFieldDirty("deliveryHours")}
+              saving={isFieldSaving("deliveryHours")}
+              onCancel={() => cancelSection("deliveryHours", () => setEditingDeliveryHours(false))}
+              onSave={() => saveSection("deliveryHours", () => setEditingDeliveryHours(false))}
+              saveLabel="Guardar horarios"
+            />
+          ) : undefined}
+        >
+          <div className={isFieldSaving("deliveryHours") ? "opacity-50 pointer-events-none" : ""}>
+            {editingDeliveryHours ? (
+              <ScheduleEditor
+                title=""
+                emoji="🛵"
+                value={deliveryHours}
+                onChange={(v) => setValue("deliveryHours", v)}
+                copyFromLabel="Retiro"
+                onCopyFromOther={() => { if (pickupHours) setValue("deliveryHours", pickupHours); }}
+              />
+            ) : (
+              <ScheduleSummary value={deliveryHours} emoji="🛵" />
+            )}
+          </div>
+        </ProfileSection>
 
-        <ScheduleEditor
+        <ProfileSection
           title="Horarios de Retiro en local"
-          emoji="🏪"
-          value={pickupHours}
-          onChange={(v) => { setValue("pickupHours", v); flushField("pickupHours"); }}
-          copyFromLabel="Delivery"
-          onCopyFromOther={() => { if (deliveryHours) { setValue("pickupHours", deliveryHours); flushField("pickupHours"); } }}
-          statusIndicator={<SaveIndicator status={statuses.pickupHours} />}
-        />
+          subtitle={editingPickupHours
+            ? "Editá los horarios. Los cambios se guardan cuando tocás \"Guardar horarios\"."
+            : "Cuándo aceptás que vengan a buscar el pedido."}
+          status={editingPickupHours
+            ? <SectionStatus dirty={isFieldDirty("pickupHours")} saving={isFieldSaving("pickupHours")} />
+            : (
+              <button
+                type="button"
+                onClick={() => setEditingPickupHours(true)}
+                className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+              >
+                ✏️ Editar horarios
+              </button>
+            )
+          }
+          footer={editingPickupHours ? (
+            <ProfileSectionFooter
+              dirty={isFieldDirty("pickupHours")}
+              saving={isFieldSaving("pickupHours")}
+              onCancel={() => cancelSection("pickupHours", () => setEditingPickupHours(false))}
+              onSave={() => saveSection("pickupHours", () => setEditingPickupHours(false))}
+              saveLabel="Guardar horarios"
+            />
+          ) : undefined}
+        >
+          <div className={isFieldSaving("pickupHours") ? "opacity-50 pointer-events-none" : ""}>
+            {editingPickupHours ? (
+              <ScheduleEditor
+                title=""
+                emoji="🏪"
+                value={pickupHours}
+                onChange={(v) => setValue("pickupHours", v)}
+                copyFromLabel="Delivery"
+                onCopyFromOther={() => { if (deliveryHours) setValue("pickupHours", deliveryHours); }}
+              />
+            ) : (
+              <ScheduleSummary value={pickupHours} emoji="🏪" />
+            )}
+          </div>
+        </ProfileSection>
 
         {/* Payment Info */}
         <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
