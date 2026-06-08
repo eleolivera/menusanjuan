@@ -19,9 +19,34 @@ export type OwnerUpdate = {
   title: string;
   emoji: string;
   body: string; // Multi-line Spanish text. Plain text — line breaks become <br/>.
+  /** Optional CTA — if present, the modal shows a primary button that opens this URL.
+   * Used to deep-link the owner to the relevant config screen for a new feature. */
+  cta?: { href: string; label: string };
 };
 
 export const OWNER_UPDATES: OwnerUpdate[] = [
+  {
+    id: "2026-06-08-modo-confiar",
+    date: "8 de junio, 2026",
+    emoji: "⚡",
+    title: "Modo confiar — pedidos pagados sin validar",
+    body: [
+      "Sumamos una opción para cuando no llegás a validar comprobantes.",
+      "",
+      "Si la prendés:",
+      "• Cada pedido nuevo se marca como pagado al instante, sin importar el método (efectivo, transferencia, MP).",
+      "• Los comprobantes que suban los clientes se auto-aprueban — no tenés que validarlos.",
+      "• Los pedidos que estaban pendientes de validar se marcan como pagados de una al activarla.",
+      "",
+      "Mientras esté prendida vas a ver un cartel amarillo arriba del Kanban recordándotelo. En cada pedido pagado por este modo aparece un \"asumido (modo confiar)\" chiquito, para que después puedas distinguir cuáles validaste de verdad.",
+      "",
+      "⚠️ Importante: perdés trazabilidad de qué cliente pagó realmente. Solo activala si no llegás a validar y preferís esa libertad al control. La podés apagar cuando quieras.",
+    ].join("\n"),
+    cta: {
+      href: "/restaurante/profile#modo-confiar",
+      label: "Ir a la configuración",
+    },
+  },
   {
     id: "2026-05-24-explicit-save-zones-horarios",
     date: "24 de mayo, 2026",

@@ -47,7 +47,7 @@ export default function ProfilePage() {
     name: "", phone: "", address: "", latitude: null, longitude: null,
     cuisineType: "", description: "", logoUrl: "", coverUrl: "",
     openHours: JSON.stringify(parseHours(null)),
-    mercadoPagoAlias: "", mercadoPagoCvu: "", bankInfo: "", posEnabled: false,
+    mercadoPagoAlias: "", mercadoPagoCvu: "", bankInfo: "", posEnabled: false, assumePaymentsAuto: false,
     deliveryEnabled: true, pickupEnabled: true,
     deliveryPricingEnabled: false,
     pickupHours: null as string | null, deliveryHours: null as string | null,
@@ -73,6 +73,7 @@ export default function ProfilePage() {
     posEnabled: { tier: "instant" as const },
     deliveryEnabled: { tier: "instant" as const },
     deliveryPricingEnabled: { tier: "instant" as const },
+    assumePaymentsAuto: { tier: "instant" as const },
     pickupEnabled: { tier: "instant" as const },
     // Tier 3 — explicit save. Complex structured editors that should commit
     // atomically (zones + schedules). User clicks "Guardar" inside the section
@@ -144,6 +145,7 @@ export default function ProfilePage() {
   const posEnabled = values.posEnabled as boolean;
   const deliveryEnabled = values.deliveryEnabled as boolean;
   const deliveryPricingEnabled = values.deliveryPricingEnabled as boolean;
+  const assumePaymentsAuto = values.assumePaymentsAuto as boolean;
   const pickupEnabled = values.pickupEnabled as boolean;
   const pickupHours = values.pickupHours as string | null;
   const deliveryHours = values.deliveryHours as string | null;
@@ -207,6 +209,7 @@ export default function ProfilePage() {
           posEnabled: d.posEnabled || false,
           deliveryEnabled: d.deliveryEnabled ?? true,
           deliveryPricingEnabled: d.deliveryPricingEnabled ?? false,
+          assumePaymentsAuto: d.assumePaymentsAuto ?? false,
           pickupEnabled: d.pickupEnabled ?? true,
           pickupHours: d.pickupHours || null,
           deliveryHours: d.deliveryHours || null,
@@ -223,14 +226,15 @@ export default function ProfilePage() {
       .catch(() => router.push("/restaurante/login"));
   }, [router]);
 
-  // Scroll to #pos section if URL hash is set
+  // Scroll to a section based on URL hash (#pos, #modo-confiar, etc.).
+  // Used by deep-links from Kanban banner + Novedades modal CTA.
   useEffect(() => {
     if (loading) return;
-    if (typeof window !== "undefined" && window.location.hash === "#pos") {
-      setTimeout(() => {
-        document.getElementById("pos")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
-    }
+    if (typeof window === "undefined" || !window.location.hash) return;
+    const id = window.location.hash.replace(/^#/, "");
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
   }, [loading]);
 
   function updateHours(day: string, field: string, value: string | boolean) {
@@ -715,6 +719,52 @@ export default function ProfilePage() {
               </label>
               <textarea value={bankInfo} onChange={(e) => setValue("bankInfo", e.target.value)} onBlur={() => flushField("bankInfo")} rows={2} placeholder="Banco, CBU, titular..."
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors resize-none" />
+            </div>
+          </div>
+
+          {/* "Modo confiar" — opt-in toggle that auto-marks every order as PAID.
+             Tradeoff is real (loss of payment trazability) so we show a thick
+             warning and a confirm dialog before flipping ON. Anchor #modo-confiar
+             so the Novedades modal CTA can deep-link here. */}
+          <div id="modo-confiar" className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 scroll-mt-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚡</span>
+                  <h3 className="text-sm font-bold text-amber-200">Modo confiar — sin validar pagos</h3>
+                </div>
+                <p className="text-xs text-amber-100/80 mt-1.5 leading-relaxed">
+                  {assumePaymentsAuto
+                    ? "Está prendido. Todos los pedidos nuevos se marcan como pagados al instante y los comprobantes que suban se auto-aprueban. No vas a tener que validar nada."
+                    : "Si lo prendés, todos los pedidos nuevos se marcan como pagados automáticamente — sin validar comprobantes, sin tocar \"Cobrar\". Lo que ya esté pendiente de validar también queda pagado."}
+                </p>
+                <p className="text-[11px] text-amber-200/60 mt-2 leading-relaxed">
+                  ⚠️ Importante: perdés la trazabilidad de qué cliente pagó realmente. Solo activalo si no llegás a validar y preferís esa libertad al control.
+                </p>
+                <SaveIndicator status={statuses.assumePaymentsAuto} />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!assumePaymentsAuto) {
+                    const ok = window.confirm(
+                      "¿Activar Modo confiar?\n\nTodos los pedidos pendientes de validación se van a marcar como pagados de una. Los pedidos futuros también, sin importar el método.\n\nVas a ver un banner en el Kanban recordándote que está activo. Lo podés apagar cuando quieras."
+                    );
+                    if (!ok) return;
+                  }
+                  setValue("assumePaymentsAuto", !assumePaymentsAuto);
+                }}
+                className={`shrink-0 relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  assumePaymentsAuto ? "bg-amber-500" : "bg-white/10"
+                }`}
+                aria-pressed={assumePaymentsAuto}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                    assumePaymentsAuto ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
             </div>
           </div>
         </section>

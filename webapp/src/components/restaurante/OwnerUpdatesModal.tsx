@@ -74,18 +74,41 @@ export function OwnerUpdatesModal() {
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-slate-900 border-t border-white/10 px-5 py-3.5 flex items-center justify-between gap-3">
+        <div className="sticky bottom-0 bg-slate-900 border-t border-white/10 px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-[11px] text-slate-500">
             {remaining > 1 ? "Quedan más novedades — las vas viendo de a una." : "Esta es la última novedad pendiente."}
           </p>
-          <button
-            type="button"
-            onClick={acknowledge}
-            disabled={busy}
-            className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-primary/30 hover:shadow-lg transition-all disabled:opacity-50"
-          >
-            {busy ? "..." : remaining > 1 ? "Entendido — siguiente" : "Entendido"}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Optional CTA button — deep-links to the relevant config screen
+               (acknowledges the update, then navigates). Falls back to plain
+               "Entendido" when the entry has no CTA. */}
+            {current.cta && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const href = current.cta!.href;
+                  await acknowledge();
+                  window.location.href = href;
+                }}
+                disabled={busy}
+                className="rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-primary/30 hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                {current.cta.label} →
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={acknowledge}
+              disabled={busy}
+              className={
+                current.cta
+                  ? "rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors disabled:opacity-50"
+                  : "rounded-xl bg-gradient-to-r from-primary to-amber-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-primary/30 hover:shadow-lg transition-all disabled:opacity-50"
+              }
+            >
+              {busy ? "..." : remaining > 1 ? "Entendido — siguiente" : "Entendido"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -65,6 +65,7 @@ export type Order = {
   cashChange: number | null;
   paymentReceiptUrl: string | null;
   paymentReceiptAt: string | null;
+  paymentAssumed: boolean;
   source: string | null;
   createdAt: string;
   updatedAt: string;
@@ -230,6 +231,7 @@ function mapOrder(dbOrder: any): Order {
     cashChange: dbOrder.cashChange,
     paymentReceiptUrl: dbOrder.paymentReceiptUrl || null,
     paymentReceiptAt: dbOrder.paymentReceiptAt ? dbOrder.paymentReceiptAt.toISOString() : null,
+    paymentAssumed: !!dbOrder.paymentAssumed,
     source: dbOrder.source || null,
     createdAt: dbOrder.createdAt.toISOString(),
     updatedAt: dbOrder.updatedAt.toISOString(),
@@ -259,6 +261,7 @@ export async function createOrder(data: {
   cashTendered?: number | null;
   cashChange?: number | null;
   paymentReceiptUrl?: string | null;
+  paymentAssumed?: boolean;
   source?: string | null;
   initialStatus?: OrderStatus; // For POS to skip GENERATED
 }): Promise<Order> {
@@ -300,6 +303,7 @@ export async function createOrder(data: {
           // (caller should set PAID_UNVERIFIED when paymentReceiptUrl is set).
           paymentReceiptUrl: data.paymentReceiptUrl ?? null,
           paymentReceiptAt: data.paymentReceiptUrl ? new Date() : null,
+          paymentAssumed: data.paymentAssumed ?? false,
           source: data.source ?? "web",
           ...(data.initialStatus ? { status: data.initialStatus as PrismaOrderStatus } : {}),
         },

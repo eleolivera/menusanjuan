@@ -392,19 +392,28 @@ export function OrderCard({
 
           {/* Payment status pill */}
           {order.paymentStatus === "PAID" ? (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 flex items-center justify-between text-xs">
-              <div className="text-emerald-300">
-                <span className="font-semibold">✓ Pagado</span>
-                {methodLabel && <span className="text-emerald-400/70"> · {methodLabel}</span>}
-                {paidAgo && <span className="text-emerald-400/70"> · {paidAgo}</span>}
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="text-emerald-300">
+                  <span className="font-semibold">✓ Pagado</span>
+                  {methodLabel && <span className="text-emerald-400/70"> · {methodLabel}</span>}
+                  {paidAgo && <span className="text-emerald-400/70"> · {paidAgo}</span>}
+                </div>
+                <button
+                  onClick={unmarkPaid}
+                  disabled={unmarking}
+                  className="text-[10px] text-emerald-400/60 hover:text-emerald-300 underline transition-colors disabled:opacity-50"
+                >
+                  {unmarking ? "..." : "desmarcar"}
+                </button>
               </div>
-              <button
-                onClick={unmarkPaid}
-                disabled={unmarking}
-                className="text-[10px] text-emerald-400/60 hover:text-emerald-300 underline transition-colors disabled:opacity-50"
-              >
-                {unmarking ? "..." : "desmarcar"}
-              </button>
+              {/* "Asumido" sub-label — distinguishes orders auto-paid by Modo confiar
+                 from ones the cashier really validated. Audit breadcrumb. */}
+              {order.paymentAssumed && (
+                <div className="text-[10px] text-emerald-400/50 italic">
+                  asumido (modo confiar)
+                </div>
+              )}
             </div>
           ) : order.paymentStatus === "PAID_UNVERIFIED" ? (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 space-y-2">
