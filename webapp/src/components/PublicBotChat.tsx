@@ -339,7 +339,7 @@ export function PublicBotChat() {
     if (typeof window === "undefined") return;
     localStorage.setItem("msj_bot_session_v2", JSON.stringify({ id: sessionId, ts: Date.now(), completed }));
   }, [sessionId]);
-  const [personality, setPersonality] = useState<"normal" | "bardero">("bardero");
+  const [personality, setPersonality] = useState<"normal" | "bardero">("normal");
   const [carts, setCarts] = useState<BotCart[]>([]);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

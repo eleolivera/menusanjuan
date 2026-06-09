@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     message.trim(),
     history || [],
     cart || [],
-    (personality as Personality) || "bardero"
+    (personality as Personality) || "normal"
   );
 
   return NextResponse.json({ reply, actions, suggestedItems });

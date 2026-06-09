@@ -27,7 +27,9 @@ export async function getConvo(sessionId: string): Promise<ConvoState> {
       personality: (row[0].personality as Personality) || "normal",
     };
   }
-  return { messages: [], personality: "bardero" };
+  // Default to "normal" — bardero is opt-in via "modo bardero" command. Owners
+  // complained the default was too aggressive for first-time visitors.
+  return { messages: [], personality: "normal" };
 }
 
 async function saveConvo(sessionId: string, convo: ConvoState) {
