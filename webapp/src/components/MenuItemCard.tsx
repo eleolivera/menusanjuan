@@ -46,6 +46,11 @@ export function MenuItemCard({
               loop
               muted
               playsInline
+              // preload metadata = first frame loads even when autoplay is blocked
+              // (Safari Low Power Mode, some Android browsers). Without this, a
+              // blocked autoplay leaves the card looking blank instead of showing
+              // at least the cover frame.
+              preload="metadata"
             />
           ) : (
             <Image
