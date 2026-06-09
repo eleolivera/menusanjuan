@@ -227,6 +227,7 @@ export default function AdminPage() {
           ))}
           <div className="flex items-center gap-2 ml-auto">
             <a href="/admin/playbook" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 hover:bg-white/5 transition-colors">Playbook</a>
+            <a href="/admin/bot/conversations" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 hover:bg-white/5 transition-colors">🤖 Bot convos</a>
             <button onClick={handleLogout} className="rounded-lg border border-red-500/20 px-2.5 py-1.5 text-[10px] text-red-400 hover:bg-red-500/10 transition-colors">Salir</button>
           </div>
         </div>
