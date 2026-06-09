@@ -1,11 +1,70 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import type { MenuItemData } from "@/data/menus";
 
 function isVideo(url: string): boolean {
   const lower = url.toLowerCase();
   return lower.includes(".mp4") || lower.includes(".mov") || lower.includes(".webm") || lower.includes("video/");
+}
+
+/**
+ * Auto-playing video that respects on-screen visibility.
+ *
+ * Why this exists: a long menu page can easily have 10+ items with video
+ * thumbnails. Autoplaying all of them simultaneously eats mobile data
+ * (a few MB each), drains battery, and hammers the decoder. We use an
+ * IntersectionObserver so each video only plays while its card is on
+ * screen, and pauses the moment it scrolls away.
+ *
+ * preload="metadata" guarantees the first frame is loaded even if
+ * autoplay is blocked (Safari Low Power Mode, some Android browsers) —
+ * so the thumbnail never looks blank.
+ */
+function VideoThumb({ src, alt }: { src: string; alt: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    if (typeof IntersectionObserver === "undefined") {
+      // SSR / very old browser — just let the native autoplay try.
+      node.play().catch(() => {});
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          node.play().catch(() => {});
+        } else {
+          node.pause();
+        }
+      },
+      { threshold: 0.25 },
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <>
+      <video
+        ref={ref}
+        src={src}
+        className="h-full w-full object-cover"
+        loop
+        muted
+        playsInline
+        preload="metadata"
+        aria-label={alt}
+      />
+      {/* Tiny corner badge so users know the thumbnail is interactive media */}
+      <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/55 px-1 py-0.5 text-[8px] font-bold text-white tracking-wider">
+        ▶ VIDEO
+      </span>
+    </>
+  );
 }
 
 export function MenuItemCard({
@@ -39,19 +98,7 @@ export function MenuItemCard({
       {item.imageUrl && (
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200">
           {isVideo(item.imageUrl) ? (
-            <video
-              src={item.imageUrl}
-              className="h-full w-full object-cover"
-              autoPlay
-              loop
-              muted
-              playsInline
-              // preload metadata = first frame loads even when autoplay is blocked
-              // (Safari Low Power Mode, some Android browsers). Without this, a
-              // blocked autoplay leaves the card looking blank instead of showing
-              // at least the cover frame.
-              preload="metadata"
-            />
+            <VideoThumb src={item.imageUrl} alt={item.name} />
           ) : (
             <Image
               src={item.imageUrl}
