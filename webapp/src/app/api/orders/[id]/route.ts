@@ -37,6 +37,47 @@ export async function PATCH(
     if (!VALID_STATUSES.includes(body.status)) {
       return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
     }
+
+    // Implicit-payment rule on transition to DELIVERED — owners are too busy
+    // to also click "Cobrar" on every order before clicking "Entregado":
+    //   - pickup  + not-yet-paid → auto-PAID (no question, since the customer
+    //                              physically came to get it = transaction implies payment)
+    //   - delivery + not-yet-paid + markPaid===true → PAID (client asked
+    //                                                  "¿estaba pagado?" via confirm dialog)
+    //   - otherwise: just status changes, payment untouched
+    // Either way, we tag paymentAssumed=true so the audit trail shows the
+    // cashier clicked through rather than running the comprobante / Cobrar flow.
+    if (body.status === "DELIVERED") {
+      const existing = await prisma.order.findUnique({
+        where: { id },
+        select: { deliveryMethod: true, paymentStatus: true, paymentIntent: true },
+      });
+      if (!existing) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+
+      const notYetPaid = existing.paymentStatus !== "PAID";
+      const isPickup = existing.deliveryMethod === "pickup";
+      const shouldAutoMarkPaid =
+        notYetPaid && (isPickup || body.markPaid === true);
+
+      if (shouldAutoMarkPaid) {
+        await prisma.order.update({
+          where: { id },
+          data: {
+            status: body.status,
+            paymentStatus: "PAID",
+            paymentAssumed: true,
+            paidAt: new Date(),
+            // Lock in the cashier-side method: prefer customer's intent, fall
+            // back to "cash" (pickup is overwhelmingly cash; delivery the
+            // courier collected it).
+            paymentMethod: existing.paymentIntent ?? "cash",
+          },
+        });
+        const fresh = await getOrder(id);
+        return NextResponse.json(fresh);
+      }
+    }
+
     const order = await updateOrderStatus(id, body.status);
     if (!order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     return NextResponse.json(order);

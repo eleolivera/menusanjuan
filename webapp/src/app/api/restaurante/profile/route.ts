@@ -70,7 +70,6 @@ export async function GET() {
     posEnabled: dealer.posEnabled,
     deliveryEnabled: dealer.deliveryEnabled,
     deliveryPricingEnabled: dealer.deliveryPricingEnabled,
-    assumePaymentsAuto: dealer.assumePaymentsAuto,
     pickupEnabled: dealer.pickupEnabled,
     pickupHours: dealer.pickupHours,
     deliveryHours: dealer.deliveryHours,
@@ -102,19 +101,7 @@ export async function PATCH(request: NextRequest) {
     mercadoPagoAlias, mercadoPagoCvu, bankInfo, posEnabled,
     isActive, deliveryEnabled, deliveryPricingEnabled, pickupEnabled, pickupHours, deliveryHours, deliveryZones, deliveryCloseRadius, deliveryClosePrice,
     deliveryFarRadius, deliveryFarPrice, deliveryFee, deliveryTimeMin,
-    assumePaymentsAuto,
   } = body;
-
-  // "Modo confiar" flip-on side effect: when the owner enables auto-PAID, sweep
-  // any existing PAID_UNVERIFIED backlog to PAID with paymentAssumed=true.
-  // The point of the toggle is to skip validation — leaving a queue defeats it.
-  const turningOn = assumePaymentsAuto === true && !dealer.assumePaymentsAuto;
-  if (turningOn) {
-    await prisma.order.updateMany({
-      where: { restauranteSlug: dealer.slug, paymentStatus: "PAID_UNVERIFIED" },
-      data: { paymentStatus: "PAID", paymentAssumed: true, paidAt: new Date() },
-    });
-  }
 
   // Validate deliveryZones up-front so we can return 400 with a friendly message
   let zonesJson: string | null | undefined = undefined;
@@ -146,7 +133,6 @@ export async function PATCH(request: NextRequest) {
       ...(isActive !== undefined && { isActive }),
       ...(deliveryEnabled !== undefined && { deliveryEnabled }),
       ...(deliveryPricingEnabled !== undefined && { deliveryPricingEnabled }),
-      ...(assumePaymentsAuto !== undefined && { assumePaymentsAuto }),
       ...(pickupEnabled !== undefined && { pickupEnabled }),
       ...(pickupHours !== undefined && { pickupHours }),
       ...(deliveryHours !== undefined && { deliveryHours }),

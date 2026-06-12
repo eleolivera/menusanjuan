@@ -44,17 +44,6 @@ export default function RestauranteDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(getArDateString(0));
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [assumePaymentsAuto, setAssumePaymentsAuto] = useState(false);
-
-  // Track whether this resta is in "Modo confiar" — controls the persistent
-  // amber warning banner at the top of the Kanban. Fetched once on mount; the
-  // banner only matters while the toggle is ON, so re-checking on poll is overkill.
-  useEffect(() => {
-    fetch("/api/restaurante/profile")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => setAssumePaymentsAuto(!!d?.assumePaymentsAuto))
-      .catch(() => {});
-  }, []);
 
   const isToday = selectedDate === getArDateString(0);
 
@@ -123,13 +112,20 @@ export default function RestauranteDashboard() {
     setSelectedDate(getArDateString(0));
   }
 
-  // Update order status
-  async function updateStatus(orderId: string, status: OrderStatus) {
+  // Update order status. Optional `extras` carries hints used by the server for
+  // implicit payment transitions — see /api/orders/[id] route, the status branch:
+  //   - markPaid:true → server flips paymentStatus to PAID with paymentAssumed=true.
+  //     The OrderCard sets this when the cashier clicks "Entregado" on a delivery
+  //     order that wasn't paid yet AND answers "Sí" to the "¿estaba pagado?" confirm.
+  //   - pickup orders auto-PAID server-side without needing the hint.
+  async function updateStatus(orderId: string, status: OrderStatus, extras?: { markPaid?: boolean }) {
     await fetch(`/api/orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...extras }),
     });
+    // Optimistic local update — server may also have flipped paymentStatus,
+    // but the next 10s poll will reconcile.
     setOrders((prev) =>
       prev.map((o) =>
         o.id === orderId ? { ...o, status, updatedAt: new Date().toISOString() } : o
@@ -259,25 +255,6 @@ export default function RestauranteDashboard() {
             </div>
           </div>
         </header>
-
-        {/* Modo confiar persistent banner — reminds the owner that all incoming
-           orders are auto-marked as paid without validation. Click-through to the
-           toggle in profile so they can disable it if they regret enabling it. */}
-        {assumePaymentsAuto && (
-          <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-6 py-2.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs text-amber-100 min-w-0">
-              <span className="text-base shrink-0">⚠️</span>
-              <span className="font-semibold">Modo confiar está activado.</span>
-              <span className="text-amber-200/80 truncate">Todos los pedidos se marcan como pagados sin validación.</span>
-            </div>
-            <a
-              href="/restaurante/profile#modo-confiar"
-              className="shrink-0 rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1 text-[11px] font-semibold text-amber-100 hover:bg-amber-500/25 transition-colors"
-            >
-              Cambiar en config →
-            </a>
-          </div>
-        )}
 
         <div className="px-3 py-2 flex-1 flex flex-col" style={{ minHeight: 0 }}>
           {loading ? (

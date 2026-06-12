@@ -116,7 +116,6 @@ model Dealer {
   rating      Float?                           // Star rating (1.0-5.0), admin-set
   deliveryEnabled    Boolean  @default(true)   // Whether restaurant offers delivery
   deliveryPricingEnabled Boolean @default(false) // Whether to auto-charge a delivery fee. When false, the public site shows "Costo a confirmar" and the resta negotiates by WhatsApp. When true, the zones / flat-fee UI is exposed.
-  assumePaymentsAuto Boolean @default(false)   // "Modo confiar": when true, every new order is created as PAID immediately (any intent) and every comprobante upload auto-validates instead of going to PAID_UNVERIFIED. paymentAssumed=true is set so the owner can audit later. Default false; only enabled by owners who can't keep up with manual validation.
   pickupEnabled      Boolean  @default(true)   // Whether restaurant accepts in-person pickup
   closedUntil        DateTime?                 // Manual early-close: closed until this timestamp regardless of schedule (e.g. ran out of food). Set to "next morning 5am AR" so the close survives midnight rollover.
   lastSeenUpdate     String?                   // ID of the most recent "Novedades" entry the owner acknowledged. Compared against changelog.ts to decide if the modal pops up.
@@ -363,7 +362,7 @@ model Order {
   cashChange       Float?
   paymentReceiptUrl String?                          // R2 URL of the customer-uploaded comprobante image
   paymentReceiptAt  DateTime?                        // When the customer uploaded the comprobante (null if none yet)
-  paymentAssumed    Boolean     @default(false)      // True when the order was auto-marked PAID via the dealer's "Modo confiar" setting (no real validation happened). Audit breadcrumb so the owner can distinguish later.
+  paymentAssumed    Boolean     @default(false)      // True when payment was implied rather than explicitly validated by the cashier — e.g. pickup auto-PAID on status→DELIVERED, or delivery "¿estaba pagado?" confirm dialog. Audit breadcrumb so we can later distinguish "real" validations from "cashier just clicked through".
   channel          String      @default("ONLINE")    // "ONLINE" | "DINE_IN" | "COUNTER"
   tableNumber      String?                           // "Mesa 12" / "Barra 3" — free text
   source           String?                           // "web" | "pos-tablet" | "pos-mobile"

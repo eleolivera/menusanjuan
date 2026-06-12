@@ -56,7 +56,7 @@ export function OrderCard({
   restaurantName,
 }: {
   order: Order;
-  onUpdateStatus: (orderId: string, status: OrderStatus) => void;
+  onUpdateStatus: (orderId: string, status: OrderStatus, extras?: { markPaid?: boolean }) => void;
   restaurantName: string;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -506,7 +506,29 @@ export function OrderCard({
           <div className="mt-3 flex gap-2">
             {config.next && config.nextLabel && (
               <button
-                onClick={() => onUpdateStatus(order.id, config.next!)}
+                onClick={() => {
+                  const nextStatus = config.next!;
+                  // Smart "Entregado" transition — owners are too busy to also click
+                  // "Cobrar" before "Entregado", so we infer payment from context:
+                  //   - pickup    → auto-PAID server-side (no question asked)
+                  //   - delivery  → if not yet paid, ask "¿estaba pagado?" with a
+                  //                  confirm dialog. Yes → markPaid hint to server.
+                  //                  No  → just status change, payment stays UNPAID.
+                  if (
+                    nextStatus === "DELIVERED" &&
+                    order.deliveryMethod === "delivery" &&
+                    order.paymentStatus !== "PAID"
+                  ) {
+                    const wasPaid = window.confirm(
+                      "¿Ya estaba pagado este pedido?\n\nTocá Aceptar si el repartidor lo cobró (o si pagaron por transferencia / MP).\nTocá Cancelar si todavía falta cobrar."
+                    );
+                    onUpdateStatus(order.id, nextStatus, { markPaid: wasPaid });
+                  } else {
+                    // Pickup → server auto-PAIDs based on deliveryMethod.
+                    // All other transitions → just the status change.
+                    onUpdateStatus(order.id, nextStatus);
+                  }
+                }}
                 className="flex-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-0.5 transition-all ring-1 ring-white/10"
               >
                 {config.nextLabel}

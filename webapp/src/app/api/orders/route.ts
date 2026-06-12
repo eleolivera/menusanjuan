@@ -9,7 +9,6 @@ import {
 } from "@/lib/orders-store";
 import { notifyRestaurantOfNewOrder } from "@/lib/order-notification";
 import { computeCartTotal } from "@/lib/money";
-import { prisma } from "@/lib/prisma";
 
 // POST — create a new order
 export async function POST(request: NextRequest) {
@@ -54,23 +53,7 @@ export async function POST(request: NextRequest) {
       rawReceiptUrl.startsWith("https://images.menusanjuan.com/")
         ? rawReceiptUrl
         : null;
-
-    // "Modo confiar": when the dealer opts in, every order auto-lands as PAID
-    // regardless of the customer's intent. We tag paymentAssumed=true so the
-    // owner can audit later which orders had no real validation step.
-    const dealer = await prisma.dealer.findUnique({
-      where: { slug: restauranteSlug },
-      select: { assumePaymentsAuto: true },
-    });
-    const assume = !!dealer?.assumePaymentsAuto;
-
-    const paymentStatus = assume
-      ? "PAID"
-      : (paymentReceiptUrl ? "PAID_UNVERIFIED" : "UNPAID");
-    // When assuming PAID, also lock in the method (use the customer's stated
-    // intent if any, else "cash" as the safe default) so the OrderCard shows
-    // something useful next to the "✓ Pagado" pill.
-    const paymentMethod = assume ? (paymentIntent ?? "cash") : null;
+    const paymentStatus = paymentReceiptUrl ? "PAID_UNVERIFIED" : "UNPAID";
 
     const order = await createOrder({
       restauranteSlug,
@@ -87,8 +70,6 @@ export async function POST(request: NextRequest) {
       paymentIntent,
       paymentReceiptUrl,
       paymentStatus,
-      paymentMethod,
-      paymentAssumed: assume,
     });
 
     // Fire-and-forget email notification to restaurant owner

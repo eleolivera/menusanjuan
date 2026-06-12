@@ -40,10 +40,7 @@ export async function POST(
     return NextResponse.json({ error: "Falta token" }, { status: 401 });
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: { dealer: { select: { assumePaymentsAuto: true } } },
-  });
+  const order = await prisma.order.findUnique({ where: { id } });
   if (!order || order.customerAccessToken !== token) {
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
   }
@@ -98,23 +95,14 @@ export async function POST(
   const buffer = Buffer.from(await file.arrayBuffer());
   const url = await uploadToR2(buffer, key, file.type);
 
-  // "Modo confiar": when the dealer has assumePaymentsAuto enabled, comprobante
-  // uploads land as PAID instead of PAID_UNVERIFIED. Tag paymentAssumed=true
-  // and stamp paidAt + a default paymentMethod so the OrderCard renders cleanly.
-  const assume = !!order.dealer?.assumePaymentsAuto;
   const updated = await prisma.order.update({
     where: { id: order.id },
     data: {
       paymentReceiptUrl: url,
       paymentReceiptAt: new Date(),
-      paymentStatus: assume ? "PAID" : "PAID_UNVERIFIED",
-      ...(assume && {
-        paymentAssumed: true,
-        paidAt: new Date(),
-        // Prefer the customer's stated intent; fall back to "transfer" since
-        // they just uploaded a comprobante (cash wouldn't have one).
-        paymentMethod: order.paymentIntent ?? "transfer",
-      }),
+      paymentStatus: "PAID_UNVERIFIED",
+      // Note: paymentMethod stays null until the cashier validates. We don't
+      // pre-fill from paymentIntent because the cashier may correct it.
     },
   });
 
