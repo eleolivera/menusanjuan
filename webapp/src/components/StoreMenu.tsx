@@ -11,6 +11,7 @@ import { FloatingCart } from "./FloatingCart";
 import { OrderModal } from "./OrderModal";
 import { ItemCustomizeSheet, type SelectedOptions, type ComponentSelection } from "./ItemCustomizeSheet";
 import { Search, X } from "lucide-react";
+import { getCategoryIcon } from "@/lib/category-icon";
 import { OrderStatusBanner } from "./OrderStatusBanner";
 import { StoreCompanion } from "./StoreCompanion";
 import { getActivePendingOrderRef, getOrderRefs, type OrderRef } from "@/lib/order-tracker";
@@ -412,7 +413,10 @@ export function StoreMenu({
                 className="mb-10 scroll-mt-32"
               >
                 <h2 className="mb-4 text-xl font-bold text-text flex items-center gap-2">
-                  <span>{category.emoji}</span>
+                  {(() => {
+                    const Icon = getCategoryIcon(category.name);
+                    return <Icon className="h-5 w-5 text-primary" strokeWidth={1.75} />;
+                  })()}
                   {category.name}
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
