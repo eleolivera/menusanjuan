@@ -13,7 +13,7 @@ import { ItemCustomizeSheet, type SelectedOptions, type ComponentSelection } fro
 import { Search, X } from "lucide-react";
 import { OrderStatusBanner } from "./OrderStatusBanner";
 import { StoreCompanion } from "./StoreCompanion";
-import { getLatestOrderRef, getOrderRefs, type OrderRef } from "@/lib/order-tracker";
+import { getActivePendingOrderRef, getOrderRefs, type OrderRef } from "@/lib/order-tracker";
 
 // Search results component — filters items across all categories
 function SearchResults({
@@ -104,9 +104,12 @@ export function StoreMenu({
 
   const searchParams = useSearchParams();
 
-  // Check localStorage for pending orders on mount
+  // Check localStorage for pending orders on mount.
+  // Only treat as "pending" if the order is still in the active window (6h).
+  // Older orders fall through to the past-orders / re-order section so they
+  // don't pin a stale banner on top of today's menu.
   useEffect(() => {
-    const ref = getLatestOrderRef(restaurant.slug);
+    const ref = getActivePendingOrderRef(restaurant.slug);
     if (ref) setPendingOrder(ref);
     // Load past orders for this restaurant (for re-order)
     setPastOrders(getOrderRefs(restaurant.slug));

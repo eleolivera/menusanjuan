@@ -51,6 +51,21 @@ export function getLatestOrderRef(slug: string): OrderRef | null {
   return refs[0] || null;
 }
 
+/** Last order that's likely still "in flight" — placed within the active window
+ * (default 6 hours). Anything older falls through to past-orders / re-order UX
+ * instead of pinning a stale banner on top of the menu.
+ *
+ * Restaurant orders typically resolve within 60–120 minutes; 6 hours gives a
+ * safe margin for late-night orders or restaurants that batch their fulfillment
+ * without leaving yesterday's order plastered on today's visit. */
+export function getActivePendingOrderRef(slug: string, maxAgeHours = 6): OrderRef | null {
+  const ref = getLatestOrderRef(slug);
+  if (!ref) return null;
+  const ageMs = Date.now() - new Date(ref.placedAt).getTime();
+  if (ageMs > maxAgeHours * 60 * 60 * 1000) return null;
+  return ref;
+}
+
 /** Get all order refs across all restaurants. */
 export function getAllOrderRefs(): (OrderRef & { slug: string })[] {
   if (typeof window === "undefined") return [];

@@ -38,6 +38,12 @@ export function OrderStatusBanner({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    // Track first-fetch separately so we can dismiss terminal-state orders
+    // (DELIVERED/CANCELLED) instantly when the page reloads on a stale order,
+    // instead of showing the banner for 30s before it goes away. The 30s
+    // delay still makes sense AFTER a fresh delivery happens during the
+    // current session (so the user sees the "Entregado" celebration).
+    let firstFetch = true;
     async function poll() {
       try {
         const res = await fetch(`/api/orders/track?id=${orderId}&token=${token}`);
@@ -45,11 +51,24 @@ export function OrderStatusBanner({
           const data = await res.json();
           setStatus(data.status);
           if (data.status === "DELIVERED") {
-            // Auto-dismiss after 30 seconds
-            setTimeout(() => { setDismissed(true); onDismiss(); }, 30000);
+            if (firstFetch) {
+              // Already delivered when we mounted → don't pin yesterday's
+              // order on today's screen, just hide it.
+              setDismissed(true);
+              onDismiss();
+            } else {
+              // Just got delivered live → 30s celebration then dismiss.
+              setTimeout(() => { setDismissed(true); onDismiss(); }, 30000);
+            }
             if (pollRef.current) clearInterval(pollRef.current);
           }
           if (data.status === "CANCELLED") {
+            if (firstFetch) {
+              // Same logic as DELIVERED — pre-existing cancellation goes away
+              // instantly. Previously this case never dismissed at all.
+              setDismissed(true);
+              onDismiss();
+            }
             if (pollRef.current) clearInterval(pollRef.current);
           }
         } else {
@@ -58,6 +77,7 @@ export function OrderStatusBanner({
           onDismiss();
         }
       } catch {}
+      firstFetch = false;
     }
     poll();
     pollRef.current = setInterval(poll, 30000);
