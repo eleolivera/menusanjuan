@@ -6,45 +6,66 @@ import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCol
 import { MoneyInput } from "@/components/MoneyInput";
 import { buildDeliveryInstructions } from "@/lib/delivery-instructions";
 import { ReceiptValidationModal } from "./ReceiptValidationModal";
+import {
+  FileText,
+  Wallet,
+  ChefHat,
+  PackageCheck,
+  XCircle,
+  Globe,
+  Store,
+  Armchair,
+  type LucideIcon,
+} from "lucide-react";
 
-const STATUS_CONFIG: Record<
-  OrderStatus,
-  { label: string; emoji: string; bg: string; text: string; next?: OrderStatus; nextLabel?: string }
-> = {
+type StatusEntry = {
+  label: string;
+  Icon: LucideIcon;
+  bg: string;
+  text: string;
+  next?: OrderStatus;
+  nextLabel?: string;
+  NextIcon?: LucideIcon;
+};
+
+const STATUS_CONFIG: Record<OrderStatus, StatusEntry> = {
   GENERATED: {
     label: "Nuevo",
-    emoji: "📝",
+    Icon: FileText,
     bg: "bg-amber-500/15",
     text: "text-amber-400",
     next: "PROCESSING",
-    nextLabel: "👨‍🍳 Mandar a Cocina",
+    nextLabel: "Mandar a Cocina",
+    NextIcon: ChefHat,
   },
   PAID: {
     // Legacy status — pre-existing orders may still be here. Treat like GENERATED for new transitions.
     label: "Pagado",
-    emoji: "💰",
+    Icon: Wallet,
     bg: "bg-emerald-500/15",
     text: "text-emerald-400",
     next: "PROCESSING",
-    nextLabel: "👨‍🍳 Mandar a Cocina",
+    nextLabel: "Mandar a Cocina",
+    NextIcon: ChefHat,
   },
   PROCESSING: {
     label: "En Cocina",
-    emoji: "🔄",
+    Icon: ChefHat,
     bg: "bg-blue-500/15",
     text: "text-blue-400",
     next: "DELIVERED",
     nextLabel: "Marcar Entregado",
+    NextIcon: PackageCheck,
   },
   DELIVERED: {
     label: "Entregado",
-    emoji: "✅",
+    Icon: PackageCheck,
     bg: "bg-slate-500/15",
     text: "text-slate-400",
   },
   CANCELLED: {
     label: "Cancelado",
-    emoji: "❌",
+    Icon: XCircle,
     bg: "bg-red-500/15",
     text: "text-red-400",
   },
@@ -188,8 +209,9 @@ export function OrderCard({
       <div className="px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${config.bg} ${config.text}`}>
-              {config.emoji} {config.label}
+            <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${config.bg} ${config.text}`}>
+              <config.Icon className="h-3.5 w-3.5" strokeWidth={2} />
+              {config.label}
             </span>
             <span className="text-sm font-bold text-white truncate">
               {order.orderNumber}
@@ -546,8 +568,9 @@ export function OrderCard({
                     onUpdateStatus(order.id, nextStatus);
                   }
                 }}
-                className="flex-1 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-0.5 transition-all ring-1 ring-white/10"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-0.5 transition-all ring-1 ring-white/10"
               >
+                {config.NextIcon && <config.NextIcon className="h-4 w-4" strokeWidth={2.25} />}
                 {config.nextLabel}
               </button>
             )}
@@ -629,7 +652,8 @@ function SourcePill({ order }: { order: Order }) {
   if (channel === "COUNTER") {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
-        🖥️ Mostrador
+        <Store className="h-3 w-3" strokeWidth={2.25} />
+        Mostrador
       </span>
     );
   }
@@ -637,14 +661,16 @@ function SourcePill({ order }: { order: Order }) {
     const label = order.tableNumber ? `Mesa ${order.tableNumber}` : "Mesa";
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
-        🍽️ {label}
+        <Armchair className="h-3 w-3" strokeWidth={2.25} />
+        {label}
       </span>
     );
   }
   // ONLINE (default) — customer placed it via the public store
   return (
     <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
-      🌐 Online
+      <Globe className="h-3 w-3" strokeWidth={2.25} />
+      Online
     </span>
   );
 }

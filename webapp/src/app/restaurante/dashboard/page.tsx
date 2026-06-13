@@ -2,6 +2,15 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ClipboardList,
+  PackageCheck,
+  ChefHat,
+  Wallet,
+  FileText,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 
 type Analytics = {
   period: string;
@@ -278,21 +287,25 @@ export default function AnalyticsPage() {
 
           {/* Status Breakdown */}
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
-            <h3 className="text-sm font-bold text-white mb-4">📋 Estado de Pedidos</h3>
+            <h3 className="inline-flex items-center gap-2 text-sm font-bold text-white mb-4">
+              <ClipboardList className="h-4 w-4 text-primary" strokeWidth={2} />
+              Estado de Pedidos
+            </h3>
             <div className="space-y-3">
-              {[
-                { label: "Entregados", count: data.statusBreakdown.delivered, emoji: "✅", color: "bg-emerald-500" },
-                { label: "En Cocina", count: data.statusBreakdown.processing, emoji: "🔄", color: "bg-blue-500" },
-                { label: "Pagados", count: data.statusBreakdown.paid, emoji: "💰", color: "bg-amber-500" },
-                { label: "Generados", count: data.statusBreakdown.generated, emoji: "📝", color: "bg-slate-500" },
-                { label: "Cancelados", count: data.statusBreakdown.cancelled, emoji: "❌", color: "bg-red-500" },
-              ].map((st) => {
+              {([
+                { label: "Entregados", count: data.statusBreakdown.delivered, Icon: PackageCheck as LucideIcon, color: "bg-emerald-500" },
+                { label: "En Cocina", count: data.statusBreakdown.processing, Icon: ChefHat as LucideIcon, color: "bg-blue-500" },
+                { label: "Pagados", count: data.statusBreakdown.paid, Icon: Wallet as LucideIcon, color: "bg-amber-500" },
+                { label: "Generados", count: data.statusBreakdown.generated, Icon: FileText as LucideIcon, color: "bg-slate-500" },
+                { label: "Cancelados", count: data.statusBreakdown.cancelled, Icon: XCircle as LucideIcon, color: "bg-red-500" },
+              ]).map((st) => {
                 const pct = s.totalOrders > 0 ? (st.count / s.totalOrders) * 100 : 0;
                 return (
                   <div key={st.label}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-slate-400">
-                        {st.emoji} {st.label}
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+                        <st.Icon className="h-3.5 w-3.5" strokeWidth={2} />
+                        {st.label}
                       </span>
                       <span className="text-xs font-bold text-white">{st.count}</span>
                     </div>
