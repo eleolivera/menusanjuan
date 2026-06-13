@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { flexMatch } from "@/lib/search";
 import { OnboardingBoard } from "@/components/OnboardingBoard";
+import { LayoutDashboard, Mail, Users, Settings, Bot, type LucideIcon } from "lucide-react";
 
 type Claim = {
   id: string;
@@ -213,21 +214,22 @@ export default function AdminPage() {
       <div className="px-3 py-2 h-full flex flex-col">
 
         <div className="flex gap-2 mb-2 shrink-0">
-          {[
-            { key: "onboarding" as const, label: "📋 Tablero" },
-            { key: "claims" as const, label: "📨 Reclamos", badge: pendingClaims },
-            { key: "users" as const, label: "👥 Usuarios" },
-            { key: "settings" as const, label: "⚙️ Config" },
-          ].map(t => (
+          {([
+            { key: "onboarding" as const, label: "Tablero", Icon: LayoutDashboard, badge: undefined as number | undefined },
+            { key: "claims" as const, label: "Reclamos", Icon: Mail, badge: pendingClaims },
+            { key: "users" as const, label: "Usuarios", Icon: Users, badge: undefined },
+            { key: "settings" as const, label: "Config", Icon: Settings, badge: undefined },
+          ] as Array<{ key: typeof tab; label: string; Icon: LucideIcon; badge: number | undefined }>).map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${tab === t.key ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
+              className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all inline-flex items-center gap-1.5 ${tab === t.key ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"}`}>
+              <t.Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
               {t.label}
               {t.badge ? <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{t.badge}</span> : null}
             </button>
           ))}
           <div className="flex items-center gap-2 ml-auto">
             <a href="/admin/playbook" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 hover:bg-white/5 transition-colors">Playbook</a>
-            <a href="/admin/bot/conversations" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 hover:bg-white/5 transition-colors">🤖 Bot convos</a>
+            <a href="/admin/bot/conversations" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 hover:bg-white/5 transition-colors inline-flex items-center gap-1"><Bot className="h-3 w-3" strokeWidth={1.75} /> Bot convos</a>
             <button onClick={handleLogout} className="rounded-lg border border-red-500/20 px-2.5 py-1.5 text-[10px] text-red-400 hover:bg-red-500/10 transition-colors">Salir</button>
           </div>
         </div>

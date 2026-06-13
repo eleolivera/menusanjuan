@@ -5,14 +5,18 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
 import { OwnerUpdatesModal } from "@/components/restaurante/OwnerUpdatesModal";
-import { ChevronDown, ExternalLink, LogOut, ChevronRight } from "lucide-react";
+import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, type LucideIcon } from "lucide-react";
 
-const DEFAULT_NAV = [
-  { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
-  { href: "/restaurante/profile", label: "Mi Restaurante", emoji: "🏪" },
-  { href: "/restaurante/pedidos", label: "Pedidos", emoji: "📋" },
-  { href: "/restaurante/pos", label: "POS", emoji: "💵" },
-  { href: "/restaurante/dashboard", label: "Dashboard", emoji: "📊" },
+// Nav uses Lucide line icons (same style as the rest of the app) instead of
+// emoji — emoji read as "consumer / playful" which felt off for the owner-side
+// dashboard. Each entry maps to a specific icon that visually represents the
+// destination at a glance.
+const DEFAULT_NAV: Array<{ href: string; label: string; Icon: LucideIcon }> = [
+  { href: "/restaurante/menu", label: "Menú", Icon: UtensilsCrossed },
+  { href: "/restaurante/profile", label: "Mi Restaurante", Icon: Store },
+  { href: "/restaurante/pedidos", label: "Pedidos", Icon: ClipboardList },
+  { href: "/restaurante/pos", label: "POS", Icon: Wallet },
+  { href: "/restaurante/dashboard", label: "Dashboard", Icon: BarChart3 },
 ];
 
 const USAGE_KEY = "msj_nav_usage";
@@ -257,7 +261,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     : "text-slate-400 hover:bg-white/5 hover:text-slate-300"
                 }`}
               >
-                <span className={collapsed ? "text-lg" : "text-base mr-2.5"}>{item.emoji}</span>
+                <item.Icon className={`shrink-0 ${collapsed ? "h-5 w-5" : "h-4 w-4 mr-2.5"}`} strokeWidth={1.75} />
                 {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
               </Link>
             );
