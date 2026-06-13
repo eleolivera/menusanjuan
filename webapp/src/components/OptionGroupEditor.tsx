@@ -85,12 +85,20 @@ export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/ap
       // Send options only when NOT using a preset
       options: newPresetId ? [] : opts,
     };
+    let res: Response;
     if (useAdminApi) {
-      await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "option-group", ...payload }) });
+      res = await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "option-group", ...payload }) });
     } else {
-      await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      res = await fetch(apiBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     }
     setSaving(false);
+    // Surface errors instead of silently closing — saves that 400 looked
+    // successful before, which made debugging "didn't save" reports really hard.
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(`No pude crear el grupo: ${data?.error || res.statusText}`);
+      return;
+    }
     resetNew();
     onUpdate();
   }
@@ -107,12 +115,18 @@ export function OptionGroupEditor({ menuItemId, groups, onUpdate, apiBase = "/ap
       presetId: editPresetId || null,
       options: editPresetId ? [] : opts,
     };
+    let res: Response;
     if (useAdminApi) {
-      await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "option-group", ...payload }) });
+      res = await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "option-group", ...payload }) });
     } else {
-      await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      res = await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     }
     setSaving(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(`No pude guardar el grupo: ${data?.error || res.statusText}`);
+      return;
+    }
     setEditingId(null);
     onUpdate();
   }
