@@ -169,6 +169,24 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   }
 
+  // Block delete if this item is a component of any promo — the DB-level FK
+  // Restrict would throw an opaque error otherwise. Surfacing it here lets us
+  // return a friendly message naming the parent promos so the owner knows
+  // what to detach first.
+  const usedIn = await prisma.menuItemComponent.findMany({
+    where: { childItemId: id },
+    include: { parentItem: { select: { name: true } } },
+  });
+  if (usedIn.length > 0) {
+    const parents = Array.from(new Set(usedIn.map((u) => u.parentItem.name)));
+    return NextResponse.json(
+      {
+        error: `No se puede eliminar — este item es componente de ${parents.length === 1 ? "el combo" : "los combos"}: ${parents.join(", ")}. Primero sacalo de esos combos.`,
+      },
+      { status: 409 },
+    );
+  }
+
   await prisma.menuItem.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

@@ -217,10 +217,15 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
 
   async function deleteItem(itemId: string) {
     if (!confirm("Eliminar este item?")) return;
-    if (useAdminApi) {
-      await fetch(`${apiBase}?type=item&targetId=${itemId}`, { method: "DELETE" });
-    } else {
-      await fetch(`/api/restaurante/menu/items?id=${itemId}`, { method: "DELETE" });
+    const res = useAdminApi
+      ? await fetch(`${apiBase}?type=item&targetId=${itemId}`, { method: "DELETE" })
+      : await fetch(`/api/restaurante/menu/items?id=${itemId}`, { method: "DELETE" });
+    // Surface 409 (item is referenced as a component) or any other failure so
+    // owners stop seeing "Eliminar didn't disappear the item" with no clue why.
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(`No pude eliminar: ${data?.error || res.statusText}`);
+      return;
     }
     onRefresh();
   }
