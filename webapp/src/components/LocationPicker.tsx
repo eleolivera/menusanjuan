@@ -6,6 +6,7 @@ import usePlacesAutocomplete, {
   getGeocode,
   getLatLng,
 } from "use-places-autocomplete";
+import { MapPin, Crosshair, CheckCircle2, X } from "lucide-react";
 
 const LIBRARIES: ("places")[] = ["places"];
 const DEFAULT_CENTER = { lat: -31.5375, lng: -68.5364 };
@@ -286,13 +287,10 @@ export function LocationPicker({
             {addressLabel}
           </label>
           <div className="relative">
-            <svg
+            <MapPin
               className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
-              fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-            </svg>
+              strokeWidth={1.5}
+            />
             <input
               type="text"
               value={searchValue}
@@ -338,10 +336,7 @@ export function LocationPicker({
               onClick={openMap}
               className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-3 py-2.5 text-sm font-medium text-text hover:border-primary hover:bg-primary/5 transition-all"
             >
-              <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-              </svg>
+              <MapPin className="h-4 w-4 text-primary" strokeWidth={1.5} />
               Ajustar en mapa
             </button>
             <button
@@ -353,10 +348,7 @@ export function LocationPicker({
               {locating ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               ) : (
-                <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <circle cx="12" cy="12" r="3" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-                </svg>
+                <Crosshair className="h-4 w-4 text-primary" />
               )}
               {geolocateLabel}
             </button>
@@ -401,10 +393,7 @@ export function LocationPicker({
 
         {mapTouched && !isConfirmed && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex items-center gap-2">
-            <svg className="h-4 w-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-            </svg>
+            <MapPin className="h-4 w-4 text-amber-600 shrink-0" strokeWidth={1.5} />
             <span className="text-xs text-amber-800">Ubicación ajustada en el mapa</span>
           </div>
         )}
@@ -423,9 +412,7 @@ export function LocationPicker({
           <div className="rounded-xl border border-success/30 bg-emerald-50 p-3 animate-fade-in">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <svg className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <CheckCircle2 className="h-4 w-4 text-success" />
                 <span className="text-sm font-medium text-emerald-800">Dirección confirmada</span>
               </div>
               <button
@@ -454,9 +441,7 @@ export function LocationPicker({
               className="rounded-full p-2 hover:bg-surface-alt transition-colors"
               aria-label="Cerrar mapa"
             >
-              <svg className="h-5 w-5 text-text" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-5 w-5 text-text" />
             </button>
             <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-text-muted">Ubicación seleccionada</div>
@@ -501,10 +486,7 @@ export function LocationPicker({
               {locating ? (
                 <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               ) : (
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <circle cx="12" cy="12" r="3" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-                </svg>
+                <Crosshair className="h-3.5 w-3.5" />
               )}
               {geolocateLabel}
             </button>

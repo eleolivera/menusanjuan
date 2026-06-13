@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { MenuItemData, OptionGroupData } from "@/data/menus";
+import { X, Plus, Minus, Check } from "lucide-react";
 
 export type SelectedOptions = {
   group: string;
@@ -181,7 +182,7 @@ export function ItemCustomizeSheet({ item, onAdd, onClose }: Props) {
           <div className="relative h-40 bg-slate-100 shrink-0">
             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
             <button onClick={onClose} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 text-white flex items-center justify-center text-sm hover:bg-black/70 transition-colors">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              <X className="h-4 w-4" />
             </button>
           </div>
         )}
@@ -190,7 +191,7 @@ export function ItemCustomizeSheet({ item, onAdd, onClose }: Props) {
         <div className="px-5 pt-4 pb-2 shrink-0">
           {!item.imageUrl && (
             <button onClick={onClose} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              <X className="h-4 w-4" />
             </button>
           )}
           <h2 className="text-lg font-bold text-text">{item.name}</h2>
@@ -264,14 +265,14 @@ export function ItemCustomizeSheet({ item, onAdd, onClose }: Props) {
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               className="h-9 w-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:border-primary hover:text-primary transition-colors"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" /></svg>
+              <Minus className="h-4 w-4" />
             </button>
             <span className="text-lg font-bold text-text w-8 text-center">{quantity}</span>
             <button
               onClick={() => setQuantity(quantity + 1)}
               className="h-9 w-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:border-primary hover:text-primary transition-colors"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              <Plus className="h-4 w-4" />
             </button>
           </div>
 
@@ -431,9 +432,7 @@ function OptionGroupBlock({
                 isSelected ? "border-primary bg-primary" : "border-border"
               }`}>
                 {isSelected && (
-                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                  </svg>
+                  <Check className="h-3 w-3 text-white" strokeWidth={3} />
                 )}
               </div>
 

@@ -10,6 +10,7 @@ import { type DeliveryConfig, calculateDeliveryFee, type DeliveryZoneResult } fr
 import { OrderStatusStepper } from "./OrderStatusStepper";
 import { saveOrderRef } from "@/lib/order-tracker";
 import { ComprobanteUploader } from "./ComprobanteUploader";
+import { X, Plus, Minus, Pencil } from "lucide-react";
 
 type PaymentIntent = "cash" | "transfer" | "mercadopago";
 
@@ -426,9 +427,7 @@ _Pedido realizado desde MenuSanJuan_`;
             {step === "tracking" && "Seguimiento"}
           </h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover transition-colors">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-5 w-5" strokeWidth={1.5} />
           </button>
         </div>
 
@@ -464,11 +463,11 @@ _Pedido realizado desde MenuSanJuan_`;
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={() => onRemove(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors">
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" /></svg>
+                          <Minus className="h-3.5 w-3.5" />
                         </button>
                         <span className="min-w-[1.25rem] text-center text-sm font-bold text-text">{ci.quantity}</span>
                         <button onClick={() => onAdd(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-white transition-colors">
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                          <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
                       <div className="text-sm font-bold text-text w-20 text-right">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</div>
@@ -500,7 +499,7 @@ _Pedido realizado desde MenuSanJuan_`;
                         onClick={() => setEditingNote({ cartKey: ci.cartKey, text: ci.note || "" })}
                         className="mt-1.5 flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors"
                       >
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
+                        <Pencil className="h-3 w-3" strokeWidth={1.5} />
                         {ci.note ? `Nota: ${ci.note}` : "Agregar nota"}
                       </button>
                     )}
@@ -761,7 +760,7 @@ _Pedido realizado desde MenuSanJuan_`;
                       className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full text-text-muted hover:bg-danger/10 hover:text-danger transition-colors"
                       title="Quitar"
                     >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ))}

@@ -10,6 +10,7 @@ import { MenuItemCard } from "./MenuItemCard";
 import { FloatingCart } from "./FloatingCart";
 import { OrderModal } from "./OrderModal";
 import { ItemCustomizeSheet, type SelectedOptions, type ComponentSelection } from "./ItemCustomizeSheet";
+import { Search, X } from "lucide-react";
 import { OrderStatusBanner } from "./OrderStatusBanner";
 import { StoreCompanion } from "./StoreCompanion";
 import { getLatestOrderRef, getOrderRefs, type OrderRef } from "@/lib/order-tracker";
@@ -372,9 +373,7 @@ export function StoreMenu({
         {/* Menu search */}
         {categories.length > 0 && (
           <div className="mb-6 relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-            </svg>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
             <input
               type="text"
               value={search}
@@ -387,9 +386,7 @@ export function StoreMenu({
                 onClick={() => setSearch("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>

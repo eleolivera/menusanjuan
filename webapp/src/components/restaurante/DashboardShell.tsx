@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
 import { OwnerUpdatesModal } from "@/components/restaurante/OwnerUpdatesModal";
+import { ChevronDown, ExternalLink, LogOut, ChevronRight } from "lucide-react";
 
 const DEFAULT_NAV = [
   { href: "/restaurante/menu", label: "Menú", emoji: "🍽️" },
@@ -161,9 +162,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       : "Panel de Control"}
                   </div>
                 </div>
-                <svg className={`h-4 w-4 text-slate-500 transition-transform ${switcherOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
+                <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${switcherOpen ? "rotate-180" : ""}`} />
               </>
             )}
           </button>
@@ -279,9 +278,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               {!collapsed && (
                 <span className="text-sm font-medium flex items-center gap-1.5">
                   Ver Página
-                  <svg className="h-3 w-3 text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                  </svg>
+                  <ExternalLink className="h-3 w-3 text-slate-500" />
                 </span>
               )}
             </a>
@@ -315,19 +312,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               collapsed ? "justify-center" : "px-3 gap-2"
             }`}
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-            </svg>
+            <LogOut className="h-4 w-4" strokeWidth={1.5} />
             {!collapsed && <span className="text-xs font-medium">Cerrar sesión</span>}
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="flex w-full items-center justify-center rounded-lg py-2 text-slate-600 hover:bg-white/5 hover:text-slate-400 transition-colors"
           >
-            <svg className={`h-4 w-4 transition-transform ${collapsed ? "" : "rotate-180"}`}
-              fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-            </svg>
+            <ChevronRight className={`h-4 w-4 transition-transform ${collapsed ? "" : "rotate-180"}`} strokeWidth={1.5} />
           </button>
         </div>
       </aside>

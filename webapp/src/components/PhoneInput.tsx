@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { isValidPhone, formatPhoneDisplay, formatForWhatsApp } from "@/lib/phone";
+import { ChevronDown, CheckCircle2, Info } from "lucide-react";
 
 const COUNTRIES = [
   { code: "AR", flag: "🇦🇷", prefix: "+54", label: "Argentina" },
@@ -109,9 +110,7 @@ export function PhoneInput({
         >
           <span>{selectedCountry.flag}</span>
           <span className="text-xs font-medium">{selectedCountry.prefix}</span>
-          <svg className="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
+          <ChevronDown className="h-3 w-3 opacity-50" />
         </button>
 
         {/* Dropdown */}
@@ -150,13 +149,9 @@ export function PhoneInput({
         {valid !== null && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
             {valid ? (
-              <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
             ) : (
-              <svg className="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
+              <Info className="h-4 w-4 text-red-400" />
             )}
           </div>
         )}
