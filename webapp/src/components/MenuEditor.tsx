@@ -162,10 +162,11 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
       label: c.label.trim() || null,
       sortOrder: i,
     }));
+    let res: Response;
     if (useAdminApi) {
-      await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", itemId: editingItem.id, name: form.name, description: form.description || null, price: Number(form.price), imageUrl: form.imageUrl || null, badge: form.badge || null }) });
+      res = await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", itemId: editingItem.id, name: form.name, description: form.description || null, price: Number(form.price), imageUrl: form.imageUrl || null, badge: form.badge || null }) });
     } else {
-      await fetch("/api/restaurante/menu/items", {
+      res = await fetch("/api/restaurante/menu/items", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -179,7 +180,17 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
         }),
       });
     }
-    setSaving(false); setEditingItem(null); onRefresh();
+    setSaving(false);
+    // Surface server-side errors instead of silently swallowing them — past me
+    // shipped a bug where the validation 400'd but the modal still closed +
+    // refreshed, making it look like the save worked when it hadn't.
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(`No pude guardar: ${data?.error || res.statusText}`);
+      return;
+    }
+    setEditingItem(null);
+    onRefresh();
   }
 
   async function toggleAvailability(item: MenuItem) {

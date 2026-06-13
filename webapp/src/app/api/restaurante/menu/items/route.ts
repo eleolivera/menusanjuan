@@ -70,16 +70,21 @@ export async function PATCH(request: NextRequest) {
     type ComponentInput = { childItemId: string; label?: string | null; sortOrder?: number };
     const inputs = components as ComponentInput[];
 
-    // Verify all children exist and belong to this dealer
+    // Verify all children exist and belong to this dealer.
+    // IMPORTANT: dedupe before the query — a promo like "2 Pachatas + Papas"
+    // legitimately references the same childItemId twice. The findMany returns
+    // each item ONCE, so comparing length against `inputs.length` would falsely
+    // fail on every multi-pachata promo and silently 400 the save.
     const childIds = inputs.map((c) => c.childItemId).filter(Boolean);
     if (childIds.length !== inputs.length) {
       return NextResponse.json({ error: "Cada componente necesita un childItemId" }, { status: 400 });
     }
+    const uniqueChildIds = Array.from(new Set(childIds));
     const children = await prisma.menuItem.findMany({
-      where: { id: { in: childIds } },
+      where: { id: { in: uniqueChildIds } },
       include: { category: true },
     });
-    if (children.length !== childIds.length) {
+    if (children.length !== uniqueChildIds.length) {
       return NextResponse.json({ error: "Un componente referencia un item que no existe" }, { status: 400 });
     }
     for (const child of children) {
