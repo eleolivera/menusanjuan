@@ -9,10 +9,15 @@ import { formatARS } from "@/lib/admin-utils";
 
 type OptionChoice = { id: string; name: string; priceDelta: number; available: boolean };
 type OptionGroup = { id: string; title: string; minSelections: number; maxSelections: number; options: OptionChoice[]; presetId?: string | null };
+/** Promo component (slot) — references another menu item by id. `childName`
+ * is included as a denormalized hint from the API GET so the editor can show
+ * the slot's display label without an extra fetch. */
+type Component = { id: string; childItemId: string; label: string | null; sortOrder: number; childName: string };
 type MenuItem = {
   id: string; name: string; description: string | null; price: number;
   imageUrl: string | null; badge: string | null; available: boolean; sortOrder?: number;
   optionGroups?: OptionGroup[];
+  components?: Component[];
 };
 type Category = { id: string; name: string; emoji: string | null; sortOrder?: number; items: MenuItem[] };
 
@@ -50,6 +55,10 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
   // Edit modal
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [form, setForm] = useState({ name: "", description: "", price: "", imageUrl: "", badge: "" });
+  // Components draft state. Lives separately from `form` because the rows are
+  // managed via add/remove/reorder helpers (not free-text inputs). Committed
+  // together with the rest of the form when the owner taps "Guardar".
+  const [editComponents, setEditComponents] = useState<Array<{ childItemId: string; label: string; childName: string }>>([]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -60,7 +69,25 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
   function startEdit(item: MenuItem) {
     setEditingItem(item);
     setForm({ name: item.name, description: item.description || "", price: String(item.price), imageUrl: item.imageUrl || "", badge: item.badge || "" });
+    setEditComponents(
+      (item.components || [])
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((c) => ({ childItemId: c.childItemId, label: c.label ?? "", childName: c.childName }))
+    );
   }
+
+  // Flat list of all other items the owner could pick as a component, sorted
+  // by category → name for predictable ordering in the picker dropdown.
+  const allItemsForPicker = (() => {
+    const out: Array<{ id: string; name: string; categoryName: string }> = [];
+    for (const cat of categories) {
+      for (const it of cat.items) {
+        out.push({ id: it.id, name: it.name, categoryName: cat.name });
+      }
+    }
+    return out;
+  })();
 
   function startAdd(categoryId: string) {
     setAddingItemCat(categoryId);
@@ -127,10 +154,30 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
   async function updateItem() {
     if (!editingItem) return;
     setSaving(true);
+    // Components are sent as a flat array; the server reconciles (delete + re-insert
+    // in a transaction). Only included on the owner-side PATCH — admin uses its
+    // own legacy shape that doesn't yet support components.
+    const componentsPayload = editComponents.map((c, i) => ({
+      childItemId: c.childItemId,
+      label: c.label.trim() || null,
+      sortOrder: i,
+    }));
     if (useAdminApi) {
       await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "item", itemId: editingItem.id, name: form.name, description: form.description || null, price: Number(form.price), imageUrl: form.imageUrl || null, badge: form.badge || null }) });
     } else {
-      await fetch("/api/restaurante/menu/items", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingItem.id, name: form.name, description: form.description || null, price: Number(form.price), imageUrl: form.imageUrl || null, badge: form.badge || null }) });
+      await fetch("/api/restaurante/menu/items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingItem.id,
+          name: form.name,
+          description: form.description || null,
+          price: Number(form.price),
+          imageUrl: form.imageUrl || null,
+          badge: form.badge || null,
+          components: componentsPayload,
+        }),
+      });
     }
     setSaving(false); setEditingItem(null); onRefresh();
   }
@@ -479,6 +526,17 @@ export function MenuEditor({ categories, onRefresh, apiBase, useAdminApi, upload
                   dealerSlug={dealerSlug}
                 />
               </div>
+
+              {/* Combo / promo components — only enabled on the owner-side API.
+                 Admin path doesn't currently support component reconciliation. */}
+              {!useAdminApi && (
+                <ComponentsEditor
+                  editingItemId={editingItem.id}
+                  components={editComponents}
+                  allItems={allItemsForPicker.filter((i) => i.id !== editingItem.id)}
+                  onChange={setEditComponents}
+                />
+              )}
             </div>
 
             <div className="px-6 py-3 shrink-0 border-t border-white/5 flex items-center justify-between">
@@ -533,4 +591,175 @@ function ImageUploadField({ imageUrl, onChange, onUpload, uploading, uploadEndpo
 
 function isVideo(url: string) {
   return /\.(mp4|mov|webm)/i.test(url);
+}
+
+/**
+ * Combo / promo components editor. Lets the owner attach existing menu items
+ * as "slots" within the item being edited (e.g. "2 Pachatas + Papas" promo
+ * gets 2 × Pachata + 1 × Papas slot). Each slot keeps the child item's own
+ * option groups — owner doesn't redefine them here.
+ *
+ * State is fully controlled by the parent. Reorder, label override, and
+ * remove are local operations; the parent commits them with the rest of the
+ * item form on "Guardar". No per-row save here.
+ */
+function ComponentsEditor({
+  editingItemId,
+  components,
+  allItems,
+  onChange,
+}: {
+  editingItemId: string;
+  components: Array<{ childItemId: string; label: string; childName: string }>;
+  allItems: Array<{ id: string; name: string; categoryName: string }>;
+  onChange: (next: Array<{ childItemId: string; label: string; childName: string }>) => void;
+}) {
+  const [expanded, setExpanded] = useState(components.length > 0);
+  const [picking, setPicking] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
+
+  function addComponent(item: { id: string; name: string }) {
+    onChange([...components, { childItemId: item.id, label: "", childName: item.name }]);
+    setPicking(false);
+    setPickerSearch("");
+  }
+  function removeAt(i: number) {
+    onChange(components.filter((_, idx) => idx !== i));
+  }
+  function moveUp(i: number) {
+    if (i === 0) return;
+    const next = [...components];
+    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+    onChange(next);
+  }
+  function moveDown(i: number) {
+    if (i === components.length - 1) return;
+    const next = [...components];
+    [next[i + 1], next[i]] = [next[i], next[i + 1]];
+    onChange(next);
+  }
+  function setLabel(i: number, label: string) {
+    const next = components.map((c, idx) => (idx === i ? { ...c, label } : c));
+    onChange(next);
+  }
+
+  const filteredItems = allItems.filter((i) =>
+    i.name.toLowerCase().includes(pickerSearch.toLowerCase())
+    || i.categoryName.toLowerCase().includes(pickerSearch.toLowerCase())
+  );
+
+  // Hide the entire section if the owner hasn't expanded it and there are no
+  // components yet — keeps the edit modal compact for non-promo items.
+  return (
+    <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-white/[0.02] transition-colors"
+      >
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-white">Combo / Promo</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">
+            {components.length === 0
+              ? "Si este item es un combo o promo, agregale los items que lo componen."
+              : `${components.length} componente${components.length > 1 ? "s" : ""} configurado${components.length > 1 ? "s" : ""}`}
+          </div>
+        </div>
+        <span className={`text-slate-500 transition-transform ${expanded ? "rotate-90" : ""}`}>›</span>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-white/5 p-3 space-y-2">
+          {components.length === 0 ? (
+            <p className="text-[11px] text-slate-500 italic">
+              Sin componentes. Tocá &quot;+ Agregar&quot; para incluir items existentes.
+              Cada componente mantiene sus propias opciones de personalización.
+            </p>
+          ) : (
+            components.map((c, i) => (
+              <div key={`${c.childItemId}-${i}`} className="rounded-lg border border-white/10 bg-white/[0.02] p-2.5 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col">
+                    <button
+                      type="button"
+                      onClick={() => moveUp(i)}
+                      disabled={i === 0}
+                      className="h-3 text-[8px] text-slate-500 hover:text-white disabled:opacity-20 leading-none"
+                    >▲</button>
+                    <button
+                      type="button"
+                      onClick={() => moveDown(i)}
+                      disabled={i === components.length - 1}
+                      className="h-3 text-[8px] text-slate-500 hover:text-white disabled:opacity-20 leading-none"
+                    >▼</button>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-white truncate">{c.childName}</div>
+                    <div className="text-[9px] text-slate-500">Item referenciado</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeAt(i)}
+                    className="rounded-md border border-red-500/30 px-2 py-0.5 text-[10px] text-red-300 hover:bg-red-500/10 transition-colors"
+                  >
+                    Quitar
+                  </button>
+                </div>
+                <input
+                  value={c.label}
+                  onChange={(e) => setLabel(i, e.target.value)}
+                  placeholder={`Etiqueta opcional (default: "${c.childName}")`}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white placeholder:text-slate-500 focus:border-primary focus:outline-none"
+                />
+              </div>
+            ))
+          )}
+
+          {!picking ? (
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              className="w-full rounded-lg border border-dashed border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:bg-white/5 transition-colors"
+            >
+              + Agregar componente
+            </button>
+          ) : (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-2 space-y-2">
+              <input
+                value={pickerSearch}
+                onChange={(e) => setPickerSearch(e.target.value)}
+                placeholder="Buscar item por nombre o categoría..."
+                autoFocus
+                className="w-full rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white placeholder:text-slate-500 focus:border-primary focus:outline-none"
+              />
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {filteredItems.length === 0 ? (
+                  <p className="text-[10px] text-slate-500 italic px-2">Sin resultados.</p>
+                ) : (
+                  filteredItems.map((it) => (
+                    <button
+                      key={it.id}
+                      type="button"
+                      onClick={() => addComponent(it)}
+                      className="w-full rounded-md px-2 py-1.5 text-left text-[11px] hover:bg-white/5 transition-colors"
+                    >
+                      <div className="font-semibold text-white">{it.name}</div>
+                      <div className="text-[9px] text-slate-500">{it.categoryName}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => { setPicking(false); setPickerSearch(""); }}
+                className="w-full rounded-md border border-white/10 px-2.5 py-1.5 text-[10px] text-slate-400 hover:bg-white/5 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

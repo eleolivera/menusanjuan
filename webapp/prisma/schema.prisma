@@ -273,9 +273,32 @@ model MenuItem {
 
   category     MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   optionGroups OptionGroup[]
+  // Promo / combo support: when this item is composed of OTHER items (e.g.
+  // "2 Pachatas + Papas"), `componentsOf` is the ordered list of child items.
+  // Each child keeps its own option groups, so the customer can customize each
+  // pachata independently. `componentIn` is the inverse — orders where this
+  // item is being referenced as part of someone else's promo (used to block
+  // deletion via FK Restrict).
+  componentsOf MenuItemComponent[] @relation("ItemComponents")
+  componentIn  MenuItemComponent[] @relation("ItemComponentRef")
 
   @@index([categoryId, sortOrder])
   @@index([available])
+}
+
+model MenuItemComponent {
+  id            String   @id @default(cuid())
+  parentItemId  String
+  childItemId   String
+  label         String?  // optional display override; falls back to childItem.name
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  parentItem    MenuItem @relation("ItemComponents",   fields: [parentItemId], references: [id], onDelete: Cascade)
+  childItem     MenuItem @relation("ItemComponentRef", fields: [childItemId],  references: [id], onDelete: Restrict)
+
+  @@index([parentItemId])
+  @@index([childItemId])
 }
 
 model OptionGroup {

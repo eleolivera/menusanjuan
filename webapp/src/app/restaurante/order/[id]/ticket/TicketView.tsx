@@ -4,9 +4,22 @@ import { useEffect, useState } from "react";
 
 // Build stamp — printed at the bottom of the ticket so we can verify a fresh
 // deploy made it to the printer. Bump whenever shipping a meaningful change.
-const TICKET_BUILD = "v2026-05-22.a";
+const TICKET_BUILD = "v2026-06-12.a";
 
-type Item = { name: string; quantity: number; unitPrice: number; optionsDelta?: number; note?: string; overrideNote?: string; selectedOptions?: { group: string; choices: { name: string }[] }[] };
+type Item = {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  optionsDelta?: number;
+  note?: string;
+  overrideNote?: string;
+  selectedOptions?: { group: string; choices: { name: string }[] }[];
+  componentSelections?: {
+    componentId: string;
+    label: string;
+    selectedOptions?: { group: string; choices: { name: string }[] }[];
+  }[];
+};
 
 type Props = {
   order: {
@@ -177,6 +190,25 @@ export function TicketView({ order, driverUrl }: Props) {
                     {it.selectedOptions && it.selectedOptions.length > 0 && (
                       <div className="text-[9px] pl-3">
                         {it.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                      </div>
+                    )}
+                    {/* Promo slots — each component's customizations indented;
+                       critical for the kitchen so they know what each pachata
+                       in a "2 pachatas" promo needs to be made with. */}
+                    {it.componentSelections && it.componentSelections.length > 0 && (
+                      <div className="pl-3 mt-0.5">
+                        {it.componentSelections.map((comp) => (
+                          <div key={comp.componentId} className="text-[9px]">
+                            <span className="font-bold">↳ {comp.label}</span>
+                            {comp.selectedOptions && comp.selectedOptions.length > 0 ? (
+                              <span>{": "}
+                                {comp.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                              </span>
+                            ) : (
+                              <span className="italic"> · sin extras</span>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                     {it.note && <div className="text-[10px] font-bold pl-3">&gt; {it.note}</div>}

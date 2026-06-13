@@ -9,7 +9,7 @@ import { CategoryNav } from "./CategoryNav";
 import { MenuItemCard } from "./MenuItemCard";
 import { FloatingCart } from "./FloatingCart";
 import { OrderModal } from "./OrderModal";
-import { ItemCustomizeSheet, type SelectedOptions } from "./ItemCustomizeSheet";
+import { ItemCustomizeSheet, type SelectedOptions, type ComponentSelection } from "./ItemCustomizeSheet";
 import { OrderStatusBanner } from "./OrderStatusBanner";
 import { StoreCompanion } from "./StoreCompanion";
 import { getLatestOrderRef, getOrderRefs, type OrderRef } from "@/lib/order-tracker";
@@ -65,6 +65,9 @@ export type CartEntry = {
   item: MenuItemData;
   quantity: number;
   selectedOptions: SelectedOptions;
+  // Promo only: per-slot customizations (each slot's option picks + its own delta).
+  // The `optionsDelta` on the CartEntry is the SUM of parent + all components.
+  componentSelections?: ComponentSelection[];
   optionsDelta: number;
   note: string;
 };
@@ -254,12 +257,20 @@ export function StoreMenu({
     setCustomizingItem(item);
   }, []);
 
-  const addCustomized = useCallback((item: MenuItemData, quantity: number, selectedOptions: SelectedOptions, optionsDelta: number, note: string) => {
+  const addCustomized = useCallback((
+    item: MenuItemData,
+    quantity: number,
+    selectedOptions: SelectedOptions,
+    optionsDelta: number,
+    note: string,
+    componentSelections?: ComponentSelection[],
+  ) => {
     setCart((prev) => [...prev, {
       cartKey: `ck-${++cartKeyCounter}`,
       item,
       quantity,
       selectedOptions,
+      componentSelections,
       optionsDelta,
       note,
     }]);
@@ -303,6 +314,7 @@ export function StoreMenu({
     quantity: e.quantity,
     cartKey: e.cartKey,
     selectedOptions: e.selectedOptions,
+    componentSelections: e.componentSelections,
     optionsDelta: e.optionsDelta,
     note: e.note,
   }));
@@ -457,7 +469,9 @@ export function StoreMenu({
       {customizingItem && (
         <ItemCustomizeSheet
           item={customizingItem}
-          onAdd={(qty, opts, delta, note) => addCustomized(customizingItem, qty, opts, delta, note)}
+          onAdd={(qty, opts, delta, note, components) =>
+            addCustomized(customizingItem, qty, opts, delta, note, components)
+          }
           onClose={() => setCustomizingItem(null)}
         />
       )}

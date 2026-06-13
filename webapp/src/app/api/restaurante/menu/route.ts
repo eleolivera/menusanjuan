@@ -20,6 +20,12 @@ export async function GET() {
               preset: { include: { options: { orderBy: { sortOrder: "asc" } } } },
             },
           },
+          // Owner-side menu also includes the promo components so the editor
+          // can render the configured slots without an extra round-trip.
+          componentsOf: {
+            orderBy: { sortOrder: "asc" },
+            include: { childItem: { select: { id: true, name: true } } },
+          },
         },
       },
     },
@@ -37,6 +43,13 @@ export async function GET() {
         options: g.preset
           ? g.preset.options.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta, available: o.available }))
           : g.options,
+      })),
+      components: item.componentsOf.map((c) => ({
+        id: c.id,
+        childItemId: c.childItemId,
+        label: c.label,
+        sortOrder: c.sortOrder,
+        childName: c.childItem.name,
       })),
     })),
   }));

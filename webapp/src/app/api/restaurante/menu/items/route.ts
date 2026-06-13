@@ -47,7 +47,7 @@ export async function PATCH(request: NextRequest) {
   if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await request.json();
-  const { id, name, description, price, imageUrl, badge, available, sortOrder, categoryId } = body;
+  const { id, name, description, price, imageUrl, badge, available, sortOrder, categoryId, components } = body;
 
   if (!id) return NextResponse.json({ error: "Falta id" }, { status: 400 });
 
@@ -58,6 +58,73 @@ export async function PATCH(request: NextRequest) {
   });
   if (!item || item.category.dealerId !== dealer.id) {
     return NextResponse.json({ error: "Item no encontrado" }, { status: 404 });
+  }
+
+  // Promo components reconciliation — if the client sent `components`, replace
+  // the entire set. Validates that every child belongs to the same dealer and
+  // that there are no cycles (a child that eventually points back to this item).
+  if (components !== undefined) {
+    if (!Array.isArray(components)) {
+      return NextResponse.json({ error: "components debe ser un array" }, { status: 400 });
+    }
+    type ComponentInput = { childItemId: string; label?: string | null; sortOrder?: number };
+    const inputs = components as ComponentInput[];
+
+    // Verify all children exist and belong to this dealer
+    const childIds = inputs.map((c) => c.childItemId).filter(Boolean);
+    if (childIds.length !== inputs.length) {
+      return NextResponse.json({ error: "Cada componente necesita un childItemId" }, { status: 400 });
+    }
+    const children = await prisma.menuItem.findMany({
+      where: { id: { in: childIds } },
+      include: { category: true },
+    });
+    if (children.length !== childIds.length) {
+      return NextResponse.json({ error: "Un componente referencia un item que no existe" }, { status: 400 });
+    }
+    for (const child of children) {
+      if (child.category.dealerId !== dealer.id) {
+        return NextResponse.json({ error: "Un componente apunta a un item de otro restaurante" }, { status: 403 });
+      }
+    }
+
+    // Cycle detection: BFS from each proposed child to make sure none of them
+    // (or their transitive components) reference `id` (the parent). Bounded by
+    // the menu's component graph depth, ~30 items in practice = trivial cost.
+    const visited = new Set<string>();
+    const queue: string[] = [...childIds];
+    while (queue.length > 0) {
+      const next = queue.shift()!;
+      if (next === id) {
+        return NextResponse.json(
+          { error: "No se puede agregar este combo dentro de sí mismo (ciclo detectado)." },
+          { status: 400 },
+        );
+      }
+      if (visited.has(next)) continue;
+      visited.add(next);
+      const deeper = await prisma.menuItemComponent.findMany({
+        where: { parentItemId: next },
+        select: { childItemId: true },
+      });
+      for (const d of deeper) queue.push(d.childItemId);
+    }
+
+    // Wipe & re-insert in one transaction. Cleaner than diffing; component
+    // rows are tiny and the typical promo has 2-5 components.
+    await prisma.$transaction([
+      prisma.menuItemComponent.deleteMany({ where: { parentItemId: id } }),
+      ...inputs.map((c, i) =>
+        prisma.menuItemComponent.create({
+          data: {
+            parentItemId: id,
+            childItemId: c.childItemId,
+            label: c.label?.trim() || null,
+            sortOrder: typeof c.sortOrder === "number" ? c.sortOrder : i,
+          },
+        })
+      ),
+    ]);
   }
 
   const updated = await prisma.menuItem.update({
@@ -71,6 +138,9 @@ export async function PATCH(request: NextRequest) {
       ...(available !== undefined && { available }),
       ...(sortOrder !== undefined && { sortOrder }),
       ...(categoryId !== undefined && { categoryId }),
+    },
+    include: {
+      componentsOf: { orderBy: { sortOrder: "asc" }, include: { childItem: true } },
     },
   });
 

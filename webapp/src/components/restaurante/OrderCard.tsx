@@ -258,6 +258,23 @@ export function OrderCard({
                             {item.selectedOptions.map((so: any) => `${so.group}: ${so.choices.map((c: any) => c.name).join(", ")}`).join(" / ")}
                           </div>
                         )}
+                        {/* Promo slots — each component's customizations indented under the parent item */}
+                        {item.componentSelections && item.componentSelections.length > 0 && (
+                          <div className="pl-5 mt-0.5 space-y-0.5">
+                            {item.componentSelections.map((comp: any) => (
+                              <div key={comp.componentId} className="text-[11px]">
+                                <span className="text-slate-300 font-semibold">↳ {comp.label}</span>
+                                {comp.selectedOptions && comp.selectedOptions.length > 0 ? (
+                                  <span className="text-slate-500">{": "}
+                                    {comp.selectedOptions.map((so: any) => `${so.group}: ${so.choices.map((c: any) => c.name).join(", ")}`).join(" / ")}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-600 italic"> · sin extras</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {hasOverride && item.overrideNote && (
                           <div className="text-[10px] text-amber-300 pl-5">Nota: {item.overrideNote}</div>
                         )}

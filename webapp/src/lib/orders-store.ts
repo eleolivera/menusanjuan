@@ -30,6 +30,15 @@ export type OrderItem = {
   overrideNote?: string;  // Required when priceOverride is set
   selectedOptions?: { group: string; choices: { name: string; priceDelta: number }[]; delta: number }[];
   optionsDelta?: number;
+  /** Promo items only: per-slot customizations. Each slot's `optionsDelta` is
+   * already included in the parent OrderItem's `optionsDelta` (and `total`). */
+  componentSelections?: {
+    componentId: string;
+    childItemId: string;
+    label: string;
+    selectedOptions: { group: string; choices: { name: string; priceDelta: number }[]; delta: number }[];
+    optionsDelta: number;
+  }[];
 };
 
 // Re-export money helpers from lib/money.ts (pure, no DB deps — usable in client components)

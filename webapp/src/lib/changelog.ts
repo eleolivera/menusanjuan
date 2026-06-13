@@ -26,6 +26,33 @@ export type OwnerUpdate = {
 
 export const OWNER_UPDATES: OwnerUpdate[] = [
   {
+    id: "2026-06-12-combos-personalizables",
+    date: "12 de junio, 2026",
+    emoji: "🍔",
+    title: "Combos y promos personalizables por item",
+    body: [
+      "Si tenés una promo tipo \"2 Pachatas + Papas\", ahora cada pachata se puede personalizar por separado.",
+      "",
+      "Cómo armarla:",
+      "1. Editá el item del combo en tu menú",
+      "2. Bajá a la sección \"Combo / Promo\"",
+      "3. Tocá \"+ Agregar componente\" y elegí los items que lo arman (ej: 2 veces \"Pachata\", 1 vez \"Papas\")",
+      "4. Opcional: ponele una etiqueta a cada slot (\"Pachata 1\", \"Pachata 2\") para diferenciarlas",
+      "5. Guardás y listo",
+      "",
+      "Lo que ve el cliente:",
+      "• Al tocar el combo, le aparece un sheet con un bloque por cada componente",
+      "• Cada bloque trae las MISMAS opciones que tiene ese item solo (ej: las extras de la Pachata standalone se aplican acá también)",
+      "• Si ponés precio extra a alguna opción, se le suma al combo automáticamente",
+      "",
+      "También polish general en el flujo de personalización:",
+      "• El botón de \"Agregar\" siempre se ve abajo, no se pierde haciendo scroll",
+      "• Los grupos obligatorios tienen badge naranja + borde, los completados se ponen verdes con \"✓ Listo\"",
+      "• Si tocás \"Agregar\" sin completar lo obligatorio, te lleva directo al grupo que falta",
+      "• El precio total se actualiza vivo en el botón mientras el cliente personaliza",
+    ].join("\n"),
+  },
+  {
     id: "2026-06-11-entregado-auto-paid",
     date: "11 de junio, 2026",
     emoji: "✅",

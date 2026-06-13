@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { MenuItemData } from "@/data/menus";
-import type { SelectedOptions } from "./ItemCustomizeSheet";
+import type { SelectedOptions, ComponentSelection } from "./ItemCustomizeSheet";
 import { LocationPicker } from "./LocationPicker";
 import { PhoneInput } from "./PhoneInput";
 import { formatForWhatsApp } from "@/lib/phone";
@@ -18,6 +18,9 @@ type CartItem = {
   quantity: number;
   cartKey: string;
   selectedOptions: SelectedOptions;
+  // Promo only — per-slot customizations. Each slot already includes its own
+  // `optionsDelta`; the CartItem-level `optionsDelta` is the SUM across parent + components.
+  componentSelections?: ComponentSelection[];
   optionsDelta: number;
   note?: string;
 };
@@ -196,12 +199,24 @@ export function OrderModal({
       .map((ci) => {
         const linePrice = (ci.item.price + ci.optionsDelta) * ci.quantity;
         let line = `  ${ci.quantity}x ${ci.item.name} — $${linePrice.toLocaleString("es-AR")}`;
+        // Parent-level options (rare on a promo, common on a normal item)
         if (ci.selectedOptions.length > 0) {
           const optLines = ci.selectedOptions.map((so) => {
             const choiceNames = so.choices.map((c) => c.priceDelta > 0 ? `${c.name} (+$${c.priceDelta.toLocaleString("es-AR")})` : c.name).join(", ");
             return `     > ${so.group}: ${choiceNames}`;
           });
           line += "\n" + optLines.join("\n");
+        }
+        // Per-component (promo slot) options — nested under each slot label
+        // so the resta sees what's customized on each pachata individually.
+        if (ci.componentSelections && ci.componentSelections.length > 0) {
+          for (const comp of ci.componentSelections) {
+            line += `\n     ↳ ${comp.label}`;
+            for (const so of comp.selectedOptions) {
+              const choiceNames = so.choices.map((c) => c.priceDelta > 0 ? `${c.name} (+$${c.priceDelta.toLocaleString("es-AR")})` : c.name).join(", ");
+              line += `\n       · ${so.group}: ${choiceNames}`;
+            }
+          }
         }
         if (ci.note) {
           line += `\n     > Nota: ${ci.note}`;
@@ -330,6 +345,10 @@ _Pedido realizado desde MenuSanJuan_`;
             unitPrice: ci.item.price,
             optionsDelta: ci.optionsDelta,
             selectedOptions: ci.selectedOptions,
+            // Promo only — per-slot customizations. Server persists this as
+            // part of the Order.items JSON so the kanban + ticket can render
+            // each slot's options independently.
+            componentSelections: ci.componentSelections,
             note: ci.note || "",
             total: (ci.item.price + ci.optionsDelta) * ci.quantity,
           })),
@@ -426,6 +445,19 @@ _Pedido realizado desde MenuSanJuan_`;
                         {ci.selectedOptions.length > 0 && (
                           <div className="text-[10px] text-text-muted mt-0.5">
                             {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                          </div>
+                        )}
+                        {/* Per-component selections (promos): one line per slot */}
+                        {ci.componentSelections && ci.componentSelections.length > 0 && (
+                          <div className="text-[10px] text-text-muted mt-0.5 space-y-0.5">
+                            {ci.componentSelections.map((comp) => (
+                              <div key={comp.componentId}>
+                                <span className="font-semibold text-text-secondary">↳ {comp.label}:</span>{" "}
+                                {comp.selectedOptions.length > 0
+                                  ? comp.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")
+                                  : <span className="italic">sin extras</span>}
+                              </div>
+                            ))}
                           </div>
                         )}
                         <div className="text-xs text-text-muted">${(ci.item.price + ci.optionsDelta).toLocaleString("es-AR")} c/u</div>
@@ -703,6 +735,19 @@ _Pedido realizado desde MenuSanJuan_`;
                       {ci.selectedOptions.length > 0 && (
                         <div className="text-[10px] text-text-muted ml-4">
                           {ci.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
+                        </div>
+                      )}
+                      {/* Per-component (promo slot) options on the confirm-step summary */}
+                      {ci.componentSelections && ci.componentSelections.length > 0 && (
+                        <div className="text-[10px] text-text-muted ml-4 space-y-0.5">
+                          {ci.componentSelections.map((comp) => (
+                            <div key={comp.componentId}>
+                              <span className="font-semibold">↳ {comp.label}:</span>{" "}
+                              {comp.selectedOptions.length > 0
+                                ? comp.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")
+                                : <span className="italic">sin extras</span>}
+                            </div>
+                          ))}
                         </div>
                       )}
                       {ci.note && (

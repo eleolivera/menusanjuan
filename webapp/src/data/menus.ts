@@ -24,6 +24,20 @@ export type MenuItemData = {
   rating?: number;
   available: boolean;
   optionGroups?: OptionGroupData[];
+  /** Promo / combo: when present, this item is composed of other items, each
+   * of which can be customized independently in ItemCustomizeSheet. */
+  components?: MenuItemComponentData[];
+};
+
+/** A slot within a promo/combo MenuItem — references another menu item
+ * (the child) whose option groups apply to this slot. Owner can override the
+ * display label (e.g. "Pachata 1" instead of just "Pachata"). */
+export type MenuItemComponentData = {
+  id: string;
+  childItemId: string;
+  label: string;            // resolved (override or fallback to child.name)
+  sortOrder: number;
+  child: MenuItemData;      // eagerly loaded so the customize sheet has the option groups
 };
 
 export type MenuCategoryData = {
