@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
-import { OwnerUpdatesModal } from "@/components/restaurante/OwnerUpdatesModal";
 import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, type LucideIcon } from "lucide-react";
 
 // Nav uses Lucide line icons (same style as the rest of the app) instead of
@@ -332,11 +331,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-hidden min-w-0">
         {children}
       </main>
-
-      {/* Novedades modal — shows the most recent un-acknowledged update.
-          The welcome popup below is a one-shot intro for brand-new owners;
-          this modal is the recurring "what changed since last login" surface. */}
-      <OwnerUpdatesModal />
 
       {/* First-time welcome popup */}
       {showWelcome && (
