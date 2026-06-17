@@ -5,41 +5,8 @@ import { createSession } from "@/lib/restaurante-auth";
 import { createAdminSession } from "@/lib/admin-auth";
 import { cookieDomain } from "@/lib/cookie-domain";
 import { authLimiter, getClientIp } from "@/lib/rate-limit";
-
-type GoogleUserInfo = {
-  sub: string;
-  email: string;
-  email_verified: boolean;
-  name: string;
-  picture?: string;
-};
-
-async function exchangeCodeForTokens(code: string, redirectUri: string) {
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Token exchange failed: ${err}`);
-  }
-  return res.json();
-}
-
-async function getUserInfo(accessToken: string): Promise<GoogleUserInfo> {
-  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error("Failed to fetch user info");
-  return res.json();
-}
+import { exchangeCodeForTokens, fetchGoogleUserInfo } from "@/lib/google-oauth";
+import { handleCustomerGoogleCallback } from "@/lib/customer-auth";
 
 // GET /api/auth/google/callback — handle Google's redirect
 export async function GET(request: NextRequest) {
@@ -88,7 +55,15 @@ export async function GET(request: NextRequest) {
   try {
     const callbackUrl = process.env.GOOGLE_REDIRECT_URI || `${request.nextUrl.origin}/api/auth/google/callback`;
     const tokens = await exchangeCodeForTokens(code, callbackUrl);
-    const googleUser = await getUserInfo(tokens.access_token);
+    const googleUser = await fetchGoogleUserInfo(tokens.access_token);
+
+    // Customer-side flow (rewards). The owner branch below only runs for the
+    // default intent. Customer intent is encoded in the state cookie so the
+    // attacker can't simply flip a URL param to escalate.
+    if ((savedState as { intent?: string }).intent === "customer") {
+      const customerRedirect = await handleCustomerGoogleCallback(googleUser, savedState.redirect);
+      return NextResponse.redirect(new URL(customerRedirect, request.url));
+    }
 
     if (!googleUser.email) {
       return NextResponse.redirect(new URL("/restaurante/login?error=google_no_email", request.url));

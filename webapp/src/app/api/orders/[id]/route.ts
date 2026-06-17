@@ -3,6 +3,7 @@ import { getOrder, updateOrderStatus, markWhatsAppSent } from "@/lib/orders-stor
 import type { OrderStatus } from "@/lib/orders-store";
 import { prisma } from "@/lib/prisma";
 import { getRestauranteFromSession } from "@/lib/restaurante-auth";
+import { incrementPunchesForOrder } from "@/lib/rewards";
 
 const VALID_STATUSES: OrderStatus[] = ["GENERATED", "PAID", "PROCESSING", "DELIVERED", "CANCELLED"];
 
@@ -73,6 +74,9 @@ export async function PATCH(
             paymentMethod: existing.paymentIntent ?? "cash",
           },
         });
+        // Rewards: increment punches. Best-effort — no-op when flag off,
+        // dealer hasn't enabled, no customer linked, or already counted.
+        try { await incrementPunchesForOrder(id); } catch (e) { console.error("rewards increment failed:", e); }
         const fresh = await getOrder(id);
         return NextResponse.json(fresh);
       }
@@ -80,6 +84,9 @@ export async function PATCH(
 
     const order = await updateOrderStatus(id, body.status);
     if (!order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+    if (body.status === "DELIVERED") {
+      try { await incrementPunchesForOrder(id); } catch (e) { console.error("rewards increment failed:", e); }
+    }
     return NextResponse.json(order);
   }
 

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { getRestaurantBySlug } from "@/lib/get-restaurant";
 import { getMenuBySlug } from "@/lib/get-restaurant-menu";
 import { StoreMenu } from "@/components/StoreMenu";
+import { RewardBadge } from "@/components/RewardBadge";
 import { ClaimBanner } from "@/components/ClaimBanner";
 import { coverGradient } from "@/lib/gradients";
 import { Star, Clock, MapPin } from "lucide-react";
@@ -197,6 +198,9 @@ export default async function StorePage({
           slug={restaurant.slug}
         />
       )}
+
+      {/* Rewards progress badge — client-side, reads stored phone from localStorage */}
+      <RewardBadge slug={restaurant.slug} />
 
       {/* Menu */}
       <StoreMenu restaurant={restaurant} categories={categories} deliveryConfig={restaurant.deliveryConfig} />

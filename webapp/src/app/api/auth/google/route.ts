@@ -10,13 +10,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Google OAuth no configurado" }, { status: 500 });
   }
 
-  const redirect = request.nextUrl.searchParams.get("redirect") || "/restaurante";
+  const intentRaw = request.nextUrl.searchParams.get("intent");
+  const intent = intentRaw === "customer" ? "customer" : "owner";
+  const redirect = request.nextUrl.searchParams.get("redirect") || (intent === "customer" ? "/" : "/restaurante");
 
   // CSRF state token — stored in a short-lived cookie on apex domain
   const state = crypto.randomBytes(32).toString("hex");
   const cookieStore = await cookies();
   const domain = await cookieDomain();
-  cookieStore.set("menusj_oauth_state", JSON.stringify({ state, redirect }), {
+  cookieStore.set("menusj_oauth_state", JSON.stringify({ state, redirect, intent }), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

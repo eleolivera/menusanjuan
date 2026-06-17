@@ -4,18 +4,21 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
-import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, type LucideIcon } from "lucide-react";
+import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, Gift, type LucideIcon } from "lucide-react";
 
 // Nav uses Lucide line icons (same style as the rest of the app) instead of
 // emoji — emoji read as "consumer / playful" which felt off for the owner-side
 // dashboard. Each entry maps to a specific icon that visually represents the
 // destination at a glance.
+const REWARDS_ENABLED = process.env.NEXT_PUBLIC_REWARDS_ENABLED === "true";
+
 const DEFAULT_NAV: Array<{ href: string; label: string; Icon: LucideIcon }> = [
   { href: "/restaurante/menu", label: "Menú", Icon: UtensilsCrossed },
   { href: "/restaurante/profile", label: "Mi Restaurante", Icon: Store },
   { href: "/restaurante/pedidos", label: "Pedidos", Icon: ClipboardList },
   { href: "/restaurante/pos", label: "POS", Icon: Wallet },
   { href: "/restaurante/dashboard", label: "Dashboard", Icon: BarChart3 },
+  ...(REWARDS_ENABLED ? [{ href: "/restaurante/rewards", label: "Rewards", Icon: Gift }] : []),
 ];
 
 const USAGE_KEY = "msj_nav_usage";

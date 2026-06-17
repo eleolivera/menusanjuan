@@ -273,6 +273,7 @@ export async function createOrder(data: {
   paymentAssumed?: boolean;
   source?: string | null;
   initialStatus?: OrderStatus; // For POS to skip GENERATED
+  customerId?: string | null;  // Link to the Customer row for rewards
 }): Promise<Order> {
   // Retry up to 5 times on unique constraint violation (concurrent inserts can race)
   const maxAttempts = 5;
@@ -314,6 +315,7 @@ export async function createOrder(data: {
           paymentReceiptAt: data.paymentReceiptUrl ? new Date() : null,
           paymentAssumed: data.paymentAssumed ?? false,
           source: data.source ?? "web",
+          customerId: data.customerId ?? null,
           ...(data.initialStatus ? { status: data.initialStatus as PrismaOrderStatus } : {}),
         },
       });

@@ -9,6 +9,8 @@ import {
 } from "@/lib/orders-store";
 import { notifyRestaurantOfNewOrder } from "@/lib/order-notification";
 import { computeCartTotal } from "@/lib/money";
+import { rewardsFlag, upsertCustomerByPhone } from "@/lib/rewards";
+import { isValidPhone } from "@/lib/phone";
 
 // POST — create a new order
 export async function POST(request: NextRequest) {
@@ -55,6 +57,18 @@ export async function POST(request: NextRequest) {
         : null;
     const paymentStatus = paymentReceiptUrl ? "PAID_UNVERIFIED" : "UNPAID";
 
+    // Rewards: upsert the phone-keyed Customer record so the order links to it
+    // for punch accrual. Best-effort — never block order creation if it fails.
+    let customerId: string | null = null;
+    if (rewardsFlag() && customerPhone && isValidPhone(customerPhone)) {
+      try {
+        const customer = await upsertCustomerByPhone(customerPhone, customerName);
+        customerId = customer.id;
+      } catch (err) {
+        console.error("Customer upsert failed (rewards):", err);
+      }
+    }
+
     const order = await createOrder({
       restauranteSlug,
       customerName,
@@ -70,6 +84,7 @@ export async function POST(request: NextRequest) {
       paymentIntent,
       paymentReceiptUrl,
       paymentStatus,
+      customerId,
     });
 
     // Fire-and-forget email notification to restaurant owner

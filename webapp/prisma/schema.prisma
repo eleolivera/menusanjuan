@@ -10,19 +10,19 @@ datasource db {
 // ─── Auth & Account ───
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String
-  name          String
-  phone         String?
-  role          UserRole  @default(USER)
-  emailVerified Boolean   @default(false)
-  verifyCode    String?                      // 6-digit email verification code
-  resetCode     String?                      // 6-digit password reset code
-  resetExpires  DateTime?                    // Reset code expiry
-  mustChangePassword Boolean @default(false) // Force password change on next login
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  password           String
+  name               String
+  phone              String?
+  role               UserRole  @default(USER)
+  emailVerified      Boolean   @default(false)
+  verifyCode         String? // 6-digit email verification code
+  resetCode          String? // 6-digit password reset code
+  resetExpires       DateTime? // Reset code expiry
+  mustChangePassword Boolean   @default(false) // Force password change on next login
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   accounts      Account[]
   sessions      Session[]
@@ -33,9 +33,9 @@ model User {
 model OAuthAccount {
   id                String   @id @default(cuid())
   userId            String
-  provider          String   // "google"
-  providerAccountId String   // Google sub (unique ID)
-  email             String?  // Email from provider at time of link
+  provider          String // "google"
+  providerAccountId String // Google sub (unique ID)
+  email             String? // Email from provider at time of link
   createdAt         DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -54,7 +54,7 @@ enum UserRole {
 model Account {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // "dealer"
+  type      String // "dealer"
   createdAt DateTime @default(now())
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -88,57 +88,59 @@ enum SessionType {
 // ─── Restaurant (Dealer) ───
 
 model Dealer {
-  id          String   @id @default(cuid())
-  accountId   String   @unique
-  name        String                         // Restaurant display name
-  slug        String   @unique               // URL slug: menusanjuan.com/{slug}
-  description String?
-  phone       String                         // WhatsApp number
-  address     String?
-  city        String   @default("San Juan")
-  latitude    Float?
-  longitude   Float?
-  logoUrl     String?
-  coverUrl    String?
-  cuisineType String   @default("General")   // Comida Rápida, Parrilla, Pizzería, etc.
-  isActive    Boolean  @default(true)
-  isVerified  Boolean  @default(false)       // Owner identity verified
-  claimedAt   DateTime?                      // When a real owner claimed this
-  pendingOwnerEmail String?                  // Email of future owner — auto-links on registration
-  sourceProfileId String?                    // ID from scraped source
-  sourceSite  String?                        // "google-maps", "instagram", "manual", etc.
-  openHours     String?                      // LEGACY: kept for back-compat. New code uses pickupHours / deliveryHours.
-  pickupHours   String?                      // JSON: {"lun":[{"open":"12:00","close":"14:00"},{"open":"20:00","close":"00:30"}],...}
-  deliveryHours String?                      // Same shape as pickupHours but separate schedule for delivery
-  mercadoPagoAlias String?
-  mercadoPagoCvu   String?
-  bankInfo    String?
-  rating      Float?                           // Star rating (1.0-5.0), admin-set
-  deliveryEnabled    Boolean  @default(true)   // Whether restaurant offers delivery
-  deliveryPricingEnabled Boolean @default(false) // Whether to auto-charge a delivery fee. When false, the public site shows "Costo a confirmar" and the resta negotiates by WhatsApp. When true, the zones / flat-fee UI is exposed.
-  pickupEnabled      Boolean  @default(true)   // Whether restaurant accepts in-person pickup
-  closedUntil        DateTime?                 // Manual early-close: closed until this timestamp regardless of schedule (e.g. ran out of food). Set to "next morning 5am AR" so the close survives midnight rollover.
-  lastSeenUpdate     String?                   // ID of the most recent "Novedades" entry the owner acknowledged. Compared against changelog.ts to decide if the modal pops up.
-  deliveryCloseRadius Float?                   // Close zone radius in km (e.g. 3.0)
-  deliveryClosePrice  Float?                   // Close zone price in ARS
-  deliveryFarRadius   Float?                   // Far zone radius in km (e.g. 7.0)
-  deliveryFarPrice    Float?                   // Far zone price in ARS
-  deliveryZones       String?                  // JSON: [{radius:number,price:number}, ...] up to 5 zones (sorted asc by radius)
-  deliveryFee Float?                           // Legacy flat fee fallback
-  deliveryTimeMin Int?                          // Estimated delivery time in minutes
-  posEnabled  Boolean  @default(false)         // Show POS / pre-pay tablet UI
-  tableSuggestions Json?                       // Recently used table names for autocomplete
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                     String    @id @default(cuid())
+  accountId              String    @unique
+  name                   String // Restaurant display name
+  slug                   String    @unique // URL slug: menusanjuan.com/{slug}
+  description            String?
+  phone                  String // WhatsApp number
+  address                String?
+  city                   String    @default("San Juan")
+  latitude               Float?
+  longitude              Float?
+  logoUrl                String?
+  coverUrl               String?
+  cuisineType            String    @default("General") // Comida Rápida, Parrilla, Pizzería, etc.
+  isActive               Boolean   @default(true)
+  isVerified             Boolean   @default(false) // Owner identity verified
+  claimedAt              DateTime? // When a real owner claimed this
+  pendingOwnerEmail      String? // Email of future owner — auto-links on registration
+  sourceProfileId        String? // ID from scraped source
+  sourceSite             String? // "google-maps", "instagram", "manual", etc.
+  openHours              String? // LEGACY: kept for back-compat. New code uses pickupHours / deliveryHours.
+  pickupHours            String? // JSON: {"lun":[{"open":"12:00","close":"14:00"},{"open":"20:00","close":"00:30"}],...}
+  deliveryHours          String? // Same shape as pickupHours but separate schedule for delivery
+  mercadoPagoAlias       String?
+  mercadoPagoCvu         String?
+  bankInfo               String?
+  rating                 Float? // Star rating (1.0-5.0), admin-set
+  deliveryEnabled        Boolean   @default(true) // Whether restaurant offers delivery
+  deliveryPricingEnabled Boolean   @default(false) // Whether to auto-charge a delivery fee. When false, the public site shows "Costo a confirmar" and the resta negotiates by WhatsApp. When true, the zones / flat-fee UI is exposed.
+  pickupEnabled          Boolean   @default(true) // Whether restaurant accepts in-person pickup
+  closedUntil            DateTime? // Manual early-close: closed until this timestamp regardless of schedule (e.g. ran out of food). Set to "next morning 5am AR" so the close survives midnight rollover.
+  lastSeenUpdate         String? // ID of the most recent "Novedades" entry the owner acknowledged. Compared against changelog.ts to decide if the modal pops up.
+  deliveryCloseRadius    Float? // Close zone radius in km (e.g. 3.0)
+  deliveryClosePrice     Float? // Close zone price in ARS
+  deliveryFarRadius      Float? // Far zone radius in km (e.g. 7.0)
+  deliveryFarPrice       Float? // Far zone price in ARS
+  deliveryZones          String? // JSON: [{radius:number,price:number}, ...] up to 5 zones (sorted asc by radius)
+  deliveryFee            Float? // Legacy flat fee fallback
+  deliveryTimeMin        Int? // Estimated delivery time in minutes
+  posEnabled             Boolean   @default(false) // Show POS / pre-pay tablet UI
+  tableSuggestions       Json? // Recently used table names for autocomplete
+  rewardsEnabled         Boolean   @default(false) // Master per-dealer kill switch for the rewards / loyalty program
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  account       Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  categories    MenuCategory[]
-  orders        Order[]
-  claimRequests ClaimRequest[]
+  account        Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categories     MenuCategory[]
+  orders         Order[]
+  claimRequests  ClaimRequest[]
   dealerCuisines DealerCuisineType[]
-  optionPresets OptionPreset[]
+  optionPresets  OptionPreset[]
   onboardingCard OnboardingCard?
-  printAgents   PrintAgent[]
+  printAgents    PrintAgent[]
+  rewardProgram  RewardProgram?
 
   @@index([slug])
   @@index([cuisineType])
@@ -151,22 +153,22 @@ model Dealer {
 // thermal printer over USB. The agent long-polls /api/print-agent/poll using
 // its API key (Bearer auth). One row per paired agent device.
 model PrintAgent {
-  id          String     @id @default(cuid())
-  dealerId    String
-  dealer      Dealer     @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  id                   String     @id @default(cuid())
+  dealerId             String
+  dealer               Dealer     @relation(fields: [dealerId], references: [id], onDelete: Cascade)
   // Both null until the agent exchanges its pairing code for an API key
-  apiKeyHash  String?    @unique               // bcrypt hash of the raw key
-  apiKeyHint  String?                          // last 4 chars for display (e.g. "a3f7")
-  name        String     @default("Impresora") // friendly name set by owner
-  status      String     @default("OFFLINE")   // OFFLINE | ONLINE
-  lastSeenAt  DateTime?
-  version     String?                          // agent reports its version on heartbeat
-  hostInfo    String?                          // e.g. "Windows 10 / PC-CAJA"
-  pairingCode String?    @unique               // short code for pairing (cleared after pair)
+  apiKeyHash           String?    @unique // bcrypt hash of the raw key
+  apiKeyHint           String? // last 4 chars for display (e.g. "a3f7")
+  name                 String     @default("Impresora") // friendly name set by owner
+  status               String     @default("OFFLINE") // OFFLINE | ONLINE
+  lastSeenAt           DateTime?
+  version              String? // agent reports its version on heartbeat
+  hostInfo             String? // e.g. "Windows 10 / PC-CAJA"
+  pairingCode          String?    @unique // short code for pairing (cleared after pair)
   pairingCodeExpiresAt DateTime?
-  pairedAt    DateTime?
-  createdAt   DateTime   @default(now())
-  jobs        PrintJob[]
+  pairedAt             DateTime?
+  createdAt            DateTime   @default(now())
+  jobs                 PrintJob[]
 
   @@index([dealerId])
 }
@@ -176,10 +178,10 @@ model PrintJob {
   id          String     @id @default(cuid())
   agentId     String
   agent       PrintAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  orderId     String?                          // null for test prints
-  kind        String     @default("ORDER")     // ORDER | TEST
-  payload     Bytes                            // raw ESC/POS bytes ready for the printer
-  status      String     @default("PENDING")   // PENDING | DELIVERED | FAILED
+  orderId     String? // null for test prints
+  kind        String     @default("ORDER") // ORDER | TEST
+  payload     Bytes // raw ESC/POS bytes ready for the printer
+  status      String     @default("PENDING") // PENDING | DELIVERED | FAILED
   attempts    Int        @default(0)
   errorMsg    String?
   createdAt   DateTime   @default(now())
@@ -197,7 +199,7 @@ model CuisineType {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 
-  dealers   DealerCuisineType[]
+  dealers DealerCuisineType[]
 
   @@index([sortOrder])
 }
@@ -216,15 +218,15 @@ model DealerCuisineType {
 // ─── Claim Requests ───
 
 model ClaimRequest {
-  id         String       @id @default(cuid())
-  dealerId   String                              // Restaurant being claimed
-  userId     String                              // User requesting the claim
-  status     ClaimStatus  @default(PENDING)
-  code       String?                             // 6-char verification code (admin-generated)
-  notes      String?                             // Admin notes
+  id          String      @id @default(cuid())
+  dealerId    String // Restaurant being claimed
+  userId      String // User requesting the claim
+  status      ClaimStatus @default(PENDING)
+  code        String? // 6-char verification code (admin-generated)
+  notes       String? // Admin notes
   requestedAt DateTime    @default(now())
   resolvedAt  DateTime?
-  resolvedBy  String?                            // Admin user ID who approved/rejected
+  resolvedBy  String? // Admin user ID who approved/rejected
 
   dealer Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -235,20 +237,20 @@ model ClaimRequest {
 }
 
 enum ClaimStatus {
-  PENDING    // Waiting for admin review
-  CODE_SENT  // Admin generated code and sent to business
-  APPROVED   // Claim approved, ownership transferred
-  REJECTED   // Claim rejected
+  PENDING // Waiting for admin review
+  CODE_SENT // Admin generated code and sent to business
+  APPROVED // Claim approved, ownership transferred
+  REJECTED // Claim rejected
 }
 
 // ─── Menu ───
 
 model MenuCategory {
-  id       String @id @default(cuid())
-  dealerId String
-  name     String            // "Lomitos", "Bebidas", etc.
-  emoji    String?           // Category icon emoji
-  sortOrder Int   @default(0)
+  id        String  @id @default(cuid())
+  dealerId  String
+  name      String // "Lomitos", "Bebidas", etc.
+  emoji     String? // Category icon emoji
+  sortOrder Int     @default(0)
 
   dealer Dealer     @relation(fields: [dealerId], references: [id], onDelete: Cascade)
   items  MenuItem[]
@@ -261,54 +263,55 @@ model MenuItem {
   categoryId  String
   name        String
   description String?
-  price       Float                // Price in ARS
-  priceUsd    Float?               // Optional USD price
+  price       Float // Price in ARS
+  priceUsd    Float? // Optional USD price
   imageUrl    String?
-  badge       String?              // "Popular", "Nuevo", etc.
+  badge       String? // "Popular", "Nuevo", etc.
   rating      Float?
   available   Boolean @default(true)
   sortOrder   Int     @default(0)
-  stock       Int?                 // null = unlimited
-  minStock    Int?                 // Alert threshold
+  stock       Int? // null = unlimited
+  minStock    Int? // Alert threshold
 
-  category     MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  optionGroups OptionGroup[]
+  category               MenuCategory        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  optionGroups           OptionGroup[]
   // Promo / combo support: when this item is composed of OTHER items (e.g.
   // "2 Pachatas + Papas"), `componentsOf` is the ordered list of child items.
   // Each child keeps its own option groups, so the customer can customize each
   // pachata independently. `componentIn` is the inverse — orders where this
   // item is being referenced as part of someone else's promo (used to block
   // deletion via FK Restrict).
-  componentsOf MenuItemComponent[] @relation("ItemComponents")
-  componentIn  MenuItemComponent[] @relation("ItemComponentRef")
+  componentsOf           MenuItemComponent[] @relation("ItemComponents")
+  componentIn            MenuItemComponent[] @relation("ItemComponentRef")
+  rewardProgramsAsReward RewardProgram[]
 
   @@index([categoryId, sortOrder])
   @@index([available])
 }
 
 model MenuItemComponent {
-  id            String   @id @default(cuid())
-  parentItemId  String
-  childItemId   String
-  label         String?  // optional display override; falls back to childItem.name
-  sortOrder     Int      @default(0)
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  parentItemId String
+  childItemId  String
+  label        String? // optional display override; falls back to childItem.name
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
 
-  parentItem    MenuItem @relation("ItemComponents",   fields: [parentItemId], references: [id], onDelete: Cascade)
-  childItem     MenuItem @relation("ItemComponentRef", fields: [childItemId],  references: [id], onDelete: Restrict)
+  parentItem MenuItem @relation("ItemComponents", fields: [parentItemId], references: [id], onDelete: Cascade)
+  childItem  MenuItem @relation("ItemComponentRef", fields: [childItemId], references: [id], onDelete: Restrict)
 
   @@index([parentItemId])
   @@index([childItemId])
 }
 
 model OptionGroup {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   menuItemId    String
-  title         String                         // "Elegir gustos", "Extras", "Tamaño"
-  minSelections Int      @default(0)           // 0 = optional, 1+ = required
-  maxSelections Int      @default(1)           // 1 = single-select, N = multi-select
-  sortOrder     Int      @default(0)
-  presetId      String?                        // If set, options come from the shared preset
+  title         String // "Elegir gustos", "Extras", "Tamaño"
+  minSelections Int     @default(0) // 0 = optional, 1+ = required
+  maxSelections Int     @default(1) // 1 = single-select, N = multi-select
+  sortOrder     Int     @default(0)
+  presetId      String? // If set, options come from the shared preset
 
   menuItem MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   options  OptionChoice[]
@@ -321,8 +324,8 @@ model OptionGroup {
 model OptionChoice {
   id            String  @id @default(cuid())
   optionGroupId String
-  name          String                         // "Bacon", "Crocante", "Chocolate"
-  priceDelta    Float   @default(0)           // Price change in ARS
+  name          String // "Bacon", "Crocante", "Chocolate"
+  priceDelta    Float   @default(0) // Price change in ARS
   available     Boolean @default(true)
   sortOrder     Int     @default(0)
 
@@ -335,7 +338,7 @@ model OptionChoice {
 model OptionPreset {
   id        String   @id @default(cuid())
   dealerId  String
-  name      String                          // "Gustos", "Extras", "Agregados"
+  name      String // "Gustos", "Extras", "Agregados"
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -350,9 +353,9 @@ model OptionPreset {
 model OptionPresetChoice {
   id         String  @id @default(cuid())
   presetId   String
-  name       String                         // "Dulce de leche"
+  name       String // "Dulce de leche"
   priceDelta Float   @default(0)
-  available  Boolean @default(true)         // Toggle sin stock once, propagates everywhere
+  available  Boolean @default(true) // Toggle sin stock once, propagates everywhere
   sortOrder  Int     @default(0)
 
   preset OptionPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
@@ -363,47 +366,142 @@ model OptionPresetChoice {
 // ─── Orders ───
 
 model Order {
-  id               String      @id @default(cuid())
-  orderNumber      String      @unique              // ORD-1001 style
-  restauranteSlug  String                            // Links to restaurant by slug
-  dealerId         String?                           // Optional FK for when Dealer records exist
-  status           OrderStatus @default(GENERATED)
-  customerName     String
-  customerPhone    String
-  customerAddress  String?
-  latitude         Float?
-  longitude        Float?
-  items            Json                              // OrderItem[] as JSON
-  total            Float
-  deliveryMethod   String      @default("delivery")  // "delivery" | "pickup"
-  deliveryFee      Float       @default(0)            // Delivery fee charged in ARS
-  paymentMethod    String?                           // "cash" | "card" | "transfer" | "mercadopago"
-  paymentStatus    String      @default("UNPAID")    // "UNPAID" | "PAID_UNVERIFIED" | "PAID"
-  paymentIntent    String?                           // What the customer SAID at checkout: "transfer" | "mercadopago" | "cash"
-  paidAt           DateTime?
-  cashTendered     Float?                            // For change calculation
-  cashChange       Float?
-  paymentReceiptUrl String?                          // R2 URL of the customer-uploaded comprobante image
-  paymentReceiptAt  DateTime?                        // When the customer uploaded the comprobante (null if none yet)
-  paymentAssumed    Boolean     @default(false)      // True when payment was implied rather than explicitly validated by the cashier — e.g. pickup auto-PAID on status→DELIVERED, or delivery "¿estaba pagado?" confirm dialog. Audit breadcrumb so we can later distinguish "real" validations from "cashier just clicked through".
-  channel          String      @default("ONLINE")    // "ONLINE" | "DINE_IN" | "COUNTER"
-  tableNumber      String?                           // "Mesa 12" / "Barra 3" — free text
-  source           String?                           // "web" | "pos-tablet" | "pos-mobile"
-  whatsappSent     Boolean     @default(false)
-  notes            String?
-  customerAccessToken String?                     // 12-char token for anonymous customer tracking
-  driverAccessToken   String?  @unique           // 12-char token for the delivery-driver-facing QR page
-  deliveredAt      DateTime?                     // When status flipped to DELIVERED (via driver QR or owner)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id                  String      @id @default(cuid())
+  orderNumber         String      @unique // ORD-1001 style
+  restauranteSlug     String // Links to restaurant by slug
+  dealerId            String? // Optional FK for when Dealer records exist
+  status              OrderStatus @default(GENERATED)
+  customerName        String
+  customerPhone       String
+  customerAddress     String?
+  latitude            Float?
+  longitude           Float?
+  items               Json // OrderItem[] as JSON
+  total               Float
+  deliveryMethod      String      @default("delivery") // "delivery" | "pickup"
+  deliveryFee         Float       @default(0) // Delivery fee charged in ARS
+  paymentMethod       String? // "cash" | "card" | "transfer" | "mercadopago"
+  paymentStatus       String      @default("UNPAID") // "UNPAID" | "PAID_UNVERIFIED" | "PAID"
+  paymentIntent       String? // What the customer SAID at checkout: "transfer" | "mercadopago" | "cash"
+  paidAt              DateTime?
+  cashTendered        Float? // For change calculation
+  cashChange          Float?
+  paymentReceiptUrl   String? // R2 URL of the customer-uploaded comprobante image
+  paymentReceiptAt    DateTime? // When the customer uploaded the comprobante (null if none yet)
+  paymentAssumed      Boolean     @default(false) // True when payment was implied rather than explicitly validated by the cashier — e.g. pickup auto-PAID on status→DELIVERED, or delivery "¿estaba pagado?" confirm dialog. Audit breadcrumb so we can later distinguish "real" validations from "cashier just clicked through".
+  channel             String      @default("ONLINE") // "ONLINE" | "DINE_IN" | "COUNTER"
+  tableNumber         String? // "Mesa 12" / "Barra 3" — free text
+  source              String? // "web" | "pos-tablet" | "pos-mobile"
+  whatsappSent        Boolean     @default(false)
+  notes               String?
+  customerAccessToken String? // 12-char token for anonymous customer tracking
+  driverAccessToken   String?     @unique // 12-char token for the delivery-driver-facing QR page
+  deliveredAt         DateTime? // When status flipped to DELIVERED (via driver QR or owner)
+  customerId          String? // Backfill: nullable for legacy orders. Set on order create via phone upsert.
+  rewardCounted       Boolean     @default(false) // Idempotency guard so DELIVERED double-fires can't double-count rewards
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
-  dealer Dealer? @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  dealer     Dealer?     @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  customer   Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  redemption Redemption? @relation("OrderRedemption")
 
   @@index([restauranteSlug, status])
   @@index([restauranteSlug, createdAt])
   @@index([restauranteSlug, channel])
   @@index([orderNumber])
   @@index([customerAccessToken])
+  @@index([customerId])
+}
+
+// ─── Rewards / loyalty program ───────────────────────────────────────────────
+// Customer-side identity. Distinct from User (which is owners). Phone-first:
+// created on first order via upsert. Google linked later at redemption time so
+// that one phone can only ever map to one Google account and vice-versa.
+model Customer {
+  id            String   @id @default(cuid())
+  phone         String   @unique // E.164 normalized (libphonenumber-js)
+  phoneVerified Boolean  @default(false) // Reserved for future SMS/WA OTP
+  googleSub     String?  @unique // Google account binding (one-to-one with phone)
+  googleEmail   String?
+  displayName   String? // From Google "name" or last order
+  createdAt     DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+
+  progress    RewardProgress[]
+  redemptions Redemption[]
+  orders      Order[]
+
+  @@index([googleEmail])
+}
+
+// Per-dealer punch program config. v1: one program per dealer (uniqueness on
+// dealerId). v2 could allow multiple (e.g. burger program + drink program) by
+// dropping the unique constraint.
+model RewardProgram {
+  id            String   @id @default(cuid())
+  dealerId      String   @unique
+  name          String // "Hermanos Rewards"
+  description   String // Customer-facing copy
+  punchesNeeded Int      @default(10)
+  rewardItemId  String // MenuItem given for free
+  expiresInDays Int      @default(30) // READY redemption TTL
+  enabled       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealer      Dealer           @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  rewardItem  MenuItem         @relation(fields: [rewardItemId], references: [id], onDelete: Restrict)
+  progress    RewardProgress[]
+  redemptions Redemption[]
+
+  @@index([dealerId, enabled])
+}
+
+// Per-customer counter for a given program. Unique on (customerId, programId)
+// so a customer has at most one row per resta program.
+model RewardProgress {
+  id         String   @id @default(cuid())
+  customerId String
+  programId  String
+  punches    Int      @default(0)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  customer Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  program  RewardProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, programId])
+  @@index([programId, punches]) // Owner-side "top N near the prize" query
+}
+
+// Each time a customer earns + claims a reward. READY = earned but not on an
+// order yet; REDEEMED = attached + the order reached DELIVERED; EXPIRED =
+// past expiresAt without ever being attached; CANCELLED = order was cancelled
+// after attachment.
+enum RedemptionStatus {
+  READY
+  REDEEMED
+  EXPIRED
+  CANCELLED
+}
+
+model Redemption {
+  id         String           @id @default(cuid())
+  customerId String
+  programId  String
+  orderId    String?          @unique // Set when claimed onto a cart
+  status     RedemptionStatus @default(READY)
+  expiresAt  DateTime
+  createdAt  DateTime         @default(now())
+  redeemedAt DateTime?
+
+  customer Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  program  RewardProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  order    Order?        @relation("OrderRedemption", fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, status])
+  @@index([programId, status])
 }
 
 // ─── Onboarding Kanban ───
@@ -417,15 +515,15 @@ enum OnboardingStage {
 }
 
 model OnboardingCard {
-  id              String           @id @default(cuid())
-  dealerId        String           @unique
-  stage           OnboardingStage  @default(NEEDS_INFO)
-  sortOrder       Int              @default(0)
-  lastPassword    String?                        // Last generated plain password (for admin reference)
+  id              String          @id @default(cuid())
+  dealerId        String          @unique
+  stage           OnboardingStage @default(NEEDS_INFO)
+  sortOrder       Int             @default(0)
+  lastPassword    String? // Last generated plain password (for admin reference)
   lastContactedAt DateTime?
-  stageChangedAt  DateTime         @default(now())
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  stageChangedAt  DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   dealer Dealer           @relation(fields: [dealerId], references: [id], onDelete: Cascade)
   notes  OnboardingNote[]
@@ -446,29 +544,29 @@ model OnboardingNote {
 }
 
 enum OrderStatus {
-  GENERATED   // Generado — order placed
-  PAID        // Pagado — payment confirmed
-  PROCESSING  // Procesado — kitchen working
-  DELIVERED   // Entregado — delivered/picked up
-  CANCELLED   // Cancelado
+  GENERATED // Generado — order placed
+  PAID // Pagado — payment confirmed
+  PROCESSING // Procesado — kitchen working
+  DELIVERED // Entregado — delivered/picked up
+  CANCELLED // Cancelado
 }
 
 // ─── Bot ───
 
 model BotFeedback {
-  id            String   @id @default(cuid())
-  sessionId     String                        // wa_phone or admin_xxx
-  rating        Int                           // 1 = bad, 2 = good
-  note          String?                       // optional reviewer note
-  userMessage   String                        // what customer said
-  botReply      String                        // what bot replied
-  selectedSlug  String?                       // restaurant context if any
-  conversation  String?                       // full conversation JSON
-  inputTokens   Int      @default(0)
-  outputTokens  Int      @default(0)
-  costCents     Float    @default(0)
-  responseMs    Int      @default(0)
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  sessionId    String // wa_phone or admin_xxx
+  rating       Int // 1 = bad, 2 = good
+  note         String? // optional reviewer note
+  userMessage  String // what customer said
+  botReply     String // what bot replied
+  selectedSlug String? // restaurant context if any
+  conversation String? // full conversation JSON
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costCents    Float    @default(0)
+  responseMs   Int      @default(0)
+  createdAt    DateTime @default(now())
 
   @@index([createdAt])
   @@index([rating])
@@ -476,8 +574,8 @@ model BotFeedback {
 
 model BotPrompt {
   id        String   @id @default(cuid())
-  key       String   @unique               // "discovery" or "ordering"
-  content   String                          // the system prompt template
+  key       String   @unique // "discovery" or "ordering"
+  content   String // the system prompt template
   updatedAt DateTime @updatedAt
-  updatedBy String?                         // admin email
+  updatedBy String? // admin email
 }
