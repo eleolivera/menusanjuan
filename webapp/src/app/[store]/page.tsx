@@ -16,14 +16,29 @@ export async function generateMetadata({
   const restaurant = await getRestaurantBySlug(store);
   if (!restaurant) return { title: "No encontrado" };
 
+  // WhatsApp link previews look way better with a square brand logo in the
+  // small thumb slot than a wide cover (most covers get cropped or skipped
+  // entirely if over ~600KB). Prefer the logo; fall back to the cover.
+  const ogImage = restaurant.logoUrl || restaurant.coverUrl;
+  const ogTitle = `${restaurant.name} — Menú | MenuSanJuan`;
+  const ogDescription = restaurant.description ?? undefined;
+
   return {
     title: `${restaurant.name} — Menú`,
     description: restaurant.description,
     openGraph: {
-      title: `${restaurant.name} — Menú | MenuSanJuan`,
-      description: restaurant.description,
-      ...(restaurant.coverUrl ? { images: [{ url: restaurant.coverUrl, width: 800, height: 400 }] } : {}),
+      title: ogTitle,
+      description: ogDescription,
+      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
       type: "website",
+    },
+    // Override the root-layout twitter defaults so iMessage / Twitter / Telegram
+    // unfurls show the dealer's brand instead of the generic site card.
+    twitter: {
+      card: "summary",
+      title: ogTitle,
+      description: ogDescription,
+      ...(ogImage ? { images: [ogImage] } : {}),
     },
   };
 }
