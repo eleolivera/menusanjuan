@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRestauranteFromSession } from "@/lib/restaurante-auth";
+import { isServiceOpenNow } from "@/lib/hours";
 
 /**
  * Accepts either a JSON string or an array. Validates max 5 zones, strict-asc radius (+1km).
@@ -81,6 +82,12 @@ export async function GET() {
     deliveryFee: dealer.deliveryFee,
     deliveryTimeMin: dealer.deliveryTimeMin,
     closedUntil: dealer.closedUntil ? dealer.closedUntil.toISOString() : null,
+    openUntil: dealer.openUntil ? dealer.openUntil.toISOString() : null,
+    // True if the resta's regular schedule says open right now (ignoring both
+    // overrides). The CloseShopButton uses this to pick which CTA to show.
+    scheduledOpen:
+      isServiceOpenNow(dealer.pickupHours || dealer.openHours) ||
+      isServiceOpenNow(dealer.deliveryHours || dealer.openHours),
     email: user.email,
     hasPassword,
     hasGoogle: googleLinked > 0,
