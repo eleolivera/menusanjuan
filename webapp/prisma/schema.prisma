@@ -118,6 +118,7 @@ model Dealer {
   deliveryPricingEnabled Boolean   @default(false) // Whether to auto-charge a delivery fee. When false, the public site shows "Costo a confirmar" and the resta negotiates by WhatsApp. When true, the zones / flat-fee UI is exposed.
   pickupEnabled          Boolean   @default(true) // Whether restaurant accepts in-person pickup
   closedUntil            DateTime? // Manual early-close: closed until this timestamp regardless of schedule (e.g. ran out of food). Set to "next morning 5am AR" so the close survives midnight rollover.
+  openUntil              DateTime? // Manual force-open: treat resta as open until this timestamp regardless of schedule. Used for testing or "abrimos hoy excepcionalmente". closedUntil still wins if both are set.
   lastSeenUpdate         String? // ID of the most recent "Novedades" entry the owner acknowledged. Compared against changelog.ts to decide if the modal pops up.
   deliveryCloseRadius    Float? // Close zone radius in km (e.g. 3.0)
   deliveryClosePrice     Float? // Close zone price in ARS

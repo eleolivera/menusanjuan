@@ -61,18 +61,29 @@ export async function getRestaurantBySlug(slug: string): Promise<RestaurantWithD
       })
     : null;
 
+  // Owner-triggered force-open override (mirror of closedUntil). When set and
+  // in the future, the resta is treated as open regardless of the schedule.
+  // Used for testing or special events ("la abrimos hoy a la tarde aunque
+  // normalmente sólo abrimos a la noche").
+  const manualOpen = !!(dealer.openUntil && dealer.openUntil.getTime() > now.getTime());
+
+  // Effective open-now: schedule says open OR owner force-opened. Manual close
+  // still wins (you can manually close during a force-open window).
+  const effectivePickupOpen  = pickupOpenNow  || manualOpen;
+  const effectiveDeliveryOpen = deliveryOpenNow || manualOpen;
+
   const pickupService: ServiceAvailability = {
     enabled: dealer.pickupEnabled,
-    openNow: pickupOpenNow,
-    available: dealer.pickupEnabled && pickupOpenNow && !manualClosed,
+    openNow: effectivePickupOpen,
+    available: dealer.pickupEnabled && effectivePickupOpen && !manualClosed,
     nextOpenLabel: pickupNextOpen,
     manualClosed,
     closedUntilLabel,
   };
   const deliveryService: ServiceAvailability = {
     enabled: dealer.deliveryEnabled,
-    openNow: deliveryOpenNow,
-    available: dealer.deliveryEnabled && deliveryOpenNow && !manualClosed,
+    openNow: effectiveDeliveryOpen,
+    available: dealer.deliveryEnabled && effectiveDeliveryOpen && !manualClosed,
     nextOpenLabel: deliveryNextOpen,
     manualClosed,
     closedUntilLabel,
