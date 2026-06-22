@@ -98,6 +98,12 @@ export function OrderModal({
   // Optional pre-order comprobante URL when the customer uploads at checkout.
   const [checkoutReceiptUrl, setCheckoutReceiptUrl] = useState<string | null>(null);
   const [copiedAlias, setCopiedAlias] = useState(false);
+  // Soft-intercept: when transfer/MP is picked and no receipt is attached, the
+  // Send button shows a one-step nudge instead of firing immediately. Customer
+  // can choose to upload or send anyway. Improves attach rate without forcing.
+  const [showReceiptNudge, setShowReceiptNudge] = useState(false);
+  // Ref to the upload section so "Subir ahora" in the nudge can scroll it into view.
+  const uploadSectionRef = useRef<HTMLDivElement | null>(null);
 
   async function copyToClipboard(text: string) {
     try {
@@ -894,11 +900,14 @@ _Pedido realizado desde MenuSanJuan_`;
                       </div>
                     )}
 
-                    {/* Comprobante uploader — only when the total is finalized */}
+                    {/* Comprobante uploader — only when the total is finalized.
+                        Removed "(opcional)" qualifier + reframed copy to lead with benefit:
+                        people skip when permission is given upfront. ~35-45% attach rate
+                        historically; the goal here is to nudge that higher without forcing. */}
                     {!(deliveryMethod === "delivery" && !hasDeliveryPricing) && (
-                      <div>
+                      <div ref={uploadSectionRef}>
                         <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5">
-                          Comprobante (opcional)
+                          Comprobante de pago
                         </div>
                         <ComprobanteUploader
                           mode="checkout"
@@ -907,7 +916,7 @@ _Pedido realizado desde MenuSanJuan_`;
                           onClear={() => setCheckoutReceiptUrl(null)}
                         />
                         <div className="text-[10px] text-text-muted mt-1.5">
-                          Si ya transferiste, subí la captura ahora. Si no, lo podés hacer después desde el link que te llega por WhatsApp.
+                          Subiendo tu comprobante ahora, el restaurante confirma tu pedido sin demoras.
                         </div>
                       </div>
                     )}
@@ -920,7 +929,17 @@ _Pedido realizado desde MenuSanJuan_`;
                   Volver
                 </button>
                 <button
-                  onClick={handleSendWhatsApp}
+                  onClick={() => {
+                    // Soft-intercept: transfer/MP without receipt → nudge first.
+                    // Customer can still choose "Enviar igual" — purely additive,
+                    // no flow is blocked. Cash orders skip the nudge entirely.
+                    const needsReceipt = paymentIntent === "transfer" || paymentIntent === "mercadopago";
+                    if (needsReceipt && !checkoutReceiptUrl) {
+                      setShowReceiptNudge(true);
+                      return;
+                    }
+                    handleSendWhatsApp();
+                  }}
                   disabled={sending}
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3.5 text-sm font-bold text-white shadow-md shadow-green-500/20 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
                 >
@@ -932,6 +951,53 @@ _Pedido realizado desde MenuSanJuan_`;
                   {sending ? "Enviando..." : "Enviar por WhatsApp"}
                 </button>
               </div>
+
+              {/* Soft-intercept nudge — shown only when customer hits Send on a
+                  transfer/MP order without an attached receipt. Customer can
+                  still proceed without uploading; this is friction, not a wall. */}
+              {showReceiptNudge && (
+                <div
+                  className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                  onClick={() => setShowReceiptNudge(false)}
+                >
+                  <div
+                    className="rounded-2xl bg-surface border border-border/50 max-w-sm w-full p-5 space-y-4 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">🧾</div>
+                      <h3 className="text-base font-bold text-text">Falta tu comprobante</h3>
+                      <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
+                        Subiendo la captura ahora, el restaurante confirma tu pedido sin demoras y empieza a prepararlo enseguida.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowReceiptNudge(false);
+                          handleSendWhatsApp();
+                        }}
+                        disabled={sending}
+                        className="rounded-xl border border-border px-3 py-3 text-xs font-semibold text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
+                      >
+                        Enviar igual
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowReceiptNudge(false);
+                          // Scroll the upload section into view + soft highlight.
+                          uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="rounded-xl bg-emerald-500 px-3 py-3 text-xs font-bold text-white shadow-md hover:shadow-lg transition-all"
+                      >
+                        Subir ahora
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
