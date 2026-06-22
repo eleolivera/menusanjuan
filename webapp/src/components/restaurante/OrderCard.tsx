@@ -77,7 +77,7 @@ export function OrderCard({
   restaurantName,
 }: {
   order: Order;
-  onUpdateStatus: (orderId: string, status: OrderStatus, extras?: { markPaid?: boolean }) => void;
+  onUpdateStatus: (orderId: string, status: OrderStatus, extras?: { markPaid?: boolean; paymentMethod?: "cash" | "transfer" | "mercadopago" }) => void;
   restaurantName: string;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -91,6 +91,11 @@ export function OrderCard({
   const [showKitchenPrompt, setShowKitchenPrompt] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  // Confirm-paid modal — shown when cashier hits "Marcar Entregado" on an order
+  // that hasn't been recorded as PAID yet (any deliveryMethod). Forces an
+  // explicit "cobré en efectivo / por transferencia / aún no" answer instead of
+  // the prior silent auto-PAY for pickup + ugly window.confirm for delivery.
+  const [showDeliverConfirm, setShowDeliverConfirm] = useState(false);
 
   /**
    * Print via hidden iframe — no intermediate tab. The iframe loads the ticket
@@ -213,6 +218,13 @@ export function OrderCard({
               <config.Icon className="h-3.5 w-3.5" strokeWidth={2} />
               {config.label}
             </span>
+            {/* Accounting-safety: flag DELIVERED orders that never had their
+                payment recorded so the owner can chase them later. */}
+            {order.status === "DELIVERED" && order.paymentStatus !== "PAID" && (
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                💸 Sin cobrar
+              </span>
+            )}
             <span className="text-sm font-bold text-white truncate">
               {order.orderNumber}
             </span>
@@ -547,26 +559,19 @@ export function OrderCard({
               <button
                 onClick={() => {
                   const nextStatus = config.next!;
-                  // Smart "Entregado" transition — owners are too busy to also click
-                  // "Cobrar" before "Entregado", so we infer payment from context:
-                  //   - pickup    → auto-PAID server-side (no question asked)
-                  //   - delivery  → if not yet paid, ask "¿estaba pagado?" with a
-                  //                  confirm dialog. Yes → markPaid hint to server.
-                  //                  No  → just status change, payment stays UNPAID.
-                  if (
-                    nextStatus === "DELIVERED" &&
-                    order.deliveryMethod === "delivery" &&
-                    order.paymentStatus !== "PAID"
-                  ) {
-                    const wasPaid = window.confirm(
-                      "¿Ya estaba pagado este pedido?\n\nTocá Aceptar si el repartidor lo cobró (o si pagaron por transferencia / MP).\nTocá Cancelar si todavía falta cobrar."
-                    );
-                    onUpdateStatus(order.id, nextStatus, { markPaid: wasPaid });
-                  } else {
-                    // Pickup → server auto-PAIDs based on deliveryMethod.
-                    // All other transitions → just the status change.
-                    onUpdateStatus(order.id, nextStatus);
+                  // "Marcar Entregado" transition. Three payment cases:
+                  //   - already PAID                  → just move status, no prompt
+                  //   - not yet paid (any method)     → show the confirm-paid modal
+                  //                                     so the cashier explicitly logs
+                  //                                     how it was collected; protects
+                  //                                     end-of-day accounting from
+                  //                                     silent UNPAID-but-DELIVERED rows.
+                  //   - other status transitions      → just the status change
+                  if (nextStatus === "DELIVERED" && order.paymentStatus !== "PAID") {
+                    setShowDeliverConfirm(true);
+                    return;
                   }
+                  onUpdateStatus(order.id, nextStatus);
                 }}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-0.5 transition-all ring-1 ring-white/10"
               >
@@ -592,6 +597,84 @@ export function OrderCard({
             onClose={() => setShowReceiptModal(false)}
             onDone={() => { setShowReceiptModal(false); window.location.reload(); }}
           />
+        )}
+
+        {/* Confirm-paid modal on Entregado transition. Three explicit choices
+            so accounting doesn't end up with silent UNPAID-but-DELIVERED rows.
+            "Aún no" path still moves the order (cashier might be running late
+            on payment), but the DELIVERED card stays flagged "Sin cobrar" so
+            it doesn't get forgotten. */}
+        {showDeliverConfirm && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setShowDeliverConfirm(false)}
+          >
+            <div
+              className="rounded-2xl bg-slate-900 border border-white/10 max-w-md w-full p-5 space-y-4 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="text-4xl mb-2">💰</div>
+                <h3 className="text-base font-bold text-white">Marcar entregado</h3>
+                <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                  ¿Ya cobraste <span className="font-bold text-primary">${totalDue.toLocaleString("es-AR")}</span>?
+                  {order.paymentIntent && (
+                    <span className="block mt-1 text-[10px] text-slate-400">
+                      El cliente dijo que iba a pagar por{" "}
+                      <span className="font-semibold">
+                        {order.paymentIntent === "cash" ? "efectivo"
+                          : order.paymentIntent === "transfer" ? "transferencia"
+                          : "Mercado Pago"}
+                      </span>.
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeliverConfirm(false);
+                    onUpdateStatus(order.id, "DELIVERED", { markPaid: true, paymentMethod: "cash" });
+                  }}
+                  className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white shadow-md hover:shadow-lg transition-all"
+                >
+                  Sí, cobré en efectivo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeliverConfirm(false);
+                    const method = order.paymentIntent === "mercadopago" ? "mercadopago" : "transfer";
+                    onUpdateStatus(order.id, "DELIVERED", { markPaid: true, paymentMethod: method });
+                  }}
+                  className="w-full rounded-xl bg-emerald-500/80 px-4 py-3 text-sm font-bold text-white shadow-md hover:bg-emerald-500 transition-all"
+                >
+                  Sí, por {order.paymentIntent === "mercadopago" ? "Mercado Pago" : "transferencia / MP"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeliverConfirm(false);
+                    // Explicit markPaid:false — server must NOT auto-pay even for pickup.
+                    // Card will render with a "Sin cobrar" pill so this doesn't get lost.
+                    onUpdateStatus(order.id, "DELIVERED", { markPaid: false });
+                  }}
+                  className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-300 hover:bg-amber-500/20 transition-all"
+                >
+                  Aún no cobré
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeliverConfirm(false)}
+                  className="w-full rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-slate-400 hover:bg-white/5 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Post-print kitchen prompt — only for orders not yet in the kitchen */}

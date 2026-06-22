@@ -118,7 +118,7 @@ export default function RestauranteDashboard() {
   //     The OrderCard sets this when the cashier clicks "Entregado" on a delivery
   //     order that wasn't paid yet AND answers "Sí" to the "¿estaba pagado?" confirm.
   //   - pickup orders auto-PAID server-side without needing the hint.
-  async function updateStatus(orderId: string, status: OrderStatus, extras?: { markPaid?: boolean }) {
+  async function updateStatus(orderId: string, status: OrderStatus, extras?: { markPaid?: boolean; paymentMethod?: "cash" | "transfer" | "mercadopago" }) {
     await fetch(`/api/orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

@@ -39,15 +39,18 @@ export async function PATCH(
       return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
     }
 
-    // Implicit-payment rule on transition to DELIVERED — owners are too busy
-    // to also click "Cobrar" on every order before clicking "Entregado":
-    //   - pickup  + not-yet-paid → auto-PAID (no question, since the customer
-    //                              physically came to get it = transaction implies payment)
-    //   - delivery + not-yet-paid + markPaid===true → PAID (client asked
-    //                                                  "¿estaba pagado?" via confirm dialog)
-    //   - otherwise: just status changes, payment untouched
-    // Either way, we tag paymentAssumed=true so the audit trail shows the
-    // cashier clicked through rather than running the comprobante / Cobrar flow.
+    // Payment rule on transition to DELIVERED. Three branches:
+    //   - body.markPaid === true   → flip to PAID, use body.paymentMethod (or
+    //                                 fall back to customer intent / cash).
+    //                                 This is the new explicit path from the
+    //                                 confirm-paid modal in OrderCard.
+    //   - body.markPaid === false  → DO NOT auto-pay, even for pickup. Cashier
+    //                                 explicitly said "still need to collect".
+    //                                 Status changes, paymentStatus untouched.
+    //                                 Card stays flagged "Sin cobrar".
+    //   - body.markPaid undefined  → legacy implicit behavior: pickup auto-PAID,
+    //                                 delivery untouched. Kept for back-compat
+    //                                 with older clients (POS tablet, scripts).
     if (body.status === "DELIVERED") {
       const existing = await prisma.order.findUnique({
         where: { id },
@@ -57,10 +60,20 @@ export async function PATCH(
 
       const notYetPaid = existing.paymentStatus !== "PAID";
       const isPickup = existing.deliveryMethod === "pickup";
+      const explicitOptOut = body.markPaid === false;
       const shouldAutoMarkPaid =
-        notYetPaid && (isPickup || body.markPaid === true);
+        notYetPaid && !explicitOptOut && (isPickup || body.markPaid === true);
 
       if (shouldAutoMarkPaid) {
+        // Sanitize requested paymentMethod to the known set; otherwise fall back
+        // to customer's stated intent, then "cash" as last resort.
+        const requested = typeof body.paymentMethod === "string" ? body.paymentMethod : null;
+        const allowedMethods = ["cash", "transfer", "mercadopago", "card"] as const;
+        const resolvedMethod =
+          (requested && (allowedMethods as readonly string[]).includes(requested) ? requested : null) ??
+          existing.paymentIntent ??
+          "cash";
+
         await prisma.order.update({
           where: { id },
           data: {
@@ -68,10 +81,7 @@ export async function PATCH(
             paymentStatus: "PAID",
             paymentAssumed: true,
             paidAt: new Date(),
-            // Lock in the cashier-side method: prefer customer's intent, fall
-            // back to "cash" (pickup is overwhelmingly cash; delivery the
-            // courier collected it).
-            paymentMethod: existing.paymentIntent ?? "cash",
+            paymentMethod: resolvedMethod,
           },
         });
         // Rewards: increment punches. Best-effort — no-op when flag off,

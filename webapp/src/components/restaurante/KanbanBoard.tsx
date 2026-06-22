@@ -14,7 +14,7 @@ export function KanbanBoard({
   restaurantName,
 }: {
   orders: Order[];
-  onUpdateStatus: (orderId: string, status: OrderStatus, extras?: { markPaid?: boolean }) => void;
+  onUpdateStatus: (orderId: string, status: OrderStatus, extras?: { markPaid?: boolean; paymentMethod?: "cash" | "transfer" | "mercadopago" }) => void;
   restaurantName: string;
 }) {
   const [dragOverCol, setDragOverCol] = useState<OrderStatus | null>(null);
