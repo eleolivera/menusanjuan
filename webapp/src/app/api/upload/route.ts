@@ -73,26 +73,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No se recibió archivo" }, { status: 400 });
   }
 
-  // Anonymous uploads are restricted to comprobantes only (image-only, stored
-  // under guests/ folder so they're easy to audit). Everything else needs auth.
+  // Anonymous uploads are restricted to:
+  //   - "comprobante" — customer uploading their payment receipt at checkout
+  //   - "lead-menu"   — sales referrer uploading a prospect's menu photo / PDF
+  // Both go under audit-friendly folders (guests/ or leads-pending/).
   if (isAnon) {
-    if (type !== "comprobante") {
+    if (type !== "comprobante" && type !== "lead-menu") {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
   }
-  const folderForRequest = isAnon ? "guests" : folder;
+  const folderForRequest = isAnon
+    ? (type === "lead-menu" ? "leads-pending" : "guests")
+    : folder;
 
-  // Validate file type (images + video)
+  // Validate file type (images + video + PDF for lead menus)
   const isImage = file.type.startsWith("image/");
   const isVideo = file.type.startsWith("video/") || file.name.toLowerCase().endsWith(".mp4");
-  if (!isImage && !isVideo) {
-    return NextResponse.json({ error: "Solo se permiten imágenes y videos (mp4)" }, { status: 400 });
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  // PDFs only allowed for the lead-menu type (referrer-uploaded menu PDFs).
+  const allowPdf = isPdf && type === "lead-menu";
+  if (!isImage && !isVideo && !allowPdf) {
+    return NextResponse.json({ error: "Solo se permiten imágenes, videos (mp4) o PDF" }, { status: 400 });
   }
 
-  // Max 5MB for images, 20MB for videos
-  const maxSize = isVideo ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+  // Max 5MB for images, 20MB for videos, 10MB for PDFs
+  const maxSize = isVideo ? 20 * 1024 * 1024 : allowPdf ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
   if (file.size > maxSize) {
-    return NextResponse.json({ error: isVideo ? "Máximo 20MB para videos" : "Máximo 5MB para imágenes" }, { status: 400 });
+    const limit = isVideo ? "20MB para videos" : allowPdf ? "10MB para PDF" : "5MB para imágenes";
+    return NextResponse.json({ error: `Máximo ${limit}` }, { status: 400 });
   }
 
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";

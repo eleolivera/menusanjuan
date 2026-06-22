@@ -544,6 +544,56 @@ model OnboardingNote {
   @@index([cardId, createdAt])
 }
 
+// ─── Referral / lead-capture pipeline ───────────────────────────────────────
+// MVP scope: capture the lead, notify admin. Demo packs, public demo viewer,
+// and reward tracking ship in later iterations (see plan).
+enum LeadStage {
+  SUBMITTED   // Just received
+  IN_REVIEW   // Admin picked it up
+  DEMO_READY  // Materials produced for the referrer (v2)
+  CONVERTED   // Prospect became an active Dealer
+  REJECTED    // Duplicate / spam / not a real resta
+}
+
+model ReferralLead {
+  id              String     @id @default(cuid())
+
+  // Referrer (the person submitting)
+  referrerName    String
+  referrerEmail   String?
+  referrerPhone   String                          // E.164 normalized — for payout
+  referrerMpAlias String?                         // Mercado Pago alias for reward payout
+
+  // Prospect (the resta being referred)
+  restaName       String
+  restaAddress    String?
+  restaPhone      String?
+  restaInstagram  String?
+  restaNotes      String?
+
+  // Uploaded menu materials as JSON array: [{url, kind: "image"|"pdf", filename}]
+  menuFiles       Json
+
+  // Lifecycle
+  stage           LeadStage  @default(SUBMITTED)
+  accessToken     String     @unique              // 32-char hex for /demos/<token> (v2)
+  adminNotes      String?
+  rejectedReason  String?
+  dealerId        String?    @unique              // Set when admin spawns Dealer
+  convertedAt     DateTime?
+  rewardAmount    Float?
+  rewardPaidAt    DateTime?
+  rewardPaidNote  String?
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([stage, createdAt])
+  @@index([accessToken])
+  @@index([referrerEmail])
+  @@index([referrerPhone])
+}
+
 enum OrderStatus {
   GENERATED // Generado — order placed
   PAID // Pagado — payment confirmed
