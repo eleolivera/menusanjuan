@@ -400,6 +400,11 @@ model Order {
   deliveredAt         DateTime? // When status flipped to DELIVERED (via driver QR or owner)
   customerId          String? // Backfill: nullable for legacy orders. Set on order create via phone upsert.
   rewardCounted       Boolean     @default(false) // Idempotency guard so DELIVERED double-fires can't double-count rewards
+  // Audit trail: which surface marked this order DELIVERED. Null for legacy
+  // rows (pre-column) + orders not yet delivered. Stamped at the same moment
+  // status flips to DELIVERED; never overwritten after. Values used today:
+  // "driver" (QR page), "owner" (kanban), "pos" (POS tablet), "print-agent".
+  markedDeliveredBy   String?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 

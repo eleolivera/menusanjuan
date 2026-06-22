@@ -82,6 +82,8 @@ export async function PATCH(
             paymentAssumed: true,
             paidAt: new Date(),
             paymentMethod: resolvedMethod,
+            // Audit trail: owner kanban marked this delivered.
+            markedDeliveredBy: "owner",
           },
         });
         // Rewards: increment punches. Best-effort — no-op when flag off,
@@ -92,7 +94,9 @@ export async function PATCH(
       }
     }
 
-    const order = await updateOrderStatus(id, body.status);
+    // Owner kanban path — fall-through when the auto-pay branch didn't fire
+    // (already PAID, or owner picked "Aún no cobré" via the new confirm modal).
+    const order = await updateOrderStatus(id, body.status, { markedDeliveredBy: "owner" });
     if (!order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     if (body.status === "DELIVERED") {
       try { await incrementPunchesForOrder(id); } catch (e) { console.error("rewards increment failed:", e); }

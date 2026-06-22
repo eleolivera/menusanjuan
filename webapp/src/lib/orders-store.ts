@@ -384,12 +384,20 @@ export async function getOrder(id: string): Promise<Order | null> {
 
 export async function updateOrderStatus(
   id: string,
-  status: OrderStatus
+  status: OrderStatus,
+  opts?: { markedDeliveredBy?: "driver" | "owner" | "pos" | "print-agent" }
 ): Promise<Order | null> {
   try {
     const dbOrder = await prisma.order.update({
       where: { id },
-      data: { status: status as PrismaOrderStatus },
+      data: {
+        status: status as PrismaOrderStatus,
+        // Stamp the surface that flipped this to DELIVERED. Only set on the
+        // DELIVERED transition itself; other transitions leave it alone.
+        ...(status === "DELIVERED" && opts?.markedDeliveredBy
+          ? { markedDeliveredBy: opts.markedDeliveredBy }
+          : {}),
+      },
     });
     return mapOrder(dbOrder);
   } catch {

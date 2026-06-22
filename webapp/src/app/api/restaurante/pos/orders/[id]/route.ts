@@ -91,6 +91,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           cashTendered: cashTenderedNorm,
           cashChange,
           status: "DELIVERED",
+          // Audit trail: POS tablet (cashier) marked this delivered.
+          markedDeliveredBy: "pos",
         },
       });
       return NextResponse.json(updated);

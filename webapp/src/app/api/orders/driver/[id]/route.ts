@@ -97,6 +97,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       data: {
         status: "DELIVERED",
         deliveredAt: new Date(),
+        // Audit trail: driver QR page marked this delivered.
+        markedDeliveredBy: "driver",
         ...(collecting && order.paymentStatus !== "PAID"
           ? {
               paymentStatus: "PAID",
