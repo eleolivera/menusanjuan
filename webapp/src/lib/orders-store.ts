@@ -184,10 +184,17 @@ async function nextOrderNumber(restauranteSlug: string, attempt = 0): Promise<st
   const todayStart = getBusinessDayStart();
   const todayEnd = getBusinessDayEnd();
 
-  // Find the highest existing order number for this restaurant today
+  // orderNumber is GLOBALLY unique in the schema (@unique), so we have to
+  // find the highest one across ALL restas today — not just this resta's. The
+  // previous per-slug scoping caused new restas (with no prior orders) to
+  // always generate ORD-MMDD-001, colliding with whichever resta posted first
+  // that day. Result: a brand-new resta's customers got 500s on every order.
+  // Scoping globally trades "consecutive numbers per-resta" (cosmetic) for
+  // "every new resta works on day 1" (correctness). restauranteSlug is kept
+  // in the signature to avoid changing call sites.
+  void restauranteSlug;
   const latest = await prisma.order.findFirst({
     where: {
-      restauranteSlug,
       createdAt: { gte: todayStart, lt: todayEnd },
       orderNumber: { startsWith: prefix },
     },
