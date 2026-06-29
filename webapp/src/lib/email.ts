@@ -2,6 +2,11 @@
 const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = "noreply@menusanjuan.com";
 const FROM_NAME = "MenuSanJuan";
+// Where replies should land. Set to a real mailbox forwarded via Cloudflare
+// Email Routing → magnicommerce@gmail.com so the resta owner / customer can
+// hit reply on a verification/claim/order email and have it reach a human.
+const REPLY_TO_EMAIL = "info@menusanjuan.com";
+const REPLY_TO_NAME = "MenuSanJuan";
 
 type SendEmailParams = {
   to: string;
@@ -25,6 +30,7 @@ export async function sendEmail({ to, subject, html }: SendEmailParams): Promise
       },
       body: JSON.stringify({
         from: { email: FROM_EMAIL, name: FROM_NAME },
+        reply_to: { email: REPLY_TO_EMAIL, name: REPLY_TO_NAME },
         to: [{ email: to }],
         subject,
         html,
