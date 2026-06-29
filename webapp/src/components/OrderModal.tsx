@@ -900,26 +900,52 @@ _Pedido realizado desde MenuSanJuan_`;
                       </div>
                     )}
 
-                    {/* Comprobante uploader — only when the total is finalized.
-                        Removed "(opcional)" qualifier + reframed copy to lead with benefit:
-                        people skip when permission is given upfront. ~35-45% attach rate
-                        historically; the goal here is to nudge that higher without forcing. */}
-                    {!(deliveryMethod === "delivery" && !hasDeliveryPricing) && (
-                      <div ref={uploadSectionRef}>
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5">
-                          Comprobante de pago
+                    {/* Comprobante area — three states:
+                          1) canUpload  → full uploader (customer can submit proof now)
+                          2) intent is transfer/MP but the resta has no alias/CVU/bankInfo,
+                             OR the delivery cost isn't finalized → show a "send it later"
+                             explanation instead of asking for an upload that doesn't make
+                             sense yet (nothing to transfer to / final total unknown)
+                          3) cash → render nothing here, no comprobante involved */}
+                    {(() => {
+                      const hasPayeeInfo = !!(mercadoPagoAlias || mercadoPagoCvu || bankInfo);
+                      const deliveryCostFinalized = !(deliveryMethod === "delivery" && !hasDeliveryPricing);
+                      const canUpload = hasPayeeInfo && deliveryCostFinalized;
+
+                      if (canUpload) {
+                        return (
+                          <div ref={uploadSectionRef}>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5">
+                              Comprobante de pago
+                            </div>
+                            <ComprobanteUploader
+                              mode="checkout"
+                              initialUrl={checkoutReceiptUrl}
+                              onUploaded={(url) => setCheckoutReceiptUrl(url)}
+                              onClear={() => setCheckoutReceiptUrl(null)}
+                            />
+                            <div className="text-[10px] text-text-muted mt-1.5">
+                              Subiendo tu comprobante ahora, el restaurante confirma tu pedido sin demoras.
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // State 2 — explain WHY we're not asking for an upload yet + what
+                      // happens instead. Pick the reason that applies so the message is
+                      // specific (alias missing vs envío sin precio confirmado).
+                      const reason = !hasPayeeInfo
+                        ? "una vez que el restaurante te pase los datos para transferir"
+                        : "una vez que el restaurante te confirme el costo del envío";
+                      return (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-[11px] text-blue-900">
+                          <div className="font-semibold mb-1">Enviar comprobante después</div>
+                          <div className="leading-relaxed">
+                            Podés enviar la captura del pago por WhatsApp {reason}.
+                          </div>
                         </div>
-                        <ComprobanteUploader
-                          mode="checkout"
-                          initialUrl={checkoutReceiptUrl}
-                          onUploaded={(url) => setCheckoutReceiptUrl(url)}
-                          onClear={() => setCheckoutReceiptUrl(null)}
-                        />
-                        <div className="text-[10px] text-text-muted mt-1.5">
-                          Subiendo tu comprobante ahora, el restaurante confirma tu pedido sin demoras.
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -933,8 +959,15 @@ _Pedido realizado desde MenuSanJuan_`;
                     // Soft-intercept: transfer/MP without receipt → nudge first.
                     // Customer can still choose "Enviar igual" — purely additive,
                     // no flow is blocked. Cash orders skip the nudge entirely.
+                    // Also skip when there's nothing to transfer to (no alias /
+                    // CVU / bankInfo) OR delivery cost isn't finalized — in both
+                    // cases the customer literally can't upload a receipt yet, so
+                    // nudging them to do so is misleading.
                     const needsReceipt = paymentIntent === "transfer" || paymentIntent === "mercadopago";
-                    if (needsReceipt && !checkoutReceiptUrl) {
+                    const hasPayeeInfo = !!(mercadoPagoAlias || mercadoPagoCvu || bankInfo);
+                    const deliveryCostFinalized = !(deliveryMethod === "delivery" && !hasDeliveryPricing);
+                    const canUpload = hasPayeeInfo && deliveryCostFinalized;
+                    if (needsReceipt && canUpload && !checkoutReceiptUrl) {
                       setShowReceiptNudge(true);
                       return;
                     }
