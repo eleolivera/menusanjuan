@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { ConditionalChrome } from "@/components/ConditionalChrome";
 
@@ -58,6 +59,9 @@ export default function RootLayout({
     <html lang="es" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <ConditionalChrome>{children}</ConditionalChrome>
+        {/* Free-tier pageview tracking. Beacon-style — zero perf cost,
+            no cookies, GDPR-clean. Dashboard at vercel.com/menusanjuan/analytics. */}
+        <Analytics />
       </body>
     </html>
   );
