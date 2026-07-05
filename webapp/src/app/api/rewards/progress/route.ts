@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { rewardsFlag, getProgressByPhoneForDealer } from "@/lib/rewards";
+import { rewardsFlag, getProgressByPhoneForDealer, normalizePhoneE164 } from "@/lib/rewards";
 import { isValidPhone } from "@/lib/phone";
 
 export async function GET(request: NextRequest) {
@@ -24,13 +24,47 @@ export async function GET(request: NextRequest) {
   const data = await getProgressByPhoneForDealer(phone, dealer.id);
   if (!data) return NextResponse.json({ enabled: false });
 
+  // Also fetch the reward item name + required-items names + the customer's
+  // googleSub so the badge can decide whether to prompt for Google Sign-In.
+  const program = await prisma.rewardProgram.findUnique({
+    where: { dealerId: dealer.id },
+    select: {
+      rewardItem: { select: { name: true } },
+      redemptionRequiresItemIds: true,
+    },
+  });
+
+  let requiresItemNames: string[] = [];
+  if (program?.redemptionRequiresItemIds && Array.isArray(program.redemptionRequiresItemIds)) {
+    const ids = (program.redemptionRequiresItemIds as unknown[]).filter((v): v is string => typeof v === "string");
+    if (ids.length > 0) {
+      const items = await prisma.menuItem.findMany({
+        where: { id: { in: ids } },
+        select: { name: true },
+      });
+      requiresItemNames = items.map((i) => i.name);
+    }
+  }
+
+  // Customer.googleSub: null means they haven't done the one-time claim yet.
+  // When they're eligible but not signed in, the badge nudges them to sign in.
+  const canonical = normalizePhoneE164(phone) || phone;
+  const customer = await prisma.customer.findUnique({
+    where: { phone: canonical },
+    select: { googleSub: true },
+  });
+  const needsGoogleSignIn = data.eligible && !customer?.googleSub;
+
   return NextResponse.json({
     enabled: true,
     punches: data.punches,
     punchesNeeded: data.program.punchesNeeded,
-    rewardName: data.program.name,
+    rewardName: data.program.name,             // program display name (legacy field)
+    rewardItemName: program?.rewardItem.name || data.program.name,
     rewardDescription: data.program.description,
     eligible: data.eligible,
     hasActiveRedemption: Boolean(data.activeRedemption),
+    needsGoogleSignIn,
+    requiresItemNames,
   });
 }

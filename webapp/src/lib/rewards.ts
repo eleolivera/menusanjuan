@@ -120,7 +120,7 @@ export async function incrementPunchesForOrder(orderId: string, tx: Tx = prisma)
   if (claimed.count === 0) return; // someone else already counted it
 
   // Upsert progress row with an atomic increment.
-  await tx.rewardProgress.upsert({
+  const progress = await tx.rewardProgress.upsert({
     where: {
       customerId_programId: {
         customerId: order.customerId,
@@ -132,6 +132,60 @@ export async function incrementPunchesForOrder(orderId: string, tx: Tx = prisma)
       customerId: order.customerId,
       programId: dealer.rewardProgram.id,
       punches: 1,
+    },
+    select: { punches: true },
+  });
+
+  // Auto-issue Redemption when the customer hits the threshold. Best-effort:
+  // any failure logs but never bubbles up (order status flip is more
+  // important than rewards issuance).
+  try {
+    await maybeIssueRedemption(order.customerId, dealer.rewardProgram.id, progress.punches, tx);
+  } catch (err) {
+    console.error("auto-issue Redemption failed:", err);
+  }
+
+  // Auto-finalize: if this delivered order had a Redemption attached (via
+  // applyPendingRedemption at checkout), flip it READY → REDEEMED now.
+  try {
+    await tx.redemption.updateMany({
+      where: { orderId: order.id, status: RedemptionStatus.READY },
+      data: { status: RedemptionStatus.REDEEMED, redeemedAt: new Date() },
+    });
+  } catch (err) {
+    console.error("auto-finalize Redemption failed:", err);
+  }
+}
+
+/**
+ * Auto-issue a READY Redemption when a customer reaches punchesNeeded.
+ * Idempotent — if a READY Redemption for (customer, program) already exists,
+ * this is a no-op. Punches stay in place until the redemption is consumed at
+ * checkout by applyPendingRedemption(). This differs from createRedemption()
+ * (which spends the punches immediately) because auto-issue reflects "you've
+ * earned it, cash it in on your next order".
+ */
+async function maybeIssueRedemption(customerId: string, programId: string, punches: number, tx: Tx): Promise<void> {
+  const program = await tx.rewardProgram.findUnique({
+    where: { id: programId },
+    select: { punchesNeeded: true, expiresInDays: true, enabled: true },
+  });
+  if (!program?.enabled) return;
+  if (punches < program.punchesNeeded) return;
+
+  const existing = await tx.redemption.findFirst({
+    where: { customerId, programId, status: RedemptionStatus.READY },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  const expiresAt = new Date(Date.now() + program.expiresInDays * 24 * 60 * 60 * 1000);
+  await tx.redemption.create({
+    data: {
+      customerId,
+      programId,
+      status: RedemptionStatus.READY,
+      expiresAt,
     },
   });
 }
@@ -232,6 +286,118 @@ export async function createRedemption(customerId: string, dealerId: string) {
       select: { id: true },
     });
     return created;
+  });
+}
+
+/**
+ * Auto-consume a pending READY Redemption at checkout.
+ *
+ * Called from POST /api/orders after customerId is resolved but before
+ * createOrder writes to the DB. Returns a possibly-augmented items array
+ * plus (if applied) the redemption ID that later needs orderId written
+ * back to it.
+ *
+ * Fraud guard: only applies when Customer.googleSub is set. The customer
+ * must have signed in with Google at least once (from /mis-recompensas)
+ * to prove ownership of the phone. This is a ONE-TIME step per customer —
+ * after their first sign-in, all future redemptions auto-apply.
+ *
+ * Additional conditions to auto-apply:
+ * - rewards flag on
+ * - dealer.rewardsEnabled + program.enabled
+ * - READY Redemption exists with expiresAt > now
+ * - if program.redemptionRequiresItemIds is set, cart contains ≥1 listed item
+ */
+export async function applyPendingRedemption(params: {
+  customerId: string;
+  dealerId: string;
+  dealerSlug: string;
+  cartItems: unknown;
+}): Promise<{
+  items: unknown;
+  redemptionId: string | null;
+  rewardName: string | null;
+}> {
+  const passThrough = { items: params.cartItems, redemptionId: null, rewardName: null };
+  if (!rewardsFlag()) return passThrough;
+
+  // Fraud guard: customer must have proved ownership via Google Sign-In.
+  const customer = await prisma.customer.findUnique({
+    where: { id: params.customerId },
+    select: { googleSub: true },
+  });
+  if (!customer?.googleSub) return passThrough;
+
+  const dealer = await prisma.dealer.findUnique({
+    where: { id: params.dealerId },
+    select: { rewardsEnabled: true, rewardProgram: { select: { id: true, enabled: true, rewardItemId: true, redemptionRequiresItemIds: true, rewardItem: { select: { name: true } } } } },
+  });
+  if (!dealer?.rewardsEnabled || !dealer.rewardProgram?.enabled) return passThrough;
+
+  const now = new Date();
+  const redemption = await prisma.redemption.findFirst({
+    where: {
+      customerId: params.customerId,
+      programId: dealer.rewardProgram.id,
+      status: RedemptionStatus.READY,
+      orderId: null,                       // hasn't been attached to another order yet
+      expiresAt: { gt: now },
+    },
+    select: { id: true, programId: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!redemption) return passThrough;
+
+  // Requires-purchase filter (optional per-program). Same helper as accrual.
+  if (!orderQualifiesForProgram(params.cartItems, dealer.rewardProgram.redemptionRequiresItemIds)) {
+    return passThrough;
+  }
+
+  const rewardItemName = dealer.rewardProgram.rewardItem.name;
+
+  // Synthesize a $0 line and append to cart. Shape mirrors OrderItem in
+  // orders-store.ts so downstream serialization (kitchen ticket, kanban
+  // card, etc.) treats it as a normal line.
+  const freeLine = {
+    menuItemId: dealer.rewardProgram.rewardItemId,
+    name: `🎁 ${rewardItemName} (premio)`,
+    quantity: 1,
+    unitPrice: 0,
+    total: 0,
+    note: "Canje de premio de fidelidad",
+  };
+
+  const nextItems = Array.isArray(params.cartItems) ? [...params.cartItems, freeLine] : [freeLine];
+
+  return { items: nextItems, redemptionId: redemption.id, rewardName: rewardItemName };
+}
+
+/**
+ * Attach a Redemption to the Order that consumed it. Called AFTER createOrder
+ * returns an id so we can write the FK. Redemption stays READY at this point;
+ * it flips to REDEEMED when the order transitions to DELIVERED (handled by
+ * incrementPunchesForOrder).
+ *
+ * Also decrement punches now — the customer has "spent" them, even though the
+ * order isn't delivered yet. If the order is cancelled, a follow-up should
+ * restore punches + release the Redemption (deferred for v1; cancel flow
+ * doesn't touch rewards today, meaning cancelled orders quietly consume the
+ * reward — acceptable for now, revisit if abuse observed).
+ */
+export async function attachRedemptionToOrder(redemptionId: string, orderId: string, tx: Tx = prisma): Promise<void> {
+  const red = await tx.redemption.update({
+    where: { id: redemptionId },
+    data: { orderId },
+    select: { customerId: true, programId: true },
+  });
+  const program = await tx.rewardProgram.findUnique({
+    where: { id: red.programId },
+    select: { punchesNeeded: true },
+  });
+  if (!program) return;
+  await tx.rewardProgress.updateMany({
+    where: { customerId: red.customerId, programId: red.programId },
+    data: { punches: { decrement: program.punchesNeeded } },
   });
 }
 

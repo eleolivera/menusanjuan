@@ -13,9 +13,12 @@ type Progress = {
   punches?: number;
   punchesNeeded?: number;
   rewardName?: string;
+  rewardItemName?: string;
   rewardDescription?: string;
   eligible?: boolean;
   hasActiveRedemption?: boolean;
+  needsGoogleSignIn?: boolean;
+  requiresItemNames?: string[];
 };
 
 const REWARDS_FLAG = process.env.NEXT_PUBLIC_REWARDS_ENABLED === "true";
@@ -49,16 +52,60 @@ export function RewardBadge({ slug }: { slug: string }) {
   const punches = data.punches ?? 0;
   const need = data.punchesNeeded ?? 10;
   const pct = Math.min(100, (punches / need) * 100);
+  const rewardItem = data.rewardItemName || data.rewardName || "tu premio";
+
+  // Determine which of three states to render:
+  //  A) eligible + needs sign-in → prompt for Google (one-time claim)
+  //  B) eligible + signed in     → "your reward will apply automatically"
+  //  C) not yet eligible         → progress bar
+  if (data.eligible && data.needsGoogleSignIn) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 mt-3">
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 flex items-center gap-3">
+          <Gift className="h-5 w-5 text-emerald-400 shrink-0" strokeWidth={2} />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-white">🎁 ¡Ya tenés tu premio!</div>
+            <div className="text-xs text-slate-300 mt-0.5">
+              Iniciá sesión con Google (una sola vez) para reclamar tu {rewardItem}. Se aplica automáticamente en tu próximo pedido.
+            </div>
+          </div>
+          <a
+            href={`/api/auth/google?intent=customer&redirect=${encodeURIComponent(`/${slug}`)}`}
+            className="whitespace-nowrap rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-white"
+          >
+            Iniciar sesión
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (data.eligible) {
+    // Signed in and eligible — reward will auto-apply.
+    const requires = data.requiresItemNames && data.requiresItemNames.length > 0
+      ? `Con tu próximo ${data.requiresItemNames.slice(0, 3).join(" / ")} te llevás ${rewardItem} gratis.`
+      : `${rewardItem} se agrega gratis a tu próximo pedido.`;
+    return (
+      <div className="mx-auto max-w-7xl px-4 mt-3">
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 flex items-center gap-3">
+          <Gift className="h-5 w-5 text-emerald-400 shrink-0" strokeWidth={2} />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-white">🎁 Tu premio está esperándote</div>
+            <div className="text-xs text-slate-300 mt-0.5">{requires}</div>
+          </div>
+          <div className="text-xs font-bold text-emerald-400 whitespace-nowrap">¡Listo!</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 mt-3">
       <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 flex items-center gap-3">
         <Gift className="h-5 w-5 text-primary shrink-0" strokeWidth={2} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-white truncate">
-            {data.eligible ? `🎁 ¡Premio listo! ${data.rewardName}` : data.rewardName}
-          </div>
-          {!data.eligible && data.rewardDescription ? (
+          <div className="text-sm font-semibold text-white truncate">{data.rewardName}</div>
+          {data.rewardDescription ? (
             <div className="text-xs text-slate-300 mt-0.5">{data.rewardDescription}</div>
           ) : null}
           <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
@@ -66,7 +113,7 @@ export function RewardBadge({ slug }: { slug: string }) {
           </div>
         </div>
         <div className="text-xs font-bold text-primary whitespace-nowrap">
-          {data.eligible ? "¡Canjealo!" : `${punches} / ${need}`}
+          {punches} / {need}
         </div>
       </div>
     </div>

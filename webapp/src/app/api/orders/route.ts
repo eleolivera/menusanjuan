@@ -9,8 +9,9 @@ import {
 } from "@/lib/orders-store";
 import { notifyRestaurantOfNewOrder } from "@/lib/order-notification";
 import { computeCartTotal } from "@/lib/money";
-import { rewardsFlag, upsertCustomerByPhone } from "@/lib/rewards";
+import { rewardsFlag, upsertCustomerByPhone, applyPendingRedemption, attachRedemptionToOrder } from "@/lib/rewards";
 import { isValidPhone } from "@/lib/phone";
+import { prisma } from "@/lib/prisma";
 
 // POST — create a new order
 export async function POST(request: NextRequest) {
@@ -69,6 +70,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Auto-apply pending Redemption at checkout. Runs BEFORE createOrder so
+    // the free reward line is included in the saved items JSON. Gated on
+    // Customer.googleSub (fraud: prevents phone-hijacking of someone else's
+    // reward). Best-effort — any failure means order still ships without
+    // the reward (redemption stays READY for the next attempt).
+    let effectiveItems = items;
+    let effectiveTotal = total;
+    let pendingRedemptionId: string | null = null;
+    if (customerId) {
+      try {
+        const dealer = await prisma.dealer.findUnique({
+          where: { slug: restauranteSlug },
+          select: { id: true },
+        });
+        if (dealer) {
+          const result = await applyPendingRedemption({
+            customerId,
+            dealerId: dealer.id,
+            dealerSlug: restauranteSlug,
+            cartItems: items,
+          });
+          if (result.redemptionId) {
+            effectiveItems = result.items as typeof items;
+            effectiveTotal = computeCartTotal(effectiveItems);   // free line = $0 so total unchanged, but recompute for correctness
+            pendingRedemptionId = result.redemptionId;
+          }
+        }
+      } catch (err) {
+        console.error("applyPendingRedemption failed:", err);
+      }
+    }
+
     const order = await createOrder({
       restauranteSlug,
       customerName,
@@ -76,8 +109,8 @@ export async function POST(request: NextRequest) {
       customerAddress: customerAddress || "",
       latitude: latitude ?? null,
       longitude: longitude ?? null,
-      items,
-      total,
+      items: effectiveItems,
+      total: effectiveTotal,
       notes: notes || "",
       deliveryMethod: deliveryMethod || "delivery",
       deliveryFee: deliveryFee || 0,
@@ -86,6 +119,17 @@ export async function POST(request: NextRequest) {
       paymentStatus,
       customerId,
     });
+
+    // Attach the Redemption to this Order + spend the punches. Best-effort:
+    // failure here means the reward line stays in the order (customer wins)
+    // but Redemption.orderId doesn't get written — cleanup deferred.
+    if (pendingRedemptionId) {
+      try {
+        await attachRedemptionToOrder(pendingRedemptionId, order.id);
+      } catch (err) {
+        console.error("attachRedemptionToOrder failed:", err);
+      }
+    }
 
     // Fire-and-forget email notification to restaurant owner
     notifyRestaurantOfNewOrder(order).catch(() => {});

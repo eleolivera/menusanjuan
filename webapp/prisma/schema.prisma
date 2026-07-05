@@ -456,6 +456,11 @@ model RewardProgram {
   // Optional array of MenuItem IDs. NULL/empty = all DELIVERED orders count.
   // Set = only orders containing ≥1 listed item increment punches.
   qualifyingItemIds Json?
+  // Optional array of MenuItem IDs for the "with purchase of X" mechanic.
+  // NULL/empty = redemption auto-applies on any next order.
+  // Set = redemption only auto-applies when cart contains ≥1 listed item
+  // (e.g. free fries with your next burger). Distinct from qualifyingItemIds.
+  redemptionRequiresItemIds Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

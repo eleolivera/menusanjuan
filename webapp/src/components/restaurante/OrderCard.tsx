@@ -225,6 +225,17 @@ export function OrderCard({
                 💸 Sin cobrar
               </span>
             )}
+            {/* Reward redemption: order has a $0 line synthesized by the
+                auto-apply flow. Signals to the owner that this order
+                includes a free item from the loyalty program. */}
+            {orderHasRedemption(order) && (
+              <span
+                className="shrink-0 inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300"
+                title="Este pedido incluye un canje del programa de premios"
+              >
+                🎁 Canje
+              </span>
+            )}
             <span className="text-sm font-bold text-white truncate">
               {order.orderNumber}
             </span>
@@ -811,4 +822,13 @@ function CopyDeliveryButton({
       {copied ? "✓ Copiado al portapapeles" : "📋 Instrucciones para delivery"}
     </button>
   );
+}
+
+// Detects a reward-redemption line synthesized by the auto-apply flow at
+// checkout. Matches on the "(premio)" suffix that applyPendingRedemption
+// injects — keeps the check client-side + zero API changes.
+function orderHasRedemption(order: Order): boolean {
+  const items = order.items as unknown as Array<{ name?: string; unitPrice?: number }> | null;
+  if (!Array.isArray(items)) return false;
+  return items.some((line) => (line?.unitPrice === 0) && typeof line?.name === "string" && line.name.includes("(premio)"));
 }
