@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
-import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, Gift, type LucideIcon } from "lucide-react";
+import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, Gift, Users, type LucideIcon } from "lucide-react";
 
 // Nav uses Lucide line icons (same style as the rest of the app) instead of
 // emoji — emoji read as "consumer / playful" which felt off for the owner-side
@@ -18,6 +18,7 @@ const DEFAULT_NAV: Array<{ href: string; label: string; Icon: LucideIcon }> = [
   { href: "/restaurante/pedidos", label: "Pedidos", Icon: ClipboardList },
   { href: "/restaurante/pos", label: "POS", Icon: Wallet },
   { href: "/restaurante/dashboard", label: "Dashboard", Icon: BarChart3 },
+  { href: "/restaurante/clientes", label: "Clientes", Icon: Users },
   ...(REWARDS_ENABLED ? [{ href: "/restaurante/rewards", label: "Rewards", Icon: Gift }] : []),
 ];
 

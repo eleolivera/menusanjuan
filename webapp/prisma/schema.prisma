@@ -453,6 +453,9 @@ model RewardProgram {
   rewardItemId  String // MenuItem given for free
   expiresInDays Int      @default(30) // READY redemption TTL
   enabled       Boolean  @default(false)
+  // Optional array of MenuItem IDs. NULL/empty = all DELIVERED orders count.
+  // Set = only orders containing ≥1 listed item increment punches.
+  qualifyingItemIds Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

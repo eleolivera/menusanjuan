@@ -62,6 +62,7 @@ export async function incrementPunchesForOrder(orderId: string, tx: Tx = prisma)
       customerId: true,
       rewardCounted: true,
       status: true,
+      items: true,                               // needed for qualifyingItemIds filter
     },
   });
   if (!order || !order.customerId) return;
@@ -73,6 +74,13 @@ export async function incrementPunchesForOrder(orderId: string, tx: Tx = prisma)
     select: { id: true, rewardsEnabled: true, rewardProgram: true },
   });
   if (!dealer?.rewardsEnabled || !dealer.rewardProgram?.enabled) return;
+
+  // Qualifying-items filter (optional per-program). NULL/empty array = all
+  // orders count (legacy). When populated, at least one line (top-level or
+  // promo component) must reference one of the listed MenuItem IDs.
+  if (!orderQualifiesForProgram(order.items, dealer.rewardProgram.qualifyingItemIds)) {
+    return;
+  }
 
   // Atomically flag the order as counted FIRST so concurrent PATCHes
   // racing on the same orderId can't both pass the rewardCounted check.
@@ -231,4 +239,38 @@ function maskPhone(phone: string): string {
   if (phone.startsWith("google:")) return "—";
   if (phone.length < 8) return phone;
   return `${phone.slice(0, 6)}... ${phone.slice(-4)}`;
+}
+
+/**
+ * True when an order's items include at least one MenuItem ID from the
+ * qualifying list. Fail-open: NULL/empty list → true (legacy behavior).
+ * Malformed JSON → true (never silently kill accrual on parse error).
+ */
+export function orderQualifiesForProgram(orderItems: unknown, qualifyingItemIds: unknown): boolean {
+  const ids = normalizeIdList(qualifyingItemIds);
+  if (!ids || ids.length === 0) return true; // NULL/empty = accept all orders
+
+  if (!Array.isArray(orderItems)) return true; // fail-open on malformed items
+
+  const set = new Set(ids);
+  for (const line of orderItems as Array<Record<string, unknown>>) {
+    const topId = typeof line?.menuItemId === "string" ? line.menuItemId : null;
+    if (topId && set.has(topId)) return true;
+
+    const components = Array.isArray(line?.componentSelections) ? line.componentSelections : null;
+    if (components) {
+      for (const c of components as Array<Record<string, unknown>>) {
+        const childId = typeof c?.childItemId === "string" ? c.childItemId : null;
+        if (childId && set.has(childId)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function normalizeIdList(raw: unknown): string[] | null {
+  if (raw == null) return null;
+  if (!Array.isArray(raw)) return null;
+  const ids = raw.filter((v): v is string => typeof v === "string" && v.length > 0);
+  return ids;
 }

@@ -13,6 +13,7 @@ type Program = {
   rewardItemId: string;
   expiresInDays: number;
   enabled: boolean;
+  qualifyingItemIds: string[] | null;
 };
 type ProgressRow = { punches: number; name: string | null; maskedPhone: string };
 type Data = {
@@ -36,6 +37,9 @@ export default function RewardsPage() {
   const [rewardItemId, setRewardItemId] = useState("");
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [programEnabled, setProgramEnabled] = useState(true);
+  const [restrictItems, setRestrictItems] = useState(false);
+  const [qualifyingItemIds, setQualifyingItemIds] = useState<string[]>([]);
+  const [qItemFilter, setQItemFilter] = useState("");
 
   useEffect(() => {
     fetch("/api/restaurante/rewards")
@@ -56,6 +60,9 @@ export default function RewardsPage() {
           setRewardItemId(d.program.rewardItemId);
           setExpiresInDays(d.program.expiresInDays);
           setProgramEnabled(d.program.enabled);
+          const q = Array.isArray(d.program.qualifyingItemIds) ? d.program.qualifyingItemIds : [];
+          setQualifyingItemIds(q);
+          setRestrictItems(q.length > 0);
         } else if (d.menuItems[0]) {
           setName("Programa de premios");
           setDescription("Juntá pedidos y llevate un premio.");
@@ -69,6 +76,10 @@ export default function RewardsPage() {
 
   async function save() {
     if (!rewardItemId) { alert("Elegí el item del premio."); return; }
+    if (restrictItems && qualifyingItemIds.length === 0) {
+      alert("Elegí al menos un item que cuente para los puntos, o desactivá la restricción.");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/restaurante/rewards", {
@@ -82,6 +93,7 @@ export default function RewardsPage() {
           rewardItemId,
           expiresInDays,
           enabled: programEnabled,
+          qualifyingItemIds: restrictItems ? qualifyingItemIds : null,
         }),
       });
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || "Save failed"); }
@@ -188,6 +200,101 @@ export default function RewardsPage() {
               ))}
             </select>
           </Field>
+        </section>
+
+        {/* Qualifying items */}
+        <section className={`rounded-2xl border border-white/5 bg-slate-900/50 p-5 space-y-4 ${rewardsEnabled ? "" : "opacity-60 pointer-events-none"}`}>
+          <div>
+            <h2 className="text-sm font-semibold text-white">¿Qué pedidos cuentan?</h2>
+            <p className="text-xs text-slate-400 mt-1">Elegí si cualquier pedido suma un punto o solo los que incluyan ítems específicos (por ejemplo, solo hamburguesas — no gaseosas sueltas).</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                checked={!restrictItems}
+                onChange={() => { setRestrictItems(false); markDirty(); }}
+                className="mt-1 accent-primary"
+              />
+              <div>
+                <div className="text-white text-sm font-medium">Todos los pedidos entregados</div>
+                <div className="text-xs text-slate-400">Cualquier pedido entregado suma 1 punto.</div>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                checked={restrictItems}
+                onChange={() => { setRestrictItems(true); markDirty(); }}
+                className="mt-1 accent-primary"
+              />
+              <div>
+                <div className="text-white text-sm font-medium">Solo pedidos que incluyan alguno de estos ítems</div>
+                <div className="text-xs text-slate-400">El pedido tiene que tener al menos uno de los ítems seleccionados. Un pedido con varios cuenta 1 punto igual.</div>
+              </div>
+            </label>
+          </div>
+
+          {restrictItems && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <input
+                  type="text"
+                  value={qItemFilter}
+                  onChange={(e) => setQItemFilter(e.target.value)}
+                  placeholder="Buscar ítem…"
+                  className="flex-1 rounded-lg bg-slate-950/60 border border-white/10 px-3 py-2 text-sm text-white"
+                />
+                <div className="text-xs text-slate-400 whitespace-nowrap">
+                  {qualifyingItemIds.length} de {data.menuItems.length} seleccionados
+                </div>
+              </div>
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-white/10 bg-slate-950/40 divide-y divide-white/5">
+                {data.menuItems
+                  .filter((m) => {
+                    if (!qItemFilter) return true;
+                    const q = qItemFilter.toLowerCase();
+                    return m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q);
+                  })
+                  .map((m) => {
+                    const checked = qualifyingItemIds.includes(m.id);
+                    return (
+                      <label key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-white/5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            setQualifyingItemIds((prev) =>
+                              e.target.checked ? Array.from(new Set([...prev, m.id])) : prev.filter((id) => id !== m.id)
+                            );
+                            markDirty();
+                          }}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-white truncate">{m.name}</div>
+                          <div className="text-xs text-slate-400">{m.category}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+              </div>
+              <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setQualifyingItemIds(data.menuItems.map((m) => m.id)); markDirty(); }}
+                  className="text-primary hover:underline"
+                >Seleccionar todos</button>
+                <span className="text-slate-600">·</span>
+                <button
+                  type="button"
+                  onClick={() => { setQualifyingItemIds([]); markDirty(); }}
+                  className="text-slate-400 hover:underline"
+                >Ninguno</button>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Top customers near the prize */}

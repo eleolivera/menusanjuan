@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma";
 import { getRestauranteFromSession } from "@/lib/restaurante-auth";
 import { rewardsFlag, getTopProgressForDealer } from "@/lib/rewards";
 
@@ -49,6 +50,7 @@ export async function PATCH(request: NextRequest) {
     rewardItemId?: string;
     expiresInDays?: number;
     enabled?: boolean;
+    qualifyingItemIds?: string[] | null;
   };
   try {
     body = await request.json();
@@ -79,6 +81,23 @@ export async function PATCH(request: NextRequest) {
     const description = (body.description || "Juntá pedidos y llevate un premio.").trim().slice(0, 240);
     const enabled = body.enabled !== undefined ? Boolean(body.enabled) : true;
 
+    // Qualifying items: NULL/empty = "all orders count" (legacy). If provided,
+    // validate every ID belongs to THIS dealer.
+    let qualifyingItemIds: string[] | null = null;
+    if (Array.isArray(body.qualifyingItemIds) && body.qualifyingItemIds.length > 0) {
+      const clean = Array.from(new Set(body.qualifyingItemIds.filter((v): v is string => typeof v === "string" && v.length > 0)));
+      if (clean.length > 0) {
+        const owned = await prisma.menuItem.findMany({
+          where: { id: { in: clean }, category: { dealerId: dealer.id } },
+          select: { id: true },
+        });
+        if (owned.length !== clean.length) {
+          return NextResponse.json({ error: "invalid_qualifying_items" }, { status: 400 });
+        }
+        qualifyingItemIds = clean;
+      }
+    }
+
     await prisma.rewardProgram.upsert({
       where: { dealerId: dealer.id },
       create: {
@@ -89,6 +108,7 @@ export async function PATCH(request: NextRequest) {
         rewardItemId: body.rewardItemId,
         expiresInDays,
         enabled,
+        qualifyingItemIds: qualifyingItemIds ?? Prisma.JsonNull,
       },
       update: {
         name,
@@ -97,6 +117,7 @@ export async function PATCH(request: NextRequest) {
         rewardItemId: body.rewardItemId,
         expiresInDays,
         enabled,
+        qualifyingItemIds: qualifyingItemIds ?? Prisma.JsonNull,
       },
     });
   }
