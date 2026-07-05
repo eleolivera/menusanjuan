@@ -51,6 +51,7 @@ export async function PATCH(request: NextRequest) {
     expiresInDays?: number;
     enabled?: boolean;
     qualifyingItemIds?: string[] | null;
+    redemptionRequiresItemIds?: string[] | null;
   };
   try {
     body = await request.json();
@@ -98,6 +99,24 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Redemption-requires items ("free X with next purchase of Y"): same
+    // validation shape as qualifyingItemIds but a distinct field. NULL/empty
+    // = auto-apply on any next order.
+    let redemptionRequiresItemIds: string[] | null = null;
+    if (Array.isArray(body.redemptionRequiresItemIds) && body.redemptionRequiresItemIds.length > 0) {
+      const clean = Array.from(new Set(body.redemptionRequiresItemIds.filter((v): v is string => typeof v === "string" && v.length > 0)));
+      if (clean.length > 0) {
+        const owned = await prisma.menuItem.findMany({
+          where: { id: { in: clean }, category: { dealerId: dealer.id } },
+          select: { id: true },
+        });
+        if (owned.length !== clean.length) {
+          return NextResponse.json({ error: "invalid_redemption_items" }, { status: 400 });
+        }
+        redemptionRequiresItemIds = clean;
+      }
+    }
+
     await prisma.rewardProgram.upsert({
       where: { dealerId: dealer.id },
       create: {
@@ -109,6 +128,7 @@ export async function PATCH(request: NextRequest) {
         expiresInDays,
         enabled,
         qualifyingItemIds: qualifyingItemIds ?? Prisma.JsonNull,
+        redemptionRequiresItemIds: redemptionRequiresItemIds ?? Prisma.JsonNull,
       },
       update: {
         name,
@@ -118,6 +138,7 @@ export async function PATCH(request: NextRequest) {
         expiresInDays,
         enabled,
         qualifyingItemIds: qualifyingItemIds ?? Prisma.JsonNull,
+        redemptionRequiresItemIds: redemptionRequiresItemIds ?? Prisma.JsonNull,
       },
     });
   }

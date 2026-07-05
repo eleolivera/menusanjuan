@@ -10,14 +10,26 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, MessageCircle, Search, Eye, EyeOff, Gift, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, MessageCircle, Search, Eye, EyeOff, Gift, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { WhatsAppComposerModal, type ComposerCustomer, type ComposerProgram } from "@/components/restaurante/WhatsAppComposerModal";
 import type { CustomersResponse, CustomerRow } from "@/app/api/restaurante/customers/route";
 
 type Filter = "all" | "vip" | "recurring" | "new" | "dormant" | "near" | "eligible" | "ready";
-type Sort = "recent" | "oldest" | "ltv" | "orders" | "punches";
+type SortKey = "name" | "orders" | "ltv" | "recent" | "punches";
+type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 50;
+
+// Default direction when switching TO this column — for numerics + dates you
+// almost always want the "biggest / most recent first" view, but names read
+// A→Z by default.
+const DEFAULT_DIR: Record<SortKey, SortDir> = {
+  name: "asc",
+  orders: "desc",
+  ltv: "desc",
+  recent: "desc",
+  punches: "desc",
+};
 
 export default function ClientesPage() {
   const router = useRouter();
@@ -25,7 +37,8 @@ export default function ClientesPage() {
   const [restaurantName, setRestaurantName] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
-  const [sort, setSort] = useState<Sort>("recent");
+  const [sortKey, setSortKey] = useState<SortKey>("recent");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [composerFor, setComposerFor] = useState<CustomerRow | null>(null);
@@ -33,7 +46,18 @@ export default function ClientesPage() {
 
   // Any change to filter/sort/search resets pagination to page 1 so the
   // user isn't stranded on an empty page N after narrowing the list.
-  useEffect(() => { setPage(0); }, [filter, sort, search]);
+  useEffect(() => { setPage(0); }, [filter, sortKey, sortDir, search]);
+
+  // Click same header → toggle direction; click a new one → switch key and
+  // reset to that column's natural default direction (numbers desc, names asc).
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(DEFAULT_DIR[key]);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/restaurante/customers")
@@ -87,18 +111,22 @@ export default function ClientesPage() {
         break;
     }
     const sorted = [...rows].sort((a, b) => {
-      switch (sort) {
-        case "ltv": return b.ltv - a.ltv;
-        case "orders": return b.totalOrders - a.totalOrders;
-        case "punches": return b.punches - a.punches;
-        case "oldest":
-          return (a.lastOrderAt || "").localeCompare(b.lastOrderAt || "");
-        default:
-          return (b.lastOrderAt || "").localeCompare(a.lastOrderAt || "");
+      const mult = sortDir === "asc" ? 1 : -1;
+      switch (sortKey) {
+        case "ltv": return (a.ltv - b.ltv) * mult;
+        case "orders": return (a.totalOrders - b.totalOrders) * mult;
+        case "punches": return (a.punches - b.punches) * mult;
+        case "name": {
+          const an = (a.displayName || a.lastCustomerName || "").toLocaleLowerCase("es-AR");
+          const bn = (b.displayName || b.lastCustomerName || "").toLocaleLowerCase("es-AR");
+          return an.localeCompare(bn, "es-AR") * mult;
+        }
+        default: // recent
+          return (a.lastOrderAt || "").localeCompare(b.lastOrderAt || "") * mult;
       }
     });
     return sorted;
-  }, [data, filter, sort, search]);
+  }, [data, filter, sortKey, sortDir, search]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -208,17 +236,10 @@ export default function ClientesPage() {
             className="w-full rounded-lg bg-slate-900/60 border border-white/10 pl-10 pr-3 py-2 text-sm text-white"
           />
         </div>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-          className="rounded-lg bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white"
-        >
-          <option value="recent">Últimas compras primero</option>
-          <option value="oldest">Primeras compras primero</option>
-          <option value="ltv">Mayor gasto primero</option>
-          <option value="orders">Más pedidos primero</option>
-          <option value="punches">Más puntos primero</option>
-        </select>
+        <div className="hidden md:flex items-center gap-2 text-xs text-slate-500 whitespace-nowrap">
+          <ArrowUpDown className="h-3.5 w-3.5" />
+          Ordená clickeando las columnas
+        </div>
       </section>
 
       <section className="flex flex-wrap gap-2">
@@ -242,12 +263,14 @@ export default function ClientesPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase tracking-wide">
               <tr>
-                <th className="text-left px-4 py-3">Cliente</th>
+                <SortableTh label="Cliente" col="name" active={sortKey} dir={sortDir} onClick={toggleSort} align="left" />
                 <th className="text-left px-4 py-3">Teléfono</th>
-                <th className="text-right px-4 py-3">Pedidos</th>
-                <th className="text-right px-4 py-3">LTV</th>
-                <th className="text-left px-4 py-3">Último</th>
-                {data.program && <th className="text-left px-4 py-3">Progreso</th>}
+                <SortableTh label="Pedidos" col="orders" active={sortKey} dir={sortDir} onClick={toggleSort} align="right" />
+                <SortableTh label="LTV" col="ltv" active={sortKey} dir={sortDir} onClick={toggleSort} align="right" />
+                <SortableTh label="Último" col="recent" active={sortKey} dir={sortDir} onClick={toggleSort} align="left" />
+                {data.program && (
+                  <SortableTh label="Progreso" col="punches" active={sortKey} dir={sortDir} onClick={toggleSort} align="left" />
+                )}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -365,6 +388,7 @@ export default function ClientesPage() {
             lastCustomerName: composerFor.lastCustomerName,
             punches: composerFor.punches,
             daysSinceLastOrder: composerFor.daysSinceLastOrder,
+            redemptionsReady: composerFor.redemptionsReady,
           } satisfies ComposerCustomer}
           restaurantName={restaurantName}
           program={composerProgram}
@@ -396,6 +420,38 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
       <div className="text-xl font-bold text-white mt-1">{value}</div>
       {hint && <div className="text-[11px] text-slate-500 mt-0.5">{hint}</div>}
     </div>
+  );
+}
+
+function SortableTh({
+  label, col, active, dir, onClick, align,
+}: {
+  label: string;
+  col: SortKey;
+  active: SortKey;
+  dir: SortDir;
+  onClick: (key: SortKey) => void;
+  align: "left" | "right";
+}) {
+  const isActive = active === col;
+  const alignClass = align === "right" ? "text-right justify-end" : "text-left justify-start";
+  return (
+    <th className={`${align === "right" ? "text-right" : "text-left"} px-4 py-3`}>
+      <button
+        type="button"
+        onClick={() => onClick(col)}
+        className={`inline-flex items-center gap-1 ${alignClass} w-full hover:text-white transition-colors ${isActive ? "text-white" : ""}`}
+      >
+        <span>{label}</span>
+        {isActive ? (
+          dir === "asc"
+            ? <ArrowUp className="h-3 w-3 text-primary" strokeWidth={2.5} />
+            : <ArrowDown className="h-3 w-3 text-primary" strokeWidth={2.5} />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" strokeWidth={2} />
+        )}
+      </button>
+    </th>
   );
 }
 

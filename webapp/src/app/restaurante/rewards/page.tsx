@@ -14,6 +14,7 @@ type Program = {
   expiresInDays: number;
   enabled: boolean;
   qualifyingItemIds: string[] | null;
+  redemptionRequiresItemIds: string[] | null;
 };
 type ProgressRow = { punches: number; name: string | null; maskedPhone: string };
 type Data = {
@@ -40,6 +41,9 @@ export default function RewardsPage() {
   const [restrictItems, setRestrictItems] = useState(false);
   const [qualifyingItemIds, setQualifyingItemIds] = useState<string[]>([]);
   const [qItemFilter, setQItemFilter] = useState("");
+  const [restrictRedemption, setRestrictRedemption] = useState(false);
+  const [redemptionRequiresItemIds, setRedemptionRequiresItemIds] = useState<string[]>([]);
+  const [rItemFilter, setRItemFilter] = useState("");
 
   useEffect(() => {
     fetch("/api/restaurante/rewards")
@@ -63,6 +67,9 @@ export default function RewardsPage() {
           const q = Array.isArray(d.program.qualifyingItemIds) ? d.program.qualifyingItemIds : [];
           setQualifyingItemIds(q);
           setRestrictItems(q.length > 0);
+          const r = Array.isArray(d.program.redemptionRequiresItemIds) ? d.program.redemptionRequiresItemIds : [];
+          setRedemptionRequiresItemIds(r);
+          setRestrictRedemption(r.length > 0);
         } else if (d.menuItems[0]) {
           setName("Programa de premios");
           setDescription("Juntá pedidos y llevate un premio.");
@@ -80,6 +87,10 @@ export default function RewardsPage() {
       alert("Elegí al menos un item que cuente para los puntos, o desactivá la restricción.");
       return;
     }
+    if (restrictRedemption && redemptionRequiresItemIds.length === 0) {
+      alert("Elegí al menos un item que se necesite para canjear, o desactivá la restricción.");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/restaurante/rewards", {
@@ -94,6 +105,7 @@ export default function RewardsPage() {
           expiresInDays,
           enabled: programEnabled,
           qualifyingItemIds: restrictItems ? qualifyingItemIds : null,
+          redemptionRequiresItemIds: restrictRedemption ? redemptionRequiresItemIds : null,
         }),
       });
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || "Save failed"); }
@@ -290,6 +302,103 @@ export default function RewardsPage() {
                 <button
                   type="button"
                   onClick={() => { setQualifyingItemIds([]); markDirty(); }}
+                  className="text-slate-400 hover:underline"
+                >Ninguno</button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Redemption requires items — "free X with your next purchase of Y" */}
+        <section className={`rounded-2xl border border-white/5 bg-slate-900/50 p-5 space-y-4 ${rewardsEnabled ? "" : "opacity-60 pointer-events-none"}`}>
+          <div>
+            <h2 className="text-sm font-semibold text-white">¿Cómo se canjea el premio?</h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Cuando un cliente junta los puntos, el premio se agrega automáticamente a su próximo pedido (gratis). Elegí si tiene que comprar algo específico para poder canjear.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                checked={!restrictRedemption}
+                onChange={() => { setRestrictRedemption(false); markDirty(); }}
+                className="mt-1 accent-primary"
+              />
+              <div>
+                <div className="text-white text-sm font-medium">Se canjea en cualquier pedido</div>
+                <div className="text-xs text-slate-400">El premio aparece gratis en el próximo pedido, cualquiera que sea.</div>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                checked={restrictRedemption}
+                onChange={() => { setRestrictRedemption(true); markDirty(); }}
+                className="mt-1 accent-primary"
+              />
+              <div>
+                <div className="text-white text-sm font-medium">Solo cuando el pedido incluya alguno de estos ítems</div>
+                <div className="text-xs text-slate-400">Por ejemplo: papas gratis <b>con la próxima hamburguesa</b>. Sirve para que el canje también te traiga plata.</div>
+              </div>
+            </label>
+          </div>
+
+          {restrictRedemption && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <input
+                  type="text"
+                  value={rItemFilter}
+                  onChange={(e) => setRItemFilter(e.target.value)}
+                  placeholder="Buscar ítem…"
+                  className="flex-1 rounded-lg bg-slate-950/60 border border-white/10 px-3 py-2 text-sm text-white"
+                />
+                <div className="text-xs text-slate-400 whitespace-nowrap">
+                  {redemptionRequiresItemIds.length} de {data.menuItems.length} seleccionados
+                </div>
+              </div>
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-white/10 bg-slate-950/40 divide-y divide-white/5">
+                {data.menuItems
+                  .filter((m) => {
+                    if (!rItemFilter) return true;
+                    const q = rItemFilter.toLowerCase();
+                    return m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q);
+                  })
+                  .map((m) => {
+                    const checked = redemptionRequiresItemIds.includes(m.id);
+                    return (
+                      <label key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-white/5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            setRedemptionRequiresItemIds((prev) =>
+                              e.target.checked ? Array.from(new Set([...prev, m.id])) : prev.filter((id) => id !== m.id)
+                            );
+                            markDirty();
+                          }}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-white truncate">{m.name}</div>
+                          <div className="text-xs text-slate-400">{m.category}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+              </div>
+              <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setRedemptionRequiresItemIds(data.menuItems.map((m) => m.id)); markDirty(); }}
+                  className="text-primary hover:underline"
+                >Seleccionar todos</button>
+                <span className="text-slate-600">·</span>
+                <button
+                  type="button"
+                  onClick={() => { setRedemptionRequiresItemIds([]); markDirty(); }}
                   className="text-slate-400 hover:underline"
                 >Ninguno</button>
               </div>

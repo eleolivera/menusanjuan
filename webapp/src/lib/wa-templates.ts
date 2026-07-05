@@ -30,6 +30,19 @@ const firstName = (v: TemplateVars): string => {
 
 export const TEMPLATES: Template[] = [
   {
+    id: "reward-ready",
+    label: "Ya tenés tu premio 🎁",
+    hint: "El cliente ya juntó los puntos — invitálo a canjear.",
+    requires: ["reward"],
+    render: (v) => {
+      const fn = firstName(v);
+      const hola = fn ? `Hola ${fn}!` : "¡Hola!";
+      const reward = v.reward || "tu premio";
+      const rest = v.restaurantName ? ` en ${v.restaurantName}` : "";
+      return `${hola} 🎉 Ya juntaste todos los puntos — tu ${reward} está esperándote${rest}. Con tu próximo pedido se agrega gratis, no tenés que hacer nada. ¡Te esperamos!`;
+    },
+  },
+  {
     id: "near-reward",
     label: "Casi hay premio",
     hint: "Recordá al cliente cuántos pedidos le faltan.",

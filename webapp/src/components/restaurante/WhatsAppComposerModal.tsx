@@ -17,6 +17,8 @@ export type ComposerCustomer = {
   lastCustomerName: string | null;
   punches: number;
   daysSinceLastOrder: number | null;
+  /** Customer has ≥1 READY redemption for this dealer — reward-ready template. */
+  redemptionsReady?: number;
 };
 
 export type ComposerProgram = {
@@ -50,6 +52,11 @@ export function WhatsAppComposerModal({
   );
 
   const initialTemplate: Template = useMemo(() => {
+    // Priority: (1) has a redemption waiting → reward-ready
+    //           (2) accruing punches → near-reward
+    //           (3) dormant → come-back
+    //           (4) default first template
+    if ((customer.redemptionsReady ?? 0) > 0) return TEMPLATES.find((t) => t.id === "reward-ready") || TEMPLATES[0];
     if (program && customer.punches > 0) return TEMPLATES.find((t) => t.id === "near-reward") || TEMPLATES[0];
     if ((customer.daysSinceLastOrder ?? 0) > 21) return TEMPLATES.find((t) => t.id === "come-back") || TEMPLATES[0];
     return TEMPLATES[0];
