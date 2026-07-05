@@ -79,14 +79,14 @@ export function RewardBadge({ slug }: { slug: string }) {
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 flex items-center gap-3">
           <Gift className="h-5 w-5 text-emerald-400 shrink-0" strokeWidth={2} />
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-white">🎁 ¡Ya tenés tu premio!</div>
-            <div className="text-xs text-slate-300 mt-0.5">
+            <div className="text-sm font-semibold text-text">🎁 ¡Ya tenés tu premio!</div>
+            <div className="text-xs text-text-secondary mt-0.5">
               Iniciá sesión con Google (una sola vez) para reclamar tu {rewardItem}. Se aplica automáticamente en tu próximo pedido.
             </div>
           </div>
           <a
             href={signInHref}
-            className="whitespace-nowrap rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-white"
+            className="whitespace-nowrap rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-text"
           >
             Iniciar sesión
           </a>
@@ -105,8 +105,8 @@ export function RewardBadge({ slug }: { slug: string }) {
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 flex items-center gap-3">
           <Gift className="h-5 w-5 text-emerald-400 shrink-0" strokeWidth={2} />
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-white">🎁 Tu premio está esperándote</div>
-            <div className="text-xs text-slate-300 mt-0.5">{requires}</div>
+            <div className="text-sm font-semibold text-text">🎁 Tu premio está esperándote</div>
+            <div className="text-xs text-text-secondary mt-0.5">{requires}</div>
           </div>
           <div className="text-xs font-bold text-emerald-400 whitespace-nowrap">¡Listo!</div>
         </div>
@@ -124,15 +124,15 @@ export function RewardBadge({ slug }: { slug: string }) {
       <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 flex items-center gap-3">
         <Gift className="h-5 w-5 text-primary shrink-0" strokeWidth={2} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-white truncate">{data.rewardName}</div>
+          <div className="text-sm font-semibold text-text truncate">{data.rewardName}</div>
           {data.rewardDescription ? (
-            <div className="text-xs text-slate-300 mt-0.5">{data.rewardDescription}</div>
+            <div className="text-xs text-text-secondary mt-0.5">{data.rewardDescription}</div>
           ) : null}
           <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
             <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
           </div>
           {showAccruingNudge && (
-            <div className="mt-2 text-[11px] text-slate-300 flex items-center gap-2">
+            <div className="mt-2 text-[11px] text-text-secondary flex items-center gap-2">
               <span>Iniciá sesión con Google para no perder tus puntos</span>
               <a href={signInHref} className="rounded bg-primary/20 hover:bg-primary/30 px-2 py-0.5 font-semibold text-primary">Activar</a>
             </div>
