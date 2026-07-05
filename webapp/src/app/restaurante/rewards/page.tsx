@@ -120,11 +120,11 @@ export default function RewardsPage() {
   }
 
   if (!data) {
-    return <div className="p-8 text-slate-400">Cargando…</div>;
+    return <div className="h-full p-8 text-slate-400">Cargando…</div>;
   }
   if (data.menuItems.length === 0) {
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="h-full overflow-y-auto p-8 max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-white mb-2">Rewards</h1>
         <p className="text-slate-400">Antes de configurar un programa de premios, agregá al menos un item en tu menú.</p>
       </div>
@@ -132,6 +132,7 @@ export default function RewardsPage() {
   }
 
   return (
+    <div className="h-full overflow-y-auto bg-slate-950">
     <div className="p-6 sm:p-8 max-w-3xl mx-auto space-y-6">
         <div>
           <h1 className="inline-flex items-center gap-2 text-2xl font-bold text-white">
@@ -433,6 +434,7 @@ export default function RewardsPage() {
           </button>
         </div>
       </div>
+    </div>
   );
 }
 
