@@ -19,18 +19,31 @@ export async function generateMetadata({
 
   // WhatsApp link previews look way better with a square brand logo in the
   // small thumb slot than a wide cover (most covers get cropped or skipped
-  // entirely if over ~600KB). Prefer the logo; fall back to the cover.
-  const ogImage = restaurant.logoUrl || restaurant.coverUrl;
+  // entirely if over ~600KB). Prefer the logo; fall back to the cover; if
+  // neither is set, fall back to the platform brand mark so the preview is
+  // never blank / a black triangle.
+  const ogImage = restaurant.logoUrl || restaurant.coverUrl || "https://menusanjuan.com/icon-512.png";
   const ogTitle = `${restaurant.name} — Menú | MenuSanJuan`;
   const ogDescription = restaurant.description ?? undefined;
+
+  // Per-resta favicon — the browser tab + bookmark + iOS home-screen icon
+  // shows the RESTAURANT'S logo instead of inheriting the platform default.
+  // When logoUrl is null, we fall back to the platform icon.
+  const tabIcon = restaurant.logoUrl || "/favicon.ico";
+  const appleIcon = restaurant.logoUrl || "/apple-touch-icon.png";
 
   return {
     title: `${restaurant.name} — Menú`,
     description: restaurant.description,
+    icons: {
+      icon: tabIcon,
+      shortcut: tabIcon,
+      apple: appleIcon,
+    },
     openGraph: {
       title: ogTitle,
       description: ogDescription,
-      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
+      images: [{ url: ogImage }],
       type: "website",
     },
     // Override the root-layout twitter defaults so iMessage / Twitter / Telegram
@@ -39,7 +52,7 @@ export async function generateMetadata({
       card: "summary",
       title: ogTitle,
       description: ogDescription,
-      ...(ogImage ? { images: [ogImage] } : {}),
+      images: [ogImage],
     },
   };
 }

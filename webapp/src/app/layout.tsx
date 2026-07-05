@@ -17,8 +17,15 @@ export const metadata: Metadata = {
   },
   description:
     "Todos los menús de San Juan en un solo lugar. Elegí, pedí por WhatsApp y listo.",
+  // Icons: `favicon.ico` at src/app/ handles legacy /favicon.ico direct
+  // requests (link preview crawlers, first paint). SVG is emitted as an
+  // additional <link> for crisp scaling on modern browsers. Per-resta pages
+  // override this via their own generateMetadata to use dealer.logoUrl.
   icons: {
-    icon: "/favicon.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
     apple: "/apple-touch-icon.png",
   },
   manifest: "/manifest.json",
@@ -29,11 +36,15 @@ export const metadata: Metadata = {
     siteName: "MenuSanJuan",
     title: "MenuSanJuan — Pedí comida en San Juan",
     description: "Todos los menús de San Juan en un solo lugar. Elegí, pedí por WhatsApp y listo.",
+    // Default preview image for any page that doesn't set its own openGraph.
+    // Previously null → WhatsApp/iMessage showed a generic card with no image.
+    images: [{ url: "/icon-512.png", width: 512, height: 512, alt: "MenuSanJuan" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "MenuSanJuan — Pedí comida en San Juan",
     description: "Todos los menús de San Juan en un solo lugar.",
+    images: ["/icon-512.png"],
   },
   keywords: [
     "restaurantes san juan",
