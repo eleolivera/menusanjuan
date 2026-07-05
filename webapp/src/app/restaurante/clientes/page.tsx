@@ -10,12 +10,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, MessageCircle, Search, Eye, EyeOff, Gift } from "lucide-react";
+import { Users, MessageCircle, Search, Eye, EyeOff, Gift, ChevronLeft, ChevronRight } from "lucide-react";
 import { WhatsAppComposerModal, type ComposerCustomer, type ComposerProgram } from "@/components/restaurante/WhatsAppComposerModal";
 import type { CustomersResponse, CustomerRow } from "@/app/api/restaurante/customers/route";
 
-type Filter = "all" | "vip" | "recurring" | "new" | "dormant" | "near";
-type Sort = "recent" | "ltv" | "orders" | "punches";
+type Filter = "all" | "vip" | "recurring" | "new" | "dormant" | "near" | "eligible" | "ready";
+type Sort = "recent" | "oldest" | "ltv" | "orders" | "punches";
+
+const PAGE_SIZE = 50;
 
 export default function ClientesPage() {
   const router = useRouter();
@@ -27,6 +29,11 @@ export default function ClientesPage() {
   const [search, setSearch] = useState("");
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [composerFor, setComposerFor] = useState<CustomerRow | null>(null);
+  const [page, setPage] = useState(0);
+
+  // Any change to filter/sort/search resets pagination to page 1 so the
+  // user isn't stranded on an empty page N after narrowing the list.
+  useEffect(() => { setPage(0); }, [filter, sort, search]);
 
   useEffect(() => {
     fetch("/api/restaurante/customers")
@@ -72,12 +79,20 @@ export default function ClientesPage() {
       case "near":
         rows = rows.filter((r) => Number.isFinite(needed) && r.punches >= needed * 0.8 && r.punches < needed);
         break;
+      case "eligible":
+        rows = rows.filter((r) => Number.isFinite(needed) && r.punches >= needed);
+        break;
+      case "ready":
+        rows = rows.filter((r) => r.redemptionsReady > 0);
+        break;
     }
     const sorted = [...rows].sort((a, b) => {
       switch (sort) {
         case "ltv": return b.ltv - a.ltv;
         case "orders": return b.totalOrders - a.totalOrders;
         case "punches": return b.punches - a.punches;
+        case "oldest":
+          return (a.lastOrderAt || "").localeCompare(b.lastOrderAt || "");
         default:
           return (b.lastOrderAt || "").localeCompare(a.lastOrderAt || "");
       }
@@ -85,20 +100,26 @@ export default function ClientesPage() {
     return sorted;
   }, [data, filter, sort, search]);
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageRows = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const rangeStart = filtered.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(filtered.length, (currentPage + 1) * PAGE_SIZE);
+
   if (error) {
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="h-full overflow-y-auto p-8 max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-white mb-2">Clientes</h1>
         <p className="text-red-400">No pude cargar los clientes: {error}</p>
       </div>
     );
   }
   if (!data) {
-    return <div className="p-8 text-slate-400">Cargando…</div>;
+    return <div className="h-full p-8 text-slate-400">Cargando…</div>;
   }
   if (data.customers.length === 0) {
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="h-full overflow-y-auto p-8 max-w-2xl mx-auto">
         <h1 className="inline-flex items-center gap-2 text-2xl font-bold text-white mb-2">
           <Users className="h-6 w-6 text-primary" strokeWidth={2} />
           Clientes
@@ -113,7 +134,8 @@ export default function ClientesPage() {
     : null;
 
   return (
-    <div className="p-6 sm:p-8 space-y-6">
+    <div className="h-full overflow-y-auto bg-slate-950">
+      <div className="p-6 sm:p-8 space-y-6">
       <header>
         <h1 className="inline-flex items-center gap-2 text-2xl font-bold text-white">
           <Users className="h-6 w-6 text-primary" strokeWidth={2} />
@@ -191,7 +213,8 @@ export default function ClientesPage() {
           onChange={(e) => setSort(e.target.value as Sort)}
           className="rounded-lg bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white"
         >
-          <option value="recent">Últimos pedidos primero</option>
+          <option value="recent">Últimas compras primero</option>
+          <option value="oldest">Primeras compras primero</option>
           <option value="ltv">Mayor gasto primero</option>
           <option value="orders">Más pedidos primero</option>
           <option value="punches">Más puntos primero</option>
@@ -205,7 +228,11 @@ export default function ClientesPage() {
         <FilterPill active={filter === "new"} onClick={() => setFilter("new")} label="Nuevos" />
         <FilterPill active={filter === "dormant"} onClick={() => setFilter("dormant")} label="Dormidos (30d+)" />
         {data.program && (
-          <FilterPill active={filter === "near"} onClick={() => setFilter("near")} label={`Cerca del premio (${data.totals.rewardsHalfway - data.totals.rewardsEligible >= 0 ? "" : ""}${data.totals.rewardsHalfway})`} />
+          <>
+            <FilterPill active={filter === "near"} onClick={() => setFilter("near")} label={`Cerca del premio (${Math.max(0, data.totals.rewardsHalfway - data.totals.rewardsEligible)})`} />
+            <FilterPill active={filter === "eligible"} onClick={() => setFilter("eligible")} label={`Elegibles (${data.totals.rewardsEligible})`} />
+            <FilterPill active={filter === "ready"} onClick={() => setFilter("ready")} label="Con premio activo" />
+          </>
         )}
       </section>
 
@@ -225,7 +252,7 @@ export default function ClientesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filtered.map((row) => {
+              {pageRows.map((row) => {
                 const isRevealed = revealed.has(row.customerId);
                 const name = row.displayName || row.lastCustomerName || "Sin nombre";
                 const progress = data.program
@@ -280,16 +307,50 @@ export default function ClientesPage() {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+              {pageRows.length === 0 && (
                 <tr>
                   <td colSpan={data.program ? 7 : 6} className="px-4 py-10 text-center text-slate-500 text-sm">
-                    No hay clientes con este filtro.
+                    {emptyStateCopy(filter)}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        {/* Pagination bar */}
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between border-t border-white/5 px-4 py-3 text-xs text-slate-400">
+            <div>
+              {rangeStart}–{rangeEnd} de {filtered.length.toLocaleString("es-AR")}
+              {filtered.length !== data.customers.length && (
+                <span className="text-slate-500"> · filtrando {data.customers.length}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-slate-300 hover:bg-white/5 disabled:opacity-40 disabled:hover:bg-transparent"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </button>
+              <span className="px-2 text-slate-500">
+                Página {currentPage + 1} / {pageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                disabled={currentPage >= pageCount - 1}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-slate-300 hover:bg-white/5 disabled:opacity-40 disabled:hover:bg-transparent"
+              >
+                Siguiente
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <p className="text-[11px] text-slate-500">
@@ -310,8 +371,22 @@ export default function ClientesPage() {
           onClose={() => setComposerFor(null)}
         />
       )}
+      </div>
     </div>
   );
+}
+
+function emptyStateCopy(filter: Filter): string {
+  switch (filter) {
+    case "vip": return "Todavía no hay clientes con 5+ pedidos.";
+    case "recurring": return "No hay recurrentes en este momento.";
+    case "new": return "No hay clientes nuevos con pedidos en los últimos 30 días.";
+    case "dormant": return "¡Buenas noticias! Ningún cliente lleva más de 30 días sin pedir.";
+    case "near": return "Nadie está cerca del premio todavía.";
+    case "eligible": return "Todavía no hay clientes que hayan juntado los puntos.";
+    case "ready": return "No hay premios activos por canjear.";
+    default: return "No hay clientes con este filtro.";
+  }
 }
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
