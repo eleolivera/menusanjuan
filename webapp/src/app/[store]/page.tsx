@@ -6,6 +6,7 @@ import { StoreMenu } from "@/components/StoreMenu";
 import { RewardBadge } from "@/components/RewardBadge";
 import { ClaimBanner } from "@/components/ClaimBanner";
 import { coverGradient } from "@/lib/gradients";
+import { prisma } from "@/lib/prisma";
 import { Star, Clock, MapPin } from "lucide-react";
 
 export async function generateMetadata({
@@ -66,6 +67,18 @@ export default async function StorePage({
   const restaurant = await getRestaurantBySlug(store);
 
   if (!restaurant) notFound();
+
+  // Rewards visibility is decided server-side to prevent the client-side
+  // badge from flickering in after page load. Only render RewardBadge if
+  // BOTH the dealer's kill-switch AND an enabled program exist. Anything
+  // else = no badge, no fetch, no flicker.
+  const rewardsAvailable = process.env.REWARDS_ENABLED === "true"
+    && restaurant.dealerId
+    ? Boolean(await prisma.dealer.findUnique({
+        where: { slug: restaurant.slug },
+        select: { rewardsEnabled: true, rewardProgram: { select: { enabled: true } } },
+      }).then((d) => d?.rewardsEnabled && d.rewardProgram?.enabled))
+    : false;
 
   const categories = await getMenuBySlug(restaurant.slug);
 
@@ -212,8 +225,10 @@ export default async function StorePage({
         />
       )}
 
-      {/* Rewards progress badge — client-side, reads stored phone from localStorage */}
-      <RewardBadge slug={restaurant.slug} />
+      {/* Rewards progress badge — only mounted when this resta has rewards on.
+          Server-side gate prevents the client-side fetch from flickering the
+          badge in seconds after page load. */}
+      {rewardsAvailable && <RewardBadge slug={restaurant.slug} />}
 
       {/* Menu */}
       <StoreMenu restaurant={restaurant} categories={categories} deliveryConfig={restaurant.deliveryConfig} />
