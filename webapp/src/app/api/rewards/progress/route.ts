@@ -47,23 +47,27 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // "Am I signed in?" — resolved by two independent signals:
-  //  1. The customer session cookie (authoritative — proves the browser owns
-  //     the Google-linked identity right now)
-  //  2. The Customer row at this phone has googleSub set (proves an account
-  //     exists, but doesn't prove THIS browser owns it)
+  // "Am I signed in for THIS phone?" — the badge state must match the
+  // consumption gate at checkout, which requires the customer session cookie
+  // to identify the SAME Customer.id as the one the typed phone maps to.
+  // A session on a DIFFERENT Customer doesn't help — checkout will still
+  // skip auto-apply because the phone-lookup returns a different row.
   //
-  // The badge should treat signal (1) as the source of truth. When the user
-  // has an active customer session on ANY Google-linked Customer, treat them
-  // as signed in — even if their localStorage phone happens to map to a
-  // different Customer (e.g. an old phone from a previous session). Fixes
-  // the "I signed in but the badge still says 'Iniciá sesión'" UX bug.
+  // hasGoogleSignIn is therefore an AND, not an OR:
+  //   (a) phone-Customer exists AND has googleSub AND
+  //   (b) an active session Customer exists AND its id === phone-Customer.id
+  //
+  // Without (b), the badge would falsely promise "listo" while checkout
+  // silently fails — the bug that surfaced when Elio had a stale session
+  // for a different Customer row than the phone in localStorage.
   const canonical = normalizePhoneE164(phone) || phone;
   const [customer, sessionCustomer] = await Promise.all([
-    prisma.customer.findUnique({ where: { phone: canonical }, select: { googleSub: true } }),
+    prisma.customer.findUnique({ where: { phone: canonical }, select: { id: true, googleSub: true } }),
     getCustomerFromSession(),
   ]);
-  const hasGoogleSignIn = Boolean(customer?.googleSub) || Boolean(sessionCustomer?.googleSub);
+  const phoneCustomerHasGoogle = Boolean(customer?.googleSub);
+  const sessionMatchesPhone = Boolean(customer && sessionCustomer && sessionCustomer.id === customer.id);
+  const hasGoogleSignIn = phoneCustomerHasGoogle && sessionMatchesPhone;
   const needsGoogleSignIn = data.eligible && !hasGoogleSignIn;
 
   return NextResponse.json({
