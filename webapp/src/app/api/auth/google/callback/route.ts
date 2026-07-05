@@ -8,12 +8,43 @@ import { authLimiter, getClientIp } from "@/lib/rate-limit";
 import { exchangeCodeForTokens, fetchGoogleUserInfo } from "@/lib/google-oauth";
 import { handleCustomerGoogleCallback } from "@/lib/customer-auth";
 
+// Small helper: pick the right "sorry that failed" landing page based on
+// whether the OAuth flow was customer-intent or owner-intent. Customer
+// intent should NEVER dump the user onto the owner login form.
+function errorRedirect(
+  request: NextRequest,
+  errorCode: string,
+  intent: string | undefined,
+  customerRedirect: string | undefined,
+): NextResponse {
+  if (intent === "customer") {
+    const dest = customerRedirect || "/";
+    const sep = dest.includes("?") ? "&" : "?";
+    return NextResponse.redirect(new URL(`${dest}${sep}rewardError=${encodeURIComponent(errorCode)}`, request.url));
+  }
+  return NextResponse.redirect(new URL(`/restaurante/login?error=${errorCode}`, request.url));
+}
+
 // GET /api/auth/google/callback — handle Google's redirect
 export async function GET(request: NextRequest) {
+  // Read intent/redirect up front so early-return error branches can route
+  // customer-intent failures back to the store page instead of owner login.
+  const cookieStore = await cookies();
+  const stateCookie = cookieStore.get("menusj_oauth_state")?.value;
+  let intentEarly: string | undefined;
+  let redirectEarly: string | undefined;
+  if (stateCookie) {
+    try {
+      const s = JSON.parse(stateCookie) as { intent?: string; redirect?: string };
+      intentEarly = s.intent;
+      redirectEarly = s.redirect;
+    } catch {}
+  }
+
   const ip = getClientIp(request);
   const limit = authLimiter(ip);
   if (!limit.allowed) {
-    return NextResponse.redirect(new URL("/restaurante/login?error=google_rate_limit", request.url));
+    return errorRedirect(request, "google_rate_limit", intentEarly, redirectEarly);
   }
 
   const { searchParams } = request.nextUrl;
@@ -23,29 +54,26 @@ export async function GET(request: NextRequest) {
 
   // User denied consent
   if (error) {
-    return NextResponse.redirect(new URL("/restaurante/login?error=google_denied", request.url));
+    return errorRedirect(request, "google_denied", intentEarly, redirectEarly);
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL("/restaurante/login?error=google_invalid", request.url));
+    return errorRedirect(request, "google_invalid", intentEarly, redirectEarly);
   }
 
-  // Validate CSRF state
-  const cookieStore = await cookies();
-  const stateCookie = cookieStore.get("menusj_oauth_state")?.value;
   if (!stateCookie) {
-    return NextResponse.redirect(new URL("/restaurante/login?error=google_expired", request.url));
+    return errorRedirect(request, "google_expired", intentEarly, redirectEarly);
   }
 
   let savedState: { state: string; redirect: string; intent?: string; phone?: string | null };
   try {
     savedState = JSON.parse(stateCookie);
   } catch {
-    return NextResponse.redirect(new URL("/restaurante/login?error=google_invalid", request.url));
+    return errorRedirect(request, "google_invalid", intentEarly, redirectEarly);
   }
 
   if (savedState.state !== state) {
-    return NextResponse.redirect(new URL("/restaurante/login?error=google_csrf", request.url));
+    return errorRedirect(request, "google_csrf", savedState.intent, savedState.redirect);
   }
 
   // Clear the state cookie on apex domain

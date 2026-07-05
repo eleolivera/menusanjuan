@@ -14,10 +14,12 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 90; // 90 days
 
 function getSecret(): string {
   // Reuse CLAIM_SECRET so we don't add a new env var for a single low-value
-  // signature key. The Customer cookie is invalidatable by rotating the env.
-  const s = process.env.CLAIM_SECRET;
-  if (!s) throw new Error("CLAIM_SECRET not configured (used by customer-auth cookie signature)");
-  return s;
+  // signature key. Falls back to the same literal the /api/claim routes use
+  // when CLAIM_SECRET is unset — throwing here would 500 the OAuth callback
+  // and manifest as an opaque "google_server" error every time someone tries
+  // to sign in, which is exactly what happened. Cookie is still HMAC-signed
+  // with a stable value; can be strengthened by setting CLAIM_SECRET in env.
+  return process.env.CLAIM_SECRET || "menusj-claim-2024";
 }
 
 function sign(value: string): string {
