@@ -824,11 +824,18 @@ function CopyDeliveryButton({
   );
 }
 
-// Detects a reward-redemption line synthesized by the auto-apply flow at
-// checkout. Matches on the "(premio)" suffix that applyPendingRedemption
-// injects — keeps the check client-side + zero API changes.
+// Detects a reward line synthesized by any of the redemption flows at
+// checkout — punch-earned "(premio)" free items, gift "(regalo)" free items,
+// or gift "(regalo)" discount rows with negative unitPrice.
 function orderHasRedemption(order: Order): boolean {
   const items = order.items as unknown as Array<{ name?: string; unitPrice?: number }> | null;
   if (!Array.isArray(items)) return false;
-  return items.some((line) => (line?.unitPrice === 0) && typeof line?.name === "string" && line.name.includes("(premio)"));
+  return items.some((line) => {
+    if (typeof line?.name !== "string") return false;
+    // Free items (premio OR regalo) have unitPrice === 0
+    if (line.unitPrice === 0 && (line.name.includes("(premio)") || line.name.includes("(regalo)"))) return true;
+    // Discounts have negative unitPrice + "(regalo)" tag
+    if (typeof line.unitPrice === "number" && line.unitPrice < 0 && line.name.includes("(regalo)")) return true;
+    return false;
+  });
 }

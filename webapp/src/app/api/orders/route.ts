@@ -9,7 +9,7 @@ import {
 } from "@/lib/orders-store";
 import { notifyRestaurantOfNewOrder } from "@/lib/order-notification";
 import { computeCartTotal } from "@/lib/money";
-import { rewardsFlag, upsertCustomerByPhone, applyPendingRedemption, attachRedemptionToOrder } from "@/lib/rewards";
+import { rewardsFlag, upsertCustomerByPhone, applyPendingRedemption, attachRedemptionToOrder, previewRedemptionCode } from "@/lib/rewards";
 import { isValidPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       deliveryFee,
       paymentIntent: rawPaymentIntent,
       paymentReceiptUrl: rawReceiptUrl,
+      redemptionCode: rawCode,
     } = body;
 
     if (!restauranteSlug || !customerName || !customerPhone || !items?.length) {
@@ -75,10 +76,40 @@ export async function POST(request: NextRequest) {
     // Customer.googleSub (fraud: prevents phone-hijacking of someone else's
     // reward). Best-effort — any failure means order still ships without
     // the reward (redemption stays READY for the next attempt).
+    //
+    // Two possible sources of Redemption at checkout:
+    //   (a) googleSub-gated auto-apply (existing PUNCH-earned rewards)
+    //   (b) redemptionCode-gated apply (owner-gifted rewards; no Google)
+    // Both write to the same field so only ONE can apply per order. Code path
+    // wins if the customer submitted one — the owner explicitly gave it.
     let effectiveItems = items;
     let effectiveTotal = total;
     let pendingRedemptionId: string | null = null;
-    if (customerId) {
+    // (b) Gift-code path — server re-validates so a tampered client can't
+    // fabricate a discount. Runs FIRST because the customer explicitly typed
+    // this code; the punch-auto-apply below is skipped if a code succeeds.
+    if (typeof rawCode === "string" && rawCode.trim().length > 0) {
+      try {
+        const preview = await previewRedemptionCode({
+          code: rawCode,
+          dealerSlug: restauranteSlug,
+          cartItems: items,
+        });
+        if (preview.ok) {
+          effectiveItems = [...items, preview.line];
+          effectiveTotal = computeCartTotal(effectiveItems);
+          pendingRedemptionId = preview.redemptionId;
+        }
+        // If the code is invalid/expired, silently drop it — customer already
+        // saw the error at preview time. Placing the order without discount
+        // is friendlier than rejecting the whole cart.
+      } catch (err) {
+        console.error("gift-code apply failed:", err);
+      }
+    }
+
+    // (a) Punch-earned auto-apply (only fires if we didn't already apply a code).
+    if (!pendingRedemptionId && customerId) {
       try {
         const dealer = await prisma.dealer.findUnique({
           where: { slug: restauranteSlug },
@@ -93,7 +124,7 @@ export async function POST(request: NextRequest) {
           });
           if (result.redemptionId) {
             effectiveItems = result.items as typeof items;
-            effectiveTotal = computeCartTotal(effectiveItems);   // free line = $0 so total unchanged, but recompute for correctness
+            effectiveTotal = computeCartTotal(effectiveItems);
             pendingRedemptionId = result.redemptionId;
           }
         }

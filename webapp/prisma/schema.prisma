@@ -500,22 +500,41 @@ enum RedemptionStatus {
   CANCELLED
 }
 
+// PUNCH = earned via program accrual (default; every pre-existing row).
+// GIFT_* = owner-created gifts, consumed by code entry at checkout.
+enum RedemptionKind {
+  PUNCH
+  GIFT_ITEM
+  GIFT_DISCOUNT_PCT
+  GIFT_DISCOUNT_AMOUNT
+}
+
 model Redemption {
   id         String           @id @default(cuid())
   customerId String
-  programId  String
-  orderId    String?          @unique // Set when claimed onto a cart
+  programId  String?                     // NULLABLE — gifts don't belong to a program
+  orderId    String?          @unique    // Set when claimed onto a cart
   status     RedemptionStatus @default(READY)
+  kind       RedemptionKind   @default(PUNCH)
+  code       String?          @unique    // 8-char human-friendly; only set for gifts
   expiresAt  DateTime
   createdAt  DateTime         @default(now())
   redeemedAt DateTime?
 
-  customer Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  program  RewardProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
-  order    Order?        @relation("OrderRedemption", fields: [orderId], references: [id], onDelete: SetNull)
+  // Gift-only fields
+  giftMenuItemId     String?   // for GIFT_ITEM
+  giftDiscountPct    Int?      // 1..100
+  giftDiscountAmount Int?      // ARS
+  giftedByUserId     String?   // owner user who created the gift
+  giftNote           String?
+
+  customer Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  program  RewardProgram? @relation(fields: [programId], references: [id], onDelete: Cascade)
+  order    Order?         @relation("OrderRedemption", fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([customerId, status])
   @@index([programId, status])
+  @@index([kind, status])
 }
 
 // ─── Onboarding Kanban ───

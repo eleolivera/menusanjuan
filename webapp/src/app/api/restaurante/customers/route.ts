@@ -25,6 +25,8 @@ export type CustomerRow = {
   punches: number;
   redemptionsTotal: number;
   redemptionsReady: number;
+  hasGoogleSignIn: boolean;
+  giftsReady: number;
 };
 
 export type CustomersResponse = {
@@ -93,10 +95,10 @@ export async function GET() {
 
   const customerIds = orderAgg.map((r) => r.customerId);
 
-  // Customer identity rows for phone + name.
+  // Customer identity rows for phone + name + Google-link status.
   const customers = await prisma.customer.findMany({
     where: { id: { in: customerIds } },
-    select: { id: true, phone: true, displayName: true },
+    select: { id: true, phone: true, displayName: true, googleSub: true },
   });
   const customerById = new Map(customers.map((c) => [c.id, c]));
 
@@ -140,6 +142,19 @@ export async function GET() {
     redemptionRows.map((r) => [r.customerId, { total: Number(r.total), ready: Number(r.ready) }])
   );
 
+  // Gift redemptions (kind starts with 'GIFT_'): counted separately so the
+  // owner sees which customers have unclaimed gifts pending.
+  type GiftAgg = { customerId: string; ready: bigint };
+  const giftRows: GiftAgg[] = await prisma.$queryRaw<GiftAgg[]>`
+    SELECT r."customerId" AS "customerId",
+           COUNT(*) FILTER (WHERE r."status" = 'READY')::bigint AS ready
+      FROM "Redemption" r
+     WHERE r."customerId" = ANY(${customerIds}::text[])
+       AND r."kind" LIKE 'GIFT_%'
+     GROUP BY r."customerId"
+  `;
+  const giftMap = new Map<string, number>(giftRows.map((r) => [r.customerId, Number(r.ready)]));
+
   const now = Date.now();
   const rows: CustomerRow[] = orderAgg.map((r) => {
     const c = customerById.get(r.customerId);
@@ -160,6 +175,8 @@ export async function GET() {
       punches: progressMap.get(r.customerId) || 0,
       redemptionsTotal: red?.total || 0,
       redemptionsReady: red?.ready || 0,
+      hasGoogleSignIn: Boolean(c?.googleSub),
+      giftsReady: giftMap.get(r.customerId) || 0,
     };
   });
 

@@ -388,8 +388,11 @@ export async function attachRedemptionToOrder(redemptionId: string, orderId: str
   const red = await tx.redemption.update({
     where: { id: redemptionId },
     data: { orderId },
-    select: { customerId: true, programId: true },
+    select: { customerId: true, programId: true, kind: true },
   });
+  // Only PUNCH kinds spend RewardProgress punches. GIFT_* kinds have no
+  // programId and no punch balance to decrement.
+  if (red.kind !== "PUNCH" || !red.programId) return;
   const program = await tx.rewardProgram.findUnique({
     where: { id: red.programId },
     select: { punchesNeeded: true },
@@ -399,6 +402,228 @@ export async function attachRedemptionToOrder(redemptionId: string, orderId: str
     where: { customerId: red.customerId, programId: red.programId },
     data: { punches: { decrement: program.punchesNeeded } },
   });
+}
+
+// ─── Gift redemptions (owner-driven, code-based) ─────────────────────────────
+
+// Alphabet excludes ambiguous chars (0/O, 1/I/L) — safer for verbal + WhatsApp transmission.
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const CODE_HALF_LEN = 4;
+
+/**
+ * Generate a random 8-char code formatted `XXXX-YYYY` (uppercase, unambiguous).
+ * Caller is responsible for retrying on @unique collision (extremely rare with
+ * 31^8 = ~850B possibilities per prefix).
+ */
+export function generateRedemptionCode(): string {
+  const pick = () => Array.from(
+    { length: CODE_HALF_LEN },
+    () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]
+  ).join("");
+  return `${pick()}-${pick()}`;
+}
+
+export type GiftKind = "GIFT_ITEM" | "GIFT_DISCOUNT_PCT" | "GIFT_DISCOUNT_AMOUNT";
+
+/**
+ * Create a gift Redemption row owned by a dealer, targeted at one customer.
+ * Returns { code, expiresAt } — caller (owner) sends the code to the customer
+ * via WhatsApp. Customer enters it at checkout to redeem.
+ *
+ * The gift is idempotent per (dealer, customer, kind) at most in spirit: we
+ * don't dedupe — an owner can legitimately gift the same customer multiple
+ * codes. Each code is single-use because Redemption.orderId @unique.
+ */
+export async function createGiftRedemption(params: {
+  ownerUserId: string;
+  dealerId: string;
+  customerId: string;
+  kind: GiftKind;
+  giftMenuItemId?: string;
+  giftDiscountPct?: number;
+  giftDiscountAmount?: number;
+  giftNote?: string;
+  ttlDays?: number;
+}): Promise<{ id: string; code: string; expiresAt: Date }> {
+  const ttl = Math.max(1, Math.min(365, params.ttlDays ?? 60));
+  const expiresAt = new Date(Date.now() + ttl * 24 * 60 * 60 * 1000);
+
+  // Validate kind-specific payload BEFORE spending code space
+  if (params.kind === "GIFT_ITEM" && !params.giftMenuItemId) {
+    throw new Error("giftMenuItemId required for GIFT_ITEM");
+  }
+  if (params.kind === "GIFT_DISCOUNT_PCT") {
+    const p = params.giftDiscountPct ?? 0;
+    if (p < 1 || p > 100) throw new Error("giftDiscountPct must be 1..100");
+  }
+  if (params.kind === "GIFT_DISCOUNT_AMOUNT") {
+    const a = params.giftDiscountAmount ?? 0;
+    if (a < 1) throw new Error("giftDiscountAmount must be ≥ 1");
+  }
+
+  // Retry loop for the extremely-rare code collision.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateRedemptionCode();
+    try {
+      const created = await prisma.redemption.create({
+        data: {
+          customerId: params.customerId,
+          programId: null,                              // gifts don't belong to a program
+          kind: params.kind,
+          code,
+          expiresAt,
+          giftMenuItemId: params.giftMenuItemId ?? null,
+          giftDiscountPct: params.giftDiscountPct ?? null,
+          giftDiscountAmount: params.giftDiscountAmount ?? null,
+          giftedByUserId: params.ownerUserId,
+          giftNote: params.giftNote ?? null,
+        },
+        select: { id: true, code: true, expiresAt: true },
+      });
+      return created as { id: string; code: string; expiresAt: Date };
+    } catch (err) {
+      // Collision → retry with a fresh code. Any other error → bubble up.
+      const msg = err instanceof Error ? err.message : "";
+      if (!msg.includes("Redemption_code_key")) throw err;
+    }
+  }
+  throw new Error("Could not generate a unique redemption code after 5 tries");
+}
+
+/**
+ * Preview a gift code against a cart — returns the line that WOULD be added
+ * plus a description string for UI, without touching the DB. Used by
+ * /api/rewards/preview-code so the customer can see the discount before submit.
+ *
+ * Also serves as the source of truth for the discount math: applyGiftAtCheckout
+ * calls this with the same inputs to construct the actual $-negative line.
+ */
+export type GiftLine = {
+  menuItemId: string | null;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  note: string;
+};
+
+export type CodePreviewResult =
+  | { ok: false; error: "invalid" | "expired" | "already_used" | "not_your_dealer" | "empty_cart" }
+  | { ok: true; description: string; line: GiftLine; redemptionId: string; kind: GiftKind };
+
+export async function previewRedemptionCode(params: {
+  code: string;
+  dealerSlug: string;
+  cartItems: unknown;
+}): Promise<CodePreviewResult> {
+  const normalized = params.code.trim().toUpperCase();
+  if (!/^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(normalized)) return { ok: false, error: "invalid" };
+
+  const red = await prisma.redemption.findUnique({
+    where: { code: normalized },
+    select: {
+      id: true,
+      status: true,
+      kind: true,
+      expiresAt: true,
+      orderId: true,
+      giftDiscountPct: true,
+      giftDiscountAmount: true,
+      giftMenuItemId: true,
+      customer: { select: { phone: true } },
+    },
+  });
+  if (!red) return { ok: false, error: "invalid" };
+  if (red.status !== RedemptionStatus.READY || red.orderId) return { ok: false, error: "already_used" };
+  if (red.expiresAt.getTime() < Date.now()) return { ok: false, error: "expired" };
+
+  // Soft-scope: the customer this code was gifted to must have ordered from
+  // THIS dealer at least once. Otherwise codes could be redeemed across restas
+  // by anyone who guesses them.
+  const dealer = await prisma.dealer.findUnique({
+    where: { slug: params.dealerSlug },
+    select: { id: true },
+  });
+  if (!dealer) return { ok: false, error: "invalid" };
+  const anyOrder = await prisma.order.findFirst({
+    where: { customerId: (await prisma.customer.findUnique({ where: { phone: red.customer.phone }, select: { id: true } }))?.id, restauranteSlug: params.dealerSlug },
+    select: { id: true },
+  });
+  if (!anyOrder) return { ok: false, error: "not_your_dealer" };
+
+  // Compute the line based on kind.
+  const kind = red.kind as GiftKind;
+  const items = Array.isArray(params.cartItems) ? params.cartItems : [];
+  if (items.length === 0) return { ok: false, error: "empty_cart" };
+
+  const subtotal = items.reduce((s: number, it: { unitPrice?: number; quantity?: number; total?: number; priceOverride?: number | null; optionsDelta?: number | null }) => {
+    const unit = it.priceOverride ?? ((it.unitPrice ?? 0) + (it.optionsDelta ?? 0));
+    return s + unit * (it.quantity ?? 1);
+  }, 0);
+
+  if (kind === "GIFT_ITEM") {
+    const item = await prisma.menuItem.findUnique({
+      where: { id: red.giftMenuItemId ?? "" },
+      select: { id: true, name: true, category: { select: { dealerId: true } } },
+    });
+    if (!item || item.category.dealerId !== dealer.id) return { ok: false, error: "invalid" };
+    return {
+      ok: true,
+      description: `${item.name} gratis`,
+      redemptionId: red.id,
+      kind,
+      line: {
+        menuItemId: item.id,
+        name: `🎁 ${item.name} (regalo)`,
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        note: "Canje de código de regalo",
+      },
+    };
+  }
+
+  if (kind === "GIFT_DISCOUNT_PCT") {
+    const pct = red.giftDiscountPct ?? 0;
+    // Clamp so total stays ≥ 1 (never zero / never negative — createOrder rejects).
+    const rawDiscount = Math.round(subtotal * (pct / 100));
+    const discount = Math.max(0, Math.min(subtotal - 1, rawDiscount));
+    return {
+      ok: true,
+      description: `${pct}% off — $${discount.toLocaleString("es-AR")} de descuento`,
+      redemptionId: red.id,
+      kind,
+      line: {
+        menuItemId: null,
+        name: `🎁 Descuento ${pct}% (regalo)`,
+        quantity: 1,
+        unitPrice: -discount,
+        total: -discount,
+        note: "Canje de código de regalo",
+      },
+    };
+  }
+
+  if (kind === "GIFT_DISCOUNT_AMOUNT") {
+    const amount = red.giftDiscountAmount ?? 0;
+    const discount = Math.max(0, Math.min(subtotal - 1, amount));
+    return {
+      ok: true,
+      description: `$${discount.toLocaleString("es-AR")} de descuento`,
+      redemptionId: red.id,
+      kind,
+      line: {
+        menuItemId: null,
+        name: `🎁 Descuento $${amount.toLocaleString("es-AR")} (regalo)`,
+        quantity: 1,
+        unitPrice: -discount,
+        total: -discount,
+        note: "Canje de código de regalo",
+      },
+    };
+  }
+
+  return { ok: false, error: "invalid" };
 }
 
 /**

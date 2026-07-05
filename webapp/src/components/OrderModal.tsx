@@ -98,6 +98,16 @@ export function OrderModal({
   // Optional pre-order comprobante URL when the customer uploads at checkout.
   const [checkoutReceiptUrl, setCheckoutReceiptUrl] = useState<string | null>(null);
   const [copiedAlias, setCopiedAlias] = useState(false);
+  // Optional gift code entry — code was WhatsApp'd to the customer by the
+  // owner. Server validates and computes the discount preview.
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [codeState, setCodeState] = useState<
+    | { status: "idle" }
+    | { status: "checking" }
+    | { status: "ok"; code: string; description: string; discountAmount: number }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
   // Soft-intercept: when transfer/MP is picked and no receipt is attached, the
   // Send button shows a one-step nudge instead of firing immediately. Customer
   // can choose to upload or send anyway. Improves attach rate without forcing.
@@ -165,7 +175,55 @@ export function OrderModal({
     (deliveryConfig.deliveryFee != null && deliveryConfig.deliveryFee > 0)
   );
   const deliveryFee = deliveryMethod === "pickup" ? 0 : (deliveryResult?.fee ?? 0);
-  const grandTotal = total + deliveryFee;
+  // Reflect any pending redemption code discount in the visible total. Discount
+  // amounts are ≥0 pesos (server clamps to subtotal-1 so the total stays ≥ $1).
+  const codeDiscount = codeState.status === "ok" ? codeState.discountAmount : 0;
+  const grandTotal = total + deliveryFee - codeDiscount;
+
+  async function validateCode(raw: string) {
+    const normalized = raw.trim().toUpperCase();
+    if (!normalized) { setCodeState({ status: "idle" }); return; }
+    setCodeState({ status: "checking" });
+    try {
+      const res = await fetch("/api/rewards/preview-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: normalized,
+          dealerSlug: restauranteSlug,
+          cartItems: items.map((ci) => ({
+            unitPrice: ci.item.price,
+            optionsDelta: ci.optionsDelta,
+            quantity: ci.quantity,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        // Extract discount amount from the line (unitPrice is negative for
+        // discounts; 0 for free item). Use absolute value.
+        const discountAmount = data.line ? Math.abs(data.line.unitPrice * data.line.quantity) : 0;
+        setCodeState({ status: "ok", code: normalized, description: data.description, discountAmount });
+      } else {
+        const messages: Record<string, string> = {
+          invalid: "Código no válido",
+          expired: "Este código ya venció",
+          already_used: "Este código ya fue canjeado",
+          not_your_dealer: "Este código no aplica en este restaurante",
+          empty_cart: "Agregá algo al carrito antes de aplicar el código",
+          rate_limited: "Muchos intentos. Esperá un momento.",
+        };
+        setCodeState({ status: "error", message: messages[data.error] || "No se pudo aplicar el código" });
+      }
+    } catch {
+      setCodeState({ status: "error", message: "Error de conexión" });
+    }
+  }
+
+  function clearCode() {
+    setCodeInput("");
+    setCodeState({ status: "idle" });
+  }
   const isOutOfRange = deliveryMethod === "delivery" && deliveryResult?.zone === null && deliveryResult !== null;
 
   // Price range text for delivery option — shown BEFORE the customer picks a
@@ -367,6 +425,8 @@ _Pedido realizado desde MenuSanJuan_`;
           notes,
           paymentIntent,
           paymentReceiptUrl: checkoutReceiptUrl,
+          // Optional gift code — server re-validates before applying.
+          redemptionCode: codeState.status === "ok" ? codeState.code : undefined,
         }),
       });
 
@@ -774,6 +834,68 @@ _Pedido realizado desde MenuSanJuan_`;
                   <span className="text-text-secondary">Subtotal</span>
                   <span className="font-semibold text-text">${total.toLocaleString("es-AR")}</span>
                 </div>
+
+                {/* Gift code entry — collapsed by default. Owner sends the
+                    code via WhatsApp; customer types it here. */}
+                {codeState.status === "ok" ? (
+                  <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">🎁 Código aplicado: {codeState.code}</div>
+                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 truncate">{codeState.description}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearCode}
+                      className="text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-2"
+                      aria-label="Quitar código"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ) : codeOpen ? (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={codeInput}
+                        onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+                        onBlur={() => validateCode(codeInput)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); validateCode(codeInput); } }}
+                        placeholder="XXXX-XXXX"
+                        maxLength={9}
+                        className="flex-1 rounded-lg border border-border/50 bg-surface-alt px-3 py-2 text-sm uppercase tracking-widest text-text"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => validateCode(codeInput)}
+                        disabled={codeState.status === "checking" || !codeInput.trim()}
+                        className="rounded-lg bg-primary text-white px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      >
+                        {codeState.status === "checking" ? "…" : "Aplicar"}
+                      </button>
+                    </div>
+                    {codeState.status === "error" && (
+                      <div className="text-[11px] text-red-500">{codeState.message}</div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setCodeOpen(true)}
+                    className="mt-2 text-xs text-primary hover:underline"
+                  >
+                    ¿Tenés un código de descuento?
+                  </button>
+                )}
+
+                {codeState.status === "ok" && codeState.discountAmount > 0 && (
+                  <div className="flex justify-between py-1 text-sm">
+                    <span className="text-emerald-600 dark:text-emerald-400">Descuento (regalo)</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">−${codeState.discountAmount.toLocaleString("es-AR")}</span>
+                  </div>
+                )}
+
                 {deliveryMethod === "delivery" && deliveryFee > 0 && (
                   <div className="flex justify-between py-1 text-sm">
                     <span className="text-text-secondary">Envío ({deliveryResult?.zone === "close" ? "zona cercana" : "zona lejana"})</span>

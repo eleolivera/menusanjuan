@@ -12,9 +12,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Users, MessageCircle, Search, Eye, EyeOff, Gift, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { WhatsAppComposerModal, type ComposerCustomer, type ComposerProgram } from "@/components/restaurante/WhatsAppComposerModal";
+import { GiftRewardModal, type GiftResult } from "@/components/restaurante/GiftRewardModal";
 import type { CustomersResponse, CustomerRow } from "@/app/api/restaurante/customers/route";
 
-type Filter = "all" | "vip" | "recurring" | "new" | "dormant" | "near" | "eligible" | "ready";
+type Filter = "all" | "vip" | "recurring" | "new" | "dormant" | "near" | "eligible" | "ready" | "no-google";
 type SortKey = "name" | "orders" | "ltv" | "recent" | "punches";
 type SortDir = "asc" | "desc";
 
@@ -42,6 +43,9 @@ export default function ClientesPage() {
   const [search, setSearch] = useState("");
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [composerFor, setComposerFor] = useState<CustomerRow | null>(null);
+  const [composerPrefill, setComposerPrefill] = useState<string | null>(null);
+  const [giftFor, setGiftFor] = useState<CustomerRow | null>(null);
+  const [menuItems, setMenuItems] = useState<Array<{ id: string; name: string; category: string }>>([]);
   const [page, setPage] = useState(0);
 
   // Any change to filter/sort/search resets pagination to page 1 so the
@@ -73,6 +77,13 @@ export default function ClientesPage() {
     fetch("/api/restaurante/profile")
       .then((r) => (r.ok ? r.json() : null))
       .then((p) => { if (p?.name) setRestaurantName(p.name); })
+      .catch(() => {});
+
+    // Prefetch menu items — needed by GiftRewardModal when the owner picks
+    // "Ítem gratis". Reuses the rewards endpoint which already scopes to dealer.
+    fetch("/api/restaurante/rewards")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.menuItems) setMenuItems(d.menuItems); })
       .catch(() => {});
   }, [router]);
 
@@ -108,6 +119,9 @@ export default function ClientesPage() {
         break;
       case "ready":
         rows = rows.filter((r) => r.redemptionsReady > 0);
+        break;
+      case "no-google":
+        rows = rows.filter((r) => !r.hasGoogleSignIn);
         break;
     }
     const sorted = [...rows].sort((a, b) => {
@@ -255,6 +269,11 @@ export default function ClientesPage() {
             <FilterPill active={filter === "ready"} onClick={() => setFilter("ready")} label="Con premio activo" />
           </>
         )}
+        <FilterPill
+          active={filter === "no-google"}
+          onClick={() => setFilter("no-google")}
+          label={`Sin Google (${data.customers.filter((c) => !c.hasGoogleSignIn).length})`}
+        />
       </section>
 
       {/* Table */}
@@ -284,9 +303,25 @@ export default function ClientesPage() {
                 return (
                   <tr key={row.customerId} className="hover:bg-white/[0.02]">
                     <td className="px-4 py-3">
-                      <div className="text-white font-medium">{name}</div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-white font-medium truncate">{name}</span>
+                        {row.hasGoogleSignIn ? (
+                          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300" title="Cuenta con Google conectada">
+                            Google ✓
+                          </span>
+                        ) : (
+                          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-slate-700/40 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400" title="Sin Google — puede canjear regalos con código, pero no acumula puntos aún">
+                            Sin Google
+                          </span>
+                        )}
+                        {row.giftsReady > 0 && (
+                          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-primary" title="Regalos pendientes de canjear">
+                            🎁 {row.giftsReady}
+                          </span>
+                        )}
+                      </div>
                       {row.deliveredOrders !== row.totalOrders && (
-                        <div className="text-[11px] text-slate-500">{row.deliveredOrders} entregado{row.deliveredOrders === 1 ? "" : "s"}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">{row.deliveredOrders} entregado{row.deliveredOrders === 1 ? "" : "s"}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -319,13 +354,23 @@ export default function ClientesPage() {
                       </td>
                     )}
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => setComposerFor(row)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 px-3 py-1.5 text-xs font-medium"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        WhatsApp
-                      </button>
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          onClick={() => setGiftFor(row)}
+                          title="Regalar un descuento o ítem"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary px-2.5 py-1.5 text-xs font-medium"
+                        >
+                          <Gift className="h-3.5 w-3.5" />
+                          Regalar
+                        </button>
+                        <button
+                          onClick={() => setComposerFor(row)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 px-2.5 py-1.5 text-xs font-medium"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          WhatsApp
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -389,10 +434,33 @@ export default function ClientesPage() {
             punches: composerFor.punches,
             daysSinceLastOrder: composerFor.daysSinceLastOrder,
             redemptionsReady: composerFor.redemptionsReady,
+            hasGoogleSignIn: composerFor.hasGoogleSignIn,
+            giftsReady: composerFor.giftsReady,
           } satisfies ComposerCustomer}
           restaurantName={restaurantName}
           program={composerProgram}
-          onClose={() => setComposerFor(null)}
+          prefillText={composerPrefill ?? undefined}
+          onClose={() => { setComposerFor(null); setComposerPrefill(null); }}
+        />
+      )}
+
+      {giftFor && (
+        <GiftRewardModal
+          customerId={giftFor.customerId}
+          customerLabel={giftFor.displayName || giftFor.lastCustomerName || giftFor.phone}
+          menuItems={menuItems}
+          onClose={() => setGiftFor(null)}
+          onGifted={(result: GiftResult) => {
+            // Prepare a WhatsApp handoff: pre-fill the composer with a gift-notify
+            // message including the newly-generated code.
+            const fn = (giftFor.displayName || giftFor.lastCustomerName || "").split(/\s+/)[0] || "";
+            const hola = fn ? `Hola ${fn}!` : "¡Hola!";
+            const rest = restaurantName ? ` en ${restaurantName}` : "";
+            const message = `${hola} 🎁 Te regalamos ${result.description}${rest}. Usá el código *${result.code}* en tu próximo pedido para canjearlo.`;
+            setComposerPrefill(message);
+            setComposerFor(giftFor);
+            setGiftFor(null);
+          }}
         />
       )}
       </div>

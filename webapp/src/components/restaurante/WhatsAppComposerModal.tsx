@@ -19,6 +19,10 @@ export type ComposerCustomer = {
   daysSinceLastOrder: number | null;
   /** Customer has ≥1 READY redemption for this dealer — reward-ready template. */
   redemptionsReady?: number;
+  /** Customer has linked Google — drives the google-signup nudge template. */
+  hasGoogleSignIn?: boolean;
+  /** Customer has ≥1 READY gift Redemption. */
+  giftsReady?: number;
 };
 
 export type ComposerProgram = {
@@ -30,11 +34,16 @@ export function WhatsAppComposerModal({
   customer,
   restaurantName,
   program,
+  prefillText,
   onClose,
 }: {
   customer: ComposerCustomer;
   restaurantName: string;
   program: ComposerProgram;
+  /** Optional pre-filled message body — used by gift-followup handoff where
+   *  the composer opens with a code already interpolated. Overrides template
+   *  auto-select. */
+  prefillText?: string;
   onClose: () => void;
 }) {
   const displayName = customer.displayName || customer.lastCustomerName || null;
@@ -62,9 +71,9 @@ export function WhatsAppComposerModal({
     return TEMPLATES[0];
   }, [program, customer]);
 
-  const [selectedId, setSelectedId] = useState(initialTemplate.id);
-  const [text, setText] = useState(() => initialTemplate.render(vars));
-  const [customized, setCustomized] = useState(false);
+  const [selectedId, setSelectedId] = useState(prefillText ? "custom" : initialTemplate.id);
+  const [text, setText] = useState(() => prefillText ?? initialTemplate.render(vars));
+  const [customized, setCustomized] = useState(Boolean(prefillText));
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
