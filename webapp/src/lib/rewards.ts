@@ -5,6 +5,7 @@
 import { prisma } from "./prisma";
 import type { Prisma, PrismaClient } from "@/generated/prisma";
 import { RedemptionStatus } from "@/generated/prisma";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 // Master feature-flag gate. Every route + every UI component should call
 // this — if false, all rewards code is dark and routes return 404.
@@ -15,12 +16,39 @@ export function rewardsFlag(): boolean {
 type Tx = Prisma.TransactionClient | PrismaClient;
 
 /**
- * Find-or-create a Customer keyed by E.164 phone. Returns the row.
+ * Canonicalize a raw phone string to E.164 for Customer.phone lookups.
+ * AR mobile numbers ALWAYS end up as `+549…` regardless of whether the input
+ * was `+54…` (no 9), plain `264…`, or already `+549…`. This is the same
+ * convention formatForWhatsApp() uses, so backfilled Customers match what
+ * new orders + rewards-progress lookups will produce.
+ *
+ * Returns null when libphonenumber can't parse the input — caller decides
+ * whether to skip or fall back to raw.
+ */
+export function normalizePhoneE164(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const parsed = parsePhoneNumberFromString(raw.trim(), "AR");
+  if (!parsed || !parsed.isValid()) return null;
+  const country = parsed.countryCallingCode;
+  const national = parsed.nationalNumber;
+  if (country === "54") {
+    let arNum = national.replace(/^0/, "").replace(/^15/, "");
+    if (!arNum.startsWith("9")) arNum = "9" + arNum;
+    return `+54${arNum}`;
+  }
+  return parsed.number; // already E.164 for non-AR
+}
+
+/**
+ * Find-or-create a Customer keyed by canonical E.164 phone. Returns the row.
  * Called from /api/orders POST so that every order links to a customer.
  * Safe to call without the rewards flag — it just creates the row.
+ * Falls back to the raw input if normalization fails (so callers who already
+ * validated with isValidPhone still succeed).
  */
 export async function upsertCustomerByPhone(phone: string, displayName?: string, tx: Tx = prisma) {
-  const existing = await tx.customer.findUnique({ where: { phone } });
+  const canonical = normalizePhoneE164(phone) || phone;
+  const existing = await tx.customer.findUnique({ where: { phone: canonical } });
   if (existing) {
     if (displayName && !existing.displayName) {
       return tx.customer.update({
@@ -34,7 +62,7 @@ export async function upsertCustomerByPhone(phone: string, displayName?: string,
     });
   }
   return tx.customer.create({
-    data: { phone, displayName: displayName || null },
+    data: { phone: canonical, displayName: displayName || null },
   });
 }
 
@@ -145,7 +173,8 @@ export async function getEligibleProgramFor(customerId: string, dealerId: string
  */
 export async function getProgressByPhoneForDealer(phone: string, dealerId: string) {
   if (!rewardsFlag()) return null;
-  const customer = await prisma.customer.findUnique({ where: { phone }, select: { id: true } });
+  const canonical = normalizePhoneE164(phone) || phone;
+  const customer = await prisma.customer.findUnique({ where: { phone: canonical }, select: { id: true } });
   if (!customer) {
     // Customer hasn't ordered yet. Still surface the program so the store
     // page can display the goal copy.
