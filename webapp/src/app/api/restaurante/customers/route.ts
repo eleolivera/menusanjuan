@@ -150,7 +150,7 @@ export async function GET() {
            COUNT(*) FILTER (WHERE r."status" = 'READY')::bigint AS ready
       FROM "Redemption" r
      WHERE r."customerId" = ANY(${customerIds}::text[])
-       AND r."kind" LIKE 'GIFT_%'
+       AND r."kind" IN ('GIFT_ITEM'::"RedemptionKind", 'GIFT_DISCOUNT_PCT'::"RedemptionKind", 'GIFT_DISCOUNT_AMOUNT'::"RedemptionKind")
      GROUP BY r."customerId"
   `;
   const giftMap = new Map<string, number>(giftRows.map((r) => [r.customerId, Number(r.ready)]));
