@@ -47,13 +47,17 @@ export async function GET(request: NextRequest) {
   }
 
   // Customer.googleSub: null means they haven't done the one-time claim yet.
-  // When they're eligible but not signed in, the badge nudges them to sign in.
+  // Two related flags exposed to the client:
+  //   hasGoogleSignIn — status flag (drives the accrue+nudge state D)
+  //   needsGoogleSignIn — computed "eligible AND no google" (legacy field used
+  //   by the pre-linkage badge — kept for compatibility while we roll out).
   const canonical = normalizePhoneE164(phone) || phone;
   const customer = await prisma.customer.findUnique({
     where: { phone: canonical },
     select: { googleSub: true },
   });
-  const needsGoogleSignIn = data.eligible && !customer?.googleSub;
+  const hasGoogleSignIn = Boolean(customer?.googleSub);
+  const needsGoogleSignIn = data.eligible && !hasGoogleSignIn;
 
   return NextResponse.json({
     enabled: true,
@@ -64,6 +68,7 @@ export async function GET(request: NextRequest) {
     rewardDescription: data.program.description,
     eligible: data.eligible,
     hasActiveRedemption: Boolean(data.activeRedemption),
+    hasGoogleSignIn,
     needsGoogleSignIn,
     requiresItemNames,
   });

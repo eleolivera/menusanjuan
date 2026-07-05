@@ -17,6 +17,7 @@ type Progress = {
   rewardDescription?: string;
   eligible?: boolean;
   hasActiveRedemption?: boolean;
+  hasGoogleSignIn?: boolean;
   needsGoogleSignIn?: boolean;
   requiresItemNames?: string[];
 };
@@ -25,15 +26,17 @@ const REWARDS_FLAG = process.env.NEXT_PUBLIC_REWARDS_ENABLED === "true";
 
 export function RewardBadge({ slug }: { slug: string }) {
   const [data, setData] = useState<Progress | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
 
   useEffect(() => {
     if (!REWARDS_FLAG) return;
     // Phone lives in the same localStorage key the customer info step writes
     // — see OrderModal.tsx. We treat its absence as "first-time visitor" and
     // show the program copy with 0/N.
-    const phone = readStoredPhone();
-    const url = phone
-      ? `/api/rewards/progress?slug=${encodeURIComponent(slug)}&phone=${encodeURIComponent(phone)}`
+    const stored = readStoredPhone();
+    setPhone(stored);
+    const url = stored
+      ? `/api/rewards/progress?slug=${encodeURIComponent(slug)}&phone=${encodeURIComponent(stored)}`
       : null;
     if (!url) {
       // Still fetch program copy with a dummy-but-valid phone — actually, we
@@ -46,6 +49,18 @@ export function RewardBadge({ slug }: { slug: string }) {
       .then(setData)
       .catch(() => setData({ enabled: false }));
   }, [slug]);
+
+  // Build the sign-in URL. Passing phone through OAuth state is what makes
+  // the callback merge Google into the pre-existing phone-Customer instead
+  // of creating a fresh `google:sub` orphan (see customer-auth.ts).
+  const signInHref = (() => {
+    const params = new URLSearchParams({
+      intent: "customer",
+      redirect: `/${slug}`,
+    });
+    if (phone) params.set("phone", phone);
+    return `/api/auth/google?${params.toString()}`;
+  })();
 
   if (!REWARDS_FLAG) return null;
   if (!data?.enabled) return null;
@@ -70,7 +85,7 @@ export function RewardBadge({ slug }: { slug: string }) {
             </div>
           </div>
           <a
-            href={`/api/auth/google?intent=customer&redirect=${encodeURIComponent(`/${slug}`)}`}
+            href={signInHref}
             className="whitespace-nowrap rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-white"
           >
             Iniciar sesión
@@ -99,6 +114,11 @@ export function RewardBadge({ slug }: { slug: string }) {
     );
   }
 
+  // State D: accruing + phone customer exists but hasn't linked Google yet.
+  // Show a subtle sign-in nudge below the progress bar so returning customers
+  // discover the program and don't lose progress if their localStorage clears.
+  const showAccruingNudge = punches > 0 && data.hasGoogleSignIn === false;
+
   return (
     <div className="mx-auto max-w-7xl px-4 mt-3">
       <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 flex items-center gap-3">
@@ -111,6 +131,12 @@ export function RewardBadge({ slug }: { slug: string }) {
           <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
             <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
           </div>
+          {showAccruingNudge && (
+            <div className="mt-2 text-[11px] text-slate-300 flex items-center gap-2">
+              <span>Iniciá sesión con Google para no perder tus puntos</span>
+              <a href={signInHref} className="rounded bg-primary/20 hover:bg-primary/30 px-2 py-0.5 font-semibold text-primary">Activar</a>
+            </div>
+          )}
         </div>
         <div className="text-xs font-bold text-primary whitespace-nowrap">
           {punches} / {need}

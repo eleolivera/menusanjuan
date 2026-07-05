@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/restaurante/login?error=google_expired", request.url));
   }
 
-  let savedState: { state: string; redirect: string };
+  let savedState: { state: string; redirect: string; intent?: string; phone?: string | null };
   try {
     savedState = JSON.parse(stateCookie);
   } catch {
@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
     // Customer-side flow (rewards). The owner branch below only runs for the
     // default intent. Customer intent is encoded in the state cookie so the
     // attacker can't simply flip a URL param to escalate.
-    if ((savedState as { intent?: string }).intent === "customer") {
-      const customerRedirect = await handleCustomerGoogleCallback(googleUser, savedState.redirect);
+    if (savedState.intent === "customer") {
+      const customerRedirect = await handleCustomerGoogleCallback(googleUser, savedState.redirect, savedState.phone ?? null);
       return NextResponse.redirect(new URL(customerRedirect, request.url));
     }
 

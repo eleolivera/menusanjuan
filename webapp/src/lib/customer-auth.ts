@@ -91,6 +91,7 @@ export async function getCustomerFromSession() {
 export async function handleCustomerGoogleCallback(
   googleUser: GoogleUserInfo,
   redirect: string,
+  phoneFromState: string | null = null,
 ): Promise<string> {
   // Look up by Google sub first — fastest path for returning customers.
   const existingByGoogle = await prisma.customer.findUnique({
@@ -104,6 +105,38 @@ export async function handleCustomerGoogleCallback(
       data: { lastSeenAt: new Date(), googleEmail: googleUser.email, displayName: googleUser.name || existingByGoogle.displayName },
     });
     return appendError(redirect, null);
+  }
+
+  // Phone-in-state branch: the store-page sign-in button forwards the
+  // customer's phone through the OAuth state so we can link Google to the
+  // pre-existing phone-Customer instead of creating a `google:sub` orphan.
+  //
+  // Without this branch, first-time Google Sign-In creates a fresh Customer
+  // (phone=google:sub), the customer's punches on the phone-Customer stay
+  // orphaned, and the fraud gate on applyPendingRedemption never opens.
+  if (phoneFromState) {
+    const byPhone = await prisma.customer.findUnique({
+      where: { phone: phoneFromState },
+    });
+    if (byPhone) {
+      if (byPhone.googleSub && byPhone.googleSub !== googleUser.sub) {
+        // Someone else already linked their Google to this phone. Refuse to
+        // silently overwrite — same reasoning as the cookie-based branch.
+        return appendError(redirect, "google_phone_mismatch");
+      }
+      await prisma.customer.update({
+        where: { id: byPhone.id },
+        data: {
+          googleSub: googleUser.sub,
+          googleEmail: googleUser.email,
+          displayName: byPhone.displayName || googleUser.name,
+          lastSeenAt: new Date(),
+        },
+      });
+      await setCustomerSession(byPhone.id);
+      return appendError(redirect, null);
+    }
+    // No phone match → fall through to cookie / brand-new paths.
   }
 
   // No customer with this Google sub yet. Two cases left:
