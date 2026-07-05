@@ -12,6 +12,7 @@ import { computeCartTotal } from "@/lib/money";
 import { rewardsFlag, upsertCustomerByPhone, applyPendingRedemption, attachRedemptionToOrder, previewRedemptionCode } from "@/lib/rewards";
 import { isValidPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
+import { getCustomerFromSession } from "@/lib/customer-auth";
 
 // POST — create a new order
 export async function POST(request: NextRequest) {
@@ -109,23 +110,35 @@ export async function POST(request: NextRequest) {
     }
 
     // (a) Punch-earned auto-apply (only fires if we didn't already apply a code).
+    //
+    // SECURITY: the browser session cookie MUST identify the same Customer
+    // whose phone was typed. Without this check, anyone who knows Ana's
+    // phone could type it at checkout, hit upsertCustomerByPhone, and get
+    // Ana's Google-linked Redemption applied to their own delivery address.
+    // Google Sign-In protects the account identity, but the fraud gate needs
+    // proof-of-ownership at the consumption moment too. Legit customers who
+    // signed in via /mis-recompensas or the store-page badge already have
+    // this cookie set; anyone else silently skips auto-apply.
     if (!pendingRedemptionId && customerId) {
       try {
-        const dealer = await prisma.dealer.findUnique({
-          where: { slug: restauranteSlug },
-          select: { id: true },
-        });
-        if (dealer) {
-          const result = await applyPendingRedemption({
-            customerId,
-            dealerId: dealer.id,
-            dealerSlug: restauranteSlug,
-            cartItems: items,
+        const sessionCustomer = await getCustomerFromSession();
+        if (sessionCustomer && sessionCustomer.id === customerId) {
+          const dealer = await prisma.dealer.findUnique({
+            where: { slug: restauranteSlug },
+            select: { id: true },
           });
-          if (result.redemptionId) {
-            effectiveItems = result.items as typeof items;
-            effectiveTotal = computeCartTotal(effectiveItems);
-            pendingRedemptionId = result.redemptionId;
+          if (dealer) {
+            const result = await applyPendingRedemption({
+              customerId,
+              dealerId: dealer.id,
+              dealerSlug: restauranteSlug,
+              cartItems: items,
+            });
+            if (result.redemptionId) {
+              effectiveItems = result.items as typeof items;
+              effectiveTotal = computeCartTotal(effectiveItems);
+              pendingRedemptionId = result.redemptionId;
+            }
           }
         }
       } catch (err) {
