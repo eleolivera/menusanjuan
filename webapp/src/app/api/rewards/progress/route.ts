@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rewardsFlag, getProgressByPhoneForDealer, normalizePhoneE164 } from "@/lib/rewards";
 import { isValidPhone } from "@/lib/phone";
+import { getCustomerFromSession } from "@/lib/customer-auth";
 
 export async function GET(request: NextRequest) {
   if (!rewardsFlag()) return new NextResponse("Not found", { status: 404 });
@@ -46,17 +47,23 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Customer.googleSub: null means they haven't done the one-time claim yet.
-  // Two related flags exposed to the client:
-  //   hasGoogleSignIn — status flag (drives the accrue+nudge state D)
-  //   needsGoogleSignIn — computed "eligible AND no google" (legacy field used
-  //   by the pre-linkage badge — kept for compatibility while we roll out).
+  // "Am I signed in?" — resolved by two independent signals:
+  //  1. The customer session cookie (authoritative — proves the browser owns
+  //     the Google-linked identity right now)
+  //  2. The Customer row at this phone has googleSub set (proves an account
+  //     exists, but doesn't prove THIS browser owns it)
+  //
+  // The badge should treat signal (1) as the source of truth. When the user
+  // has an active customer session on ANY Google-linked Customer, treat them
+  // as signed in — even if their localStorage phone happens to map to a
+  // different Customer (e.g. an old phone from a previous session). Fixes
+  // the "I signed in but the badge still says 'Iniciá sesión'" UX bug.
   const canonical = normalizePhoneE164(phone) || phone;
-  const customer = await prisma.customer.findUnique({
-    where: { phone: canonical },
-    select: { googleSub: true },
-  });
-  const hasGoogleSignIn = Boolean(customer?.googleSub);
+  const [customer, sessionCustomer] = await Promise.all([
+    prisma.customer.findUnique({ where: { phone: canonical }, select: { googleSub: true } }),
+    getCustomerFromSession(),
+  ]);
+  const hasGoogleSignIn = Boolean(customer?.googleSub) || Boolean(sessionCustomer?.googleSub);
   const needsGoogleSignIn = data.eligible && !hasGoogleSignIn;
 
   return NextResponse.json({

@@ -20,6 +20,10 @@ type SessionData = {
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [session, setSession] = useState<SessionData>(null);
+  // `sessionLoaded` gates the "Iniciar Sesión" fallback so it doesn't flicker
+  // on-then-off during the initial fetch. Rendered as `null` until we know.
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [customerSignedIn, setCustomerSignedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -33,16 +37,26 @@ export function Header() {
           const ad = await a.json().catch(() => null);
           if (ad?.authenticated) {
             setSession(null);
+            setSessionLoaded(true);
             return;
           }
         }
       } catch {}
       try {
         const r = await fetch("/api/restaurante/session");
-        if (!r.ok) return;
-        const data = await r.json();
-        if (data?.authenticated) setSession(data);
+        if (r.ok) {
+          const data = await r.json();
+          if (data?.authenticated) setSession(data);
+        }
       } catch {}
+      // Customer session check (rewards / /mis-recompensas). Separate cookie
+      // from the owner one — a user can be signed in as customer without
+      // being an owner. Endpoint returns 401 when no cookie / expired.
+      try {
+        const c = await fetch("/api/mis-recompensas");
+        setCustomerSignedIn(c.ok);
+      } catch {}
+      setSessionLoaded(true);
     })();
   }, []);
 
@@ -197,11 +211,25 @@ export function Header() {
                 </div>
               )}
             </div>
+          ) : sessionLoaded ? (
+            customerSignedIn ? (
+              // Customer session active but no owner session — show a "Mis
+              // premios" link to the rewards page instead of the misleading
+              // owner-login button.
+              <Link href="/mis-recompensas"
+                className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-all">
+                🎁 Mis premios
+              </Link>
+            ) : (
+              <Link href="/restaurante/login"
+                className="rounded-xl border border-border/60 px-3 py-2 text-xs sm:text-sm font-medium text-text-secondary hover:border-primary/40 hover:text-primary transition-all">
+                Iniciar Sesión
+              </Link>
+            )
           ) : (
-            <Link href="/restaurante/login"
-              className="rounded-xl border border-border/60 px-3 py-2 text-xs sm:text-sm font-medium text-text-secondary hover:border-primary/40 hover:text-primary transition-all">
-              Iniciar Sesión
-            </Link>
+            // Still loading — reserve the space but render nothing so the
+            // page doesn't flash 'Iniciar Sesión' before we know.
+            <div className="w-[110px]" />
           )}
 
           {/* Mobile hamburger */}
