@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DashboardShell } from "@/components/restaurante/DashboardShell";
 import { Gift, Save } from "lucide-react";
 
 type MenuItem = { id: string; name: string; price: number; category: string };
@@ -97,22 +96,19 @@ export default function RewardsPage() {
   }
 
   if (!data) {
-    return <DashboardShell><div className="p-8 text-slate-400">Cargando…</div></DashboardShell>;
+    return <div className="p-8 text-slate-400">Cargando…</div>;
   }
   if (data.menuItems.length === 0) {
     return (
-      <DashboardShell>
-        <div className="p-8 max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-white mb-2">Rewards</h1>
-          <p className="text-slate-400">Antes de configurar un programa de premios, agregá al menos un item en tu menú.</p>
-        </div>
-      </DashboardShell>
+      <div className="p-8 max-w-2xl mx-auto">
+        <h1 className="text-2xl font-bold text-white mb-2">Rewards</h1>
+        <p className="text-slate-400">Antes de configurar un programa de premios, agregá al menos un item en tu menú.</p>
+      </div>
     );
   }
 
   return (
-    <DashboardShell>
-      <div className="p-6 sm:p-8 max-w-3xl mx-auto space-y-6">
+    <div className="p-6 sm:p-8 max-w-3xl mx-auto space-y-6">
         <div>
           <h1 className="inline-flex items-center gap-2 text-2xl font-bold text-white">
             <Gift className="h-6 w-6 text-primary" strokeWidth={2} />
@@ -221,7 +217,6 @@ export default function RewardsPage() {
           </button>
         </div>
       </div>
-    </DashboardShell>
   );
 }
 
