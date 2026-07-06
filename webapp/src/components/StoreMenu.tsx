@@ -99,7 +99,9 @@ export function StoreMenu({
   // Redemption for this dealer, we surface it in the FloatingCart + OrderModal
   // so the free item is visible BEFORE submit (previously appeared only in the
   // post-submit confirmation, causing 'why isn't it free?' confusion).
-  const [rewardReady, setRewardReady] = useState<{ rewardItemName: string } | null>(null);
+  const [rewardReady, setRewardReady] = useState<
+    { rewardItemName: string; rewardItemId: string | null; rewardItemPrice: number | null } | null
+  >(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -110,10 +112,14 @@ export function StoreMenu({
     // the reward WILL apply on submit (eligible + signed-in-for-this-phone).
     fetch(`/api/rewards/progress?slug=${encodeURIComponent(restaurant.slug)}&phone=${encodeURIComponent(phone)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { enabled?: boolean; eligible?: boolean; needsGoogleSignIn?: boolean; hasActiveRedemption?: boolean; rewardItemName?: string; rewardName?: string } | null) => {
+      .then((d: { enabled?: boolean; eligible?: boolean; needsGoogleSignIn?: boolean; hasActiveRedemption?: boolean; rewardItemName?: string; rewardName?: string; rewardItemId?: string | null; rewardItemPrice?: number | null } | null) => {
         if (!d?.enabled) return;
         if (d.eligible && d.hasActiveRedemption && !d.needsGoogleSignIn) {
-          setRewardReady({ rewardItemName: d.rewardItemName || d.rewardName || "tu premio" });
+          setRewardReady({
+            rewardItemName: d.rewardItemName || d.rewardName || "tu premio",
+            rewardItemId: d.rewardItemId ?? null,
+            rewardItemPrice: d.rewardItemPrice ?? null,
+          });
         }
       })
       .catch(() => {});

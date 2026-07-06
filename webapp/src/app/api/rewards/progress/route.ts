@@ -25,12 +25,13 @@ export async function GET(request: NextRequest) {
   const data = await getProgressByPhoneForDealer(phone, dealer.id);
   if (!data) return NextResponse.json({ enabled: false });
 
-  // Also fetch the reward item name + required-items names + the customer's
+  // Also fetch the reward item + required-items names + the customer's
   // googleSub so the badge can decide whether to prompt for Google Sign-In.
   const program = await prisma.rewardProgram.findUnique({
     where: { dealerId: dealer.id },
     select: {
-      rewardItem: { select: { name: true } },
+      rewardItemId: true,
+      rewardItem: { select: { name: true, price: true } },
       redemptionRequiresItemIds: true,
     },
   });
@@ -75,7 +76,9 @@ export async function GET(request: NextRequest) {
     punches: data.punches,
     punchesNeeded: data.program.punchesNeeded,
     rewardName: data.program.name,             // program display name (legacy field)
+    rewardItemId: program?.rewardItemId || null,
     rewardItemName: program?.rewardItem.name || data.program.name,
+    rewardItemPrice: program?.rewardItem.price ?? null,
     rewardDescription: data.program.description,
     eligible: data.eligible,
     hasActiveRedemption: Boolean(data.activeRedemption),

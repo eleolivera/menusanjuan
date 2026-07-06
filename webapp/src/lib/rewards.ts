@@ -330,7 +330,7 @@ export async function applyPendingRedemption(params: {
 
   const dealer = await prisma.dealer.findUnique({
     where: { id: params.dealerId },
-    select: { rewardsEnabled: true, rewardProgram: { select: { id: true, enabled: true, rewardItemId: true, redemptionRequiresItemIds: true, rewardItem: { select: { name: true } } } } },
+    select: { rewardsEnabled: true, rewardProgram: { select: { id: true, enabled: true, rewardItemId: true, redemptionRequiresItemIds: true, rewardItem: { select: { name: true, price: true } } } } },
   });
   if (!dealer?.rewardsEnabled || !dealer.rewardProgram?.enabled) return passThrough;
 
@@ -354,20 +354,56 @@ export async function applyPendingRedemption(params: {
   }
 
   const rewardItemName = dealer.rewardProgram.rewardItem.name;
+  const rewardItemPrice = dealer.rewardProgram.rewardItem.price ?? 0;
+  const rewardItemId = dealer.rewardProgram.rewardItemId;
 
-  // Synthesize a $0 line and append to cart. Shape mirrors OrderItem in
-  // orders-store.ts so downstream serialization (kitchen ticket, kanban
-  // card, etc.) treats it as a normal line.
-  const freeLine = {
-    menuItemId: dealer.rewardProgram.rewardItemId,
-    name: `🎁 ${rewardItemName} (premio)`,
-    quantity: 1,
-    unitPrice: 0,
-    total: 0,
-    note: "Canje de premio de fidelidad",
-  };
+  // Two ways the free reward can join the order — depending on whether the
+  // customer already has the reward item in their cart:
+  //   (A) Cart contains the reward item → apply as a DISCOUNT ($-N line) so
+  //       their paid item becomes free. Matches the 'your 10th coffee free'
+  //       mental model — no bonus, no double-print on the kitchen ticket.
+  //   (B) Cart does NOT contain the reward item → APPEND the reward as a $0
+  //       line so the customer gets a bonus item they didn't ask for.
+  //
+  // Discount is clamped to (subtotal - 1) so the /api/orders total > 0 check
+  // stays happy even on 100%-off edge cases.
+  const cartHasRewardItem = Array.isArray(params.cartItems) && (params.cartItems as Array<Record<string, unknown>>).some(
+    (line) => typeof line?.menuItemId === "string" && line.menuItemId === rewardItemId
+  );
 
-  const nextItems = Array.isArray(params.cartItems) ? [...params.cartItems, freeLine] : [freeLine];
+  let addedLine;
+  if (cartHasRewardItem && rewardItemPrice > 0) {
+    // Compute subtotal so we can clamp the discount.
+    const subtotal = (params.cartItems as Array<Record<string, unknown>>).reduce((s, it) => {
+      const unit = typeof it?.priceOverride === "number" && it.priceOverride !== null
+        ? it.priceOverride
+        : (Number(it?.unitPrice) || 0) + (Number(it?.optionsDelta) || 0);
+      return s + unit * (Number(it?.quantity) || 1);
+    }, 0);
+    const discount = Math.max(0, Math.min(subtotal - 1, Math.round(rewardItemPrice)));
+    addedLine = {
+      menuItemId: null,
+      name: `🎁 ${rewardItemName} gratis (canje)`,
+      quantity: 1,
+      unitPrice: -discount,
+      total: -discount,
+      note: "Canje de premio de fidelidad",
+    };
+  } else {
+    // Bonus mode — customer didn't add the reward item themselves; give it
+    // as an extra at $0. Kitchen ticket + kanban card will render this as a
+    // normal line thanks to the (premio) tag.
+    addedLine = {
+      menuItemId: rewardItemId,
+      name: `🎁 ${rewardItemName} (premio)`,
+      quantity: 1,
+      unitPrice: 0,
+      total: 0,
+      note: "Canje de premio de fidelidad",
+    };
+  }
+
+  const nextItems = Array.isArray(params.cartItems) ? [...params.cartItems, addedLine] : [addedLine];
 
   return { items: nextItems, redemptionId: redemption.id, rewardName: rewardItemName };
 }

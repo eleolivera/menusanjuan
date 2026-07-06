@@ -67,8 +67,14 @@ export function OrderModal({
   trackingOrder?: { orderId: string; token: string; orderNumber: string } | null;
   /** Populated by StoreMenu when the customer is signed in + eligible.
    *  Shows a "your free X will be added" callout in the confirm summary so
-   *  the reward is visible BEFORE hitting submit. */
-  rewardPreview?: { rewardItemName: string } | null;
+   *  the reward is visible BEFORE hitting submit. When the cart already
+   *  contains the reward item, the server applies as a DISCOUNT (not a
+   *  bonus); we mirror that math client-side for accurate preview. */
+  rewardPreview?: {
+    rewardItemName: string;
+    rewardItemId: string | null;
+    rewardItemPrice: number | null;
+  } | null;
 }) {
   const [step, setStep] = useState<"cart" | "method" | "info" | "confirm" | "tracking">(
     trackingOrder ? "tracking" : "cart"
@@ -185,7 +191,18 @@ export function OrderModal({
   // Reflect any pending redemption code discount in the visible total. Discount
   // amounts are ≥0 pesos (server clamps to subtotal-1 so the total stays ≥ $1).
   const codeDiscount = codeState.status === "ok" ? codeState.discountAmount : 0;
-  const grandTotal = total + deliveryFee - codeDiscount;
+
+  // Punch-reward preview: when cart already contains the reward item, the
+  // server will apply as a discount (not a bonus). Mirror that math here.
+  // If the customer added N of the reward item, only ONE gets discounted.
+  const cartHasRewardItem = Boolean(
+    rewardPreview?.rewardItemId &&
+    items.some((ci) => ci.item.id === rewardPreview.rewardItemId)
+  );
+  const rewardDiscount = cartHasRewardItem && rewardPreview?.rewardItemPrice
+    ? Math.max(0, Math.min(total - 1, Math.round(rewardPreview.rewardItemPrice)))
+    : 0;
+  const grandTotal = total + deliveryFee - codeDiscount - rewardDiscount;
 
   async function validateCode(raw: string) {
     const normalized = raw.trim().toUpperCase();
@@ -841,9 +858,17 @@ _Pedido realizado desde MenuSanJuan_`;
                   <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm">
                     <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
                       <span>🎁</span>
-                      <span>{rewardPreview.rewardItemName}</span>
+                      <span>
+                        {cartHasRewardItem
+                          ? `${rewardPreview.rewardItemName} gratis (canje)`
+                          : `${rewardPreview.rewardItemName} de regalo`}
+                      </span>
                     </span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-300">GRATIS</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                      {cartHasRewardItem && rewardDiscount > 0
+                        ? `−$${rewardDiscount.toLocaleString("es-AR")}`
+                        : "GRATIS"}
+                    </span>
                   </div>
                 )}
 
