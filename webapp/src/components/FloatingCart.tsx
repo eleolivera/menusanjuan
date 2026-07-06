@@ -40,7 +40,7 @@ export function FloatingCart({
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-1.5 animate-scale-in">
       {rewardHint && (
         <div className="rounded-full bg-emerald-500 text-white px-3 py-1 text-[11px] font-semibold shadow-lg shadow-emerald-500/40">
-          🎁 {rewardHint} gratis se suma al pedido
+          🎁 Recibís {rewardHint} de regalo con este pedido
         </div>
       )}
       <button
