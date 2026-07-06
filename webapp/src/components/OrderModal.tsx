@@ -595,9 +595,34 @@ _Pedido realizado desde MenuSanJuan_`;
                     )}
                   </div>
                 ))}
+
+                {/* Bonus reward item shown as a virtual line item so the
+                    customer SEES what they're getting for free, alongside
+                    their own selections. Not editable, not part of the
+                    client cart state — the server injects the real line at
+                    checkout submit. */}
+                {rewardPreview && !cartHasRewardItem && (
+                  <div className="rounded-xl border-2 border-dashed border-emerald-500/40 bg-emerald-500/5 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 truncate flex items-center gap-1.5">
+                          <span>🎁</span>
+                          <span>{rewardPreview.rewardItemName}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wide bg-emerald-500 text-white rounded px-1.5 py-0.5">Regalo</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">
+                          Se suma sin costo — canje de premio de fidelidad
+                        </div>
+                      </div>
+                      <div className="text-sm font-bold text-emerald-700 dark:text-emerald-300 w-20 text-right">
+                        GRATIS
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {rewardPreview && (
+              {rewardPreview && cartHasRewardItem && (
                 <div className="mb-3 flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 text-sm">
                   <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
                     <span>🎁</span>
