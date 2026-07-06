@@ -121,6 +121,10 @@ export function OrderModal({
   >({ status: "idle" });
   // (rewardPreview arrives via props from StoreMenu; that parent already
   // fetches /api/rewards/progress once for the FloatingCart hint.)
+  // Opt-in gate: default ON when there's a reward available. Customer can
+  // toggle OFF from the cart step to save the redemption for later — server
+  // then skips applyPendingRedemption + leaves the Redemption row READY.
+  const [useReward, setUseReward] = useState(true);
   // Soft-intercept: when transfer/MP is picked and no receipt is attached, the
   // Send button shows a one-step nudge instead of firing immediately. Customer
   // can choose to upload or send anyway. Improves attach rate without forcing.
@@ -195,11 +199,13 @@ export function OrderModal({
   // Punch-reward preview: when cart already contains the reward item, the
   // server will apply as a discount (not a bonus). Mirror that math here.
   // If the customer added N of the reward item, only ONE gets discounted.
+  // Zero everything out when the customer opts out via the toggle.
   const cartHasRewardItem = Boolean(
     rewardPreview?.rewardItemId &&
     items.some((ci) => ci.item.id === rewardPreview.rewardItemId)
   );
-  const rewardDiscount = cartHasRewardItem && rewardPreview?.rewardItemPrice
+  const rewardActive = Boolean(rewardPreview) && useReward;
+  const rewardDiscount = rewardActive && cartHasRewardItem && rewardPreview?.rewardItemPrice
     ? Math.max(0, Math.min(total - 1, Math.round(rewardPreview.rewardItemPrice)))
     : 0;
   const grandTotal = total + deliveryFee - codeDiscount - rewardDiscount;
@@ -451,6 +457,10 @@ _Pedido realizado desde MenuSanJuan_`;
           paymentReceiptUrl: checkoutReceiptUrl,
           // Optional gift code — server re-validates before applying.
           redemptionCode: codeState.status === "ok" ? codeState.code : undefined,
+          // Opt-in for the punch-earned reward. Default true (auto-apply);
+          // customer can turn OFF in the cart step to save the redemption
+          // for later.
+          useReward,
         }),
       });
 
@@ -596,49 +606,44 @@ _Pedido realizado desde MenuSanJuan_`;
                   </div>
                 ))}
 
-                {/* Bonus reward item shown as a virtual line item so the
-                    customer SEES what they're getting for free, alongside
-                    their own selections. Not editable, not part of the
-                    client cart state — the server injects the real line at
-                    checkout submit. */}
-                {rewardPreview && !cartHasRewardItem && (
-                  <div className="rounded-xl border-2 border-dashed border-emerald-500/40 bg-emerald-500/5 p-3">
-                    <div className="flex items-center justify-between gap-3">
+                {/* Reward opt-in card: shown alongside cart items so the
+                    customer can decide to use their premio on this order or
+                    save it for later. Toggle default ON — server skips
+                    applyPendingRedemption when useReward=false. */}
+                {rewardPreview && (
+                  <div className={`rounded-xl border-2 ${useReward ? "border-emerald-500/50 bg-emerald-500/10" : "border-dashed border-slate-300 bg-slate-50 dark:bg-slate-900/40"} p-3`}>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useReward}
+                        onChange={(e) => setUseReward(e.target.checked)}
+                        className="h-5 w-5 accent-emerald-500 shrink-0"
+                      />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 truncate flex items-center gap-1.5">
+                        <div className={`text-sm font-semibold flex items-center gap-1.5 ${useReward ? "text-emerald-700 dark:text-emerald-300" : "text-text-secondary"}`}>
                           <span>🎁</span>
-                          <span>{rewardPreview.rewardItemName}</span>
-                          <span className="text-[10px] font-bold uppercase tracking-wide bg-emerald-500 text-white rounded px-1.5 py-0.5">Regalo</span>
+                          <span className="truncate">{rewardPreview.rewardItemName}</span>
+                          <span className={`text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 ${useReward ? "bg-emerald-500 text-white" : "bg-slate-400 text-white"}`}>
+                            {cartHasRewardItem ? "Canje" : "Regalo"}
+                          </span>
                         </div>
-                        <div className="text-[11px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">
-                          Se suma sin costo — canje de premio de fidelidad
+                        <div className="text-[11px] text-text-muted mt-0.5">
+                          {useReward
+                            ? cartHasRewardItem
+                              ? `Se descuenta uno de tu pedido — ahorrás $${(rewardPreview.rewardItemPrice ?? 0).toLocaleString("es-AR")}.`
+                              : "Se suma a tu pedido sin costo. Destildá si preferís guardarlo para otro pedido."
+                            : "No se usará en este pedido — queda guardado para otro."}
                         </div>
                       </div>
-                      <div className="text-sm font-bold text-emerald-700 dark:text-emerald-300 w-20 text-right">
-                        GRATIS
+                      <div className={`text-sm font-bold w-20 text-right ${useReward ? "text-emerald-700 dark:text-emerald-300" : "text-text-muted line-through"}`}>
+                        {useReward && cartHasRewardItem && rewardDiscount > 0
+                          ? `−$${rewardDiscount.toLocaleString("es-AR")}`
+                          : "GRATIS"}
                       </div>
-                    </div>
+                    </label>
                   </div>
                 )}
               </div>
-
-              {rewardPreview && cartHasRewardItem && (
-                <div className="mb-3 flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 text-sm">
-                  <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
-                    <span>🎁</span>
-                    <span>
-                      {cartHasRewardItem
-                        ? `${rewardPreview.rewardItemName} gratis (canje)`
-                        : `${rewardPreview.rewardItemName} de regalo`}
-                    </span>
-                  </span>
-                  <span className="font-bold text-emerald-700 dark:text-emerald-300">
-                    {cartHasRewardItem && rewardDiscount > 0
-                      ? `−$${rewardDiscount.toLocaleString("es-AR")}`
-                      : "GRATIS"}
-                  </span>
-                </div>
-              )}
 
               <div className="flex items-center justify-between rounded-xl bg-gradient-to-br from-primary/5 to-orange-50 p-4 mb-5">
                 <span className="text-sm font-semibold text-text">Subtotal</span>
@@ -899,14 +904,14 @@ _Pedido realizado desde MenuSanJuan_`;
                     </button>
                   </div>
                 ))}
-                {rewardPreview && (
+                {rewardActive && (
                   <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm">
                     <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
                       <span>🎁</span>
                       <span>
                         {cartHasRewardItem
-                          ? `${rewardPreview.rewardItemName} gratis (canje)`
-                          : `${rewardPreview.rewardItemName} de regalo`}
+                          ? `${rewardPreview!.rewardItemName} gratis (canje)`
+                          : `${rewardPreview!.rewardItemName} de regalo`}
                       </span>
                     </span>
                     <span className="font-bold text-emerald-700 dark:text-emerald-300">

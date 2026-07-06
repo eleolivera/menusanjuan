@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       paymentIntent: rawPaymentIntent,
       paymentReceiptUrl: rawReceiptUrl,
       redemptionCode: rawCode,
+      useReward: rawUseReward,
     } = body;
 
     if (!restauranteSlug || !customerName || !customerPhone || !items?.length) {
@@ -119,7 +120,12 @@ export async function POST(request: NextRequest) {
     // proof-of-ownership at the consumption moment too. Legit customers who
     // signed in via /mis-recompensas or the store-page badge already have
     // this cookie set; anyone else silently skips auto-apply.
-    if (!pendingRedemptionId && customerId) {
+    //
+    // OPT-IN: customer can toggle 'use reward' off from the checkout to
+    // save the redemption for a later order. Default true (backwards compat
+    // — clients that never send the flag still get auto-apply).
+    const useReward = rawUseReward === undefined ? true : Boolean(rawUseReward);
+    if (!pendingRedemptionId && customerId && useReward) {
       try {
         const sessionCustomer = await getCustomerFromSession();
         if (sessionCustomer && sessionCustomer.id === customerId) {
