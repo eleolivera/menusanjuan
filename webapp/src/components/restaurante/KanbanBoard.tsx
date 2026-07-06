@@ -84,7 +84,16 @@ export function KanbanBoard({
         ))}
       </div>
 
-      <div className="flex gap-3 flex-1" style={{ minHeight: 0 }}>
+      {/* Column row. On mobile, becomes a horizontal snap scroller so each
+          column fills the viewport width (85vw) and the owner swipes between
+          them. Desktop keeps the flex-1 auto-fit layout. Drag-and-drop
+          continues to work on desktop; iOS Safari doesn't fire HTML5 drag
+          events, so mobile relies on tapping the card → status-advance CTAs
+          in the order modal. */}
+      <div
+        className="flex gap-3 flex-1 overflow-x-auto snap-x snap-mandatory md:overflow-visible md:snap-none pb-2 md:pb-0 -mx-2 px-2 md:mx-0 md:px-0"
+        style={{ minHeight: 0 }}
+      >
         {COLUMNS.map((col) => {
           const colOrders = filteredOrders.filter((o) => o.status === col.status)
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -93,7 +102,7 @@ export function KanbanBoard({
           return (
             <div
               key={col.status}
-              className={`min-w-[220px] flex-1 rounded-2xl border p-3 transition-colors flex flex-col ${
+              className={`snap-start snap-always shrink-0 min-w-[85vw] max-w-[85vw] md:min-w-[220px] md:max-w-none md:flex-1 md:shrink rounded-2xl border p-3 transition-colors flex flex-col ${
                 isDragOver ? "border-primary/50 bg-primary/5" : "border-white/5 bg-slate-900/30"
               } ${col.status === "CANCELLED" ? "opacity-60" : ""}`}
               onDragOver={(e) => handleDragOver(e, col.status)}
