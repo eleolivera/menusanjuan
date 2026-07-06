@@ -81,7 +81,7 @@ export function RewardBadge({ slug }: { slug: string }) {
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-text">🎁 ¡Ya tenés tu premio!</div>
             <div className="text-xs text-text-secondary mt-0.5">
-              Iniciá sesión con Google (una sola vez) para reclamar tu {rewardItem}. Se aplica automáticamente en tu próximo pedido.
+              Iniciá sesión con Google (una sola vez) para reclamar tu {rewardItem}. Se agrega automáticamente cuando pidas.
             </div>
           </div>
           <a
@@ -97,9 +97,11 @@ export function RewardBadge({ slug }: { slug: string }) {
 
   if (data.eligible) {
     // Signed in and eligible — reward will auto-apply.
+    // Copy avoids 'próximo pedido' since the customer might be about to place
+    // an order right now — reads as 'the one AFTER this' otherwise.
     const requires = data.requiresItemNames && data.requiresItemNames.length > 0
-      ? `Con tu próximo ${data.requiresItemNames.slice(0, 3).join(" / ")} te llevás ${rewardItem} gratis.`
-      : `${rewardItem} se agrega gratis a tu próximo pedido.`;
+      ? `Sumando alguno de estos — ${data.requiresItemNames.slice(0, 3).join(" / ")} — te llevás ${rewardItem} gratis.`
+      : `Se agrega ${rewardItem} gratis a tu pedido — no necesitás hacer nada.`;
     return (
       <div className="mx-auto max-w-7xl px-4 mt-3">
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 flex items-center gap-3">
