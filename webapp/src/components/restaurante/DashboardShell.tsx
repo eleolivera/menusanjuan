@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
-import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, Gift, Users, type LucideIcon } from "lucide-react";
+import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, Gift, Users, Menu as MenuIcon, X as XIcon, type LucideIcon } from "lucide-react";
 
 // Nav uses Lucide line icons (same style as the rest of the app) instead of
 // emoji — emoji read as "consumer / playful" which felt off for the owner-side
@@ -60,6 +60,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [pendingClaims, setPendingClaims] = useState<Array<{ id: string; status: string; dealer: { id: string; name: string; slug: string } }>>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  // Mobile drawer state: full-screen slide-in that mirrors the desktop
+  // sidebar's nav + account section. Bottom-nav (Pedidos/Menú/POS) always
+  // stays visible; the drawer surfaces the rest.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
@@ -82,6 +86,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       setNavVersion((v) => v + 1);
     }
   }, [pathname, isAuthPage, authed]);
+
+  // Close mobile drawer whenever the user navigates elsewhere.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (isAuthPage) { setAuthed(false); return; }
@@ -142,11 +151,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return pathname === item.href || pathname.startsWith(item.href + "/");
   }
 
+  // Mobile bottom-nav: the three surfaces owners live in. Everything else
+  // (Dashboard, Clientes, Rewards, Mi Restaurante) lives in the drawer.
+  const bottomNav = [
+    DEFAULT_NAV.find((n) => n.href === "/restaurante/pedidos"),
+    DEFAULT_NAV.find((n) => n.href === "/restaurante/menu"),
+    DEFAULT_NAV.find((n) => n.href === "/restaurante/pos"),
+  ].filter(Boolean) as typeof DEFAULT_NAV;
+
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
+      {/* Sidebar (desktop only — mobile uses the drawer + bottom nav below) */}
       <aside
-        className={`flex flex-col border-r border-white/5 bg-slate-900 transition-all duration-200 shrink-0 ${
+        className={`hidden lg:flex flex-col border-r border-white/5 bg-slate-900 transition-all duration-200 shrink-0 ${
           collapsed ? "w-16" : "w-64"
         }`}
       >
@@ -331,10 +348,139 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Content */}
-      <main className="flex-1 overflow-hidden min-w-0">
+      {/* Content — mobile gets top/bottom padding to sit clear of the fixed
+          mobile top bar (h-14) and bottom nav (h-16 + safe-area). Desktop
+          keeps the split-scroll model unchanged. */}
+      <main className="flex-1 overflow-hidden min-w-0 pt-14 lg:pt-0 pb-16 lg:pb-0">
         {children}
       </main>
+
+      {/* ─── Mobile chrome (< lg) ─────────────────────────────────────── */}
+
+      {/* Top bar: brand + hamburger */}
+      <div className="fixed top-0 inset-x-0 z-40 h-14 flex items-center justify-between px-4 border-b border-white/5 bg-slate-900/85 backdrop-blur-md lg:hidden">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-sm shadow-md shadow-primary/25">
+            {restaurantName.charAt(0) || "M"}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-white truncate">{restaurantName || "MenuSanJuan"}</div>
+          </div>
+        </div>
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-300 hover:bg-white/5 active:bg-white/10 transition-colors"
+          aria-label="Abrir menú"
+        >
+          <MenuIcon className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* Bottom nav: Pedidos / Menú / POS */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-40 border-t border-white/5 bg-slate-900/95 backdrop-blur-md lg:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex items-stretch h-16">
+          {bottomNav.map((item) => {
+            const active = isActive(item);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  active ? "text-primary" : "text-slate-400 active:text-slate-200"
+                }`}
+              >
+                <item.Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
+                <span className={`text-[10px] font-semibold ${active ? "" : "font-medium"}`}>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Drawer overlay */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-50 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
+          <div
+            className="absolute inset-y-0 right-0 w-72 max-w-[85vw] bg-slate-900 border-l border-white/5 shadow-2xl flex flex-col animate-slide-in-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+              <div className="text-sm font-bold text-white truncate">{restaurantName}</div>
+              <button
+                onClick={() => setMobileNavOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-white/5"
+                aria-label="Cerrar menú"
+              >
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Drawer nav — everything from DEFAULT_NAV */}
+            <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+              {navItems.map((item) => {
+                const active = isActive(item);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-primary/15 text-primary-light"
+                        : "text-slate-300 hover:bg-white/5"
+                    }`}
+                  >
+                    <item.Icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+              {slug && (
+                <a
+                  href={`/${slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/5 transition-colors"
+                >
+                  <ExternalLink className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+                  <span>Ver página pública</span>
+                </a>
+              )}
+              {slug && (
+                <button
+                  type="button"
+                  onClick={() => { setMobileNavOpen(false); setQrOpen(true); }}
+                  className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/5 transition-colors"
+                >
+                  <span className="text-lg">📱</span>
+                  <span>Mi QR</span>
+                </button>
+              )}
+            </nav>
+
+            {/* Drawer footer — logout */}
+            <div className="border-t border-white/5 p-2">
+              <button
+                onClick={async () => {
+                  await fetch("/api/restaurante/session", { method: "DELETE" });
+                  router.push("/restaurante/login");
+                }}
+                className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
+              >
+                <LogOut className="h-4 w-4" strokeWidth={1.75} />
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* First-time welcome popup */}
       {showWelcome && (
