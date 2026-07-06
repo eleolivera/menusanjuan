@@ -95,6 +95,29 @@ export function StoreMenu({
   const [pastOrders, setPastOrders] = useState<OrderRef[]>([]);
   const [reordering, setReordering] = useState(false);
   const [toast, setToast] = useState<{ message: string; kind: "warn" | "info" } | null>(null);
+  // Reward-ready preview: when the customer is signed in AND has an eligible
+  // Redemption for this dealer, we surface it in the FloatingCart + OrderModal
+  // so the free item is visible BEFORE submit (previously appeared only in the
+  // post-submit confirmation, causing 'why isn't it free?' confusion).
+  const [rewardReady, setRewardReady] = useState<{ rewardItemName: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const phone = (localStorage.getItem("msj_phone") || "").trim();
+    if (!phone) return;
+    // Best-effort — silently skips if endpoint returns 404 (rewards off) or
+    // 400 (invalid phone). Only mounts the preview when the server tells us
+    // the reward WILL apply on submit (eligible + signed-in-for-this-phone).
+    fetch(`/api/rewards/progress?slug=${encodeURIComponent(restaurant.slug)}&phone=${encodeURIComponent(phone)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { enabled?: boolean; eligible?: boolean; needsGoogleSignIn?: boolean; hasActiveRedemption?: boolean; rewardItemName?: string; rewardName?: string } | null) => {
+        if (!d?.enabled) return;
+        if (d.eligible && d.hasActiveRedemption && !d.needsGoogleSignIn) {
+          setRewardReady({ rewardItemName: d.rewardItemName || d.rewardName || "tu premio" });
+        }
+      })
+      .catch(() => {});
+  }, [restaurant.slug]);
 
   // Auto-dismiss toast after 4s
   useEffect(() => {
@@ -443,6 +466,7 @@ export function StoreMenu({
         onClick={() => { setTrackingMode(false); setShowModal(true); }}
         pendingOrderNumber={pendingOrder?.orderNumber}
         onViewOrder={() => { setTrackingMode(true); setShowModal(true); }}
+        rewardHint={rewardReady?.rewardItemName ?? null}
       />
 
       {showModal && (
@@ -467,6 +491,7 @@ export function StoreMenu({
             setPendingOrder({ orderId: id, token, orderNumber: num, placedAt: new Date().toISOString() });
           }}
           trackingOrder={trackingMode && pendingOrder ? { orderId: pendingOrder.orderId, token: pendingOrder.token, orderNumber: pendingOrder.orderNumber } : null}
+          rewardPreview={rewardReady}
         />
       )}
 

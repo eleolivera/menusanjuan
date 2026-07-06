@@ -45,6 +45,7 @@ export function OrderModal({
   onClearCart,
   onOrderSent,
   trackingOrder,
+  rewardPreview,
 }: {
   items: CartItem[];
   total: number;
@@ -64,6 +65,10 @@ export function OrderModal({
   onClearCart?: () => void;
   onOrderSent?: (orderId: string, token: string, orderNumber: string) => void;
   trackingOrder?: { orderId: string; token: string; orderNumber: string } | null;
+  /** Populated by StoreMenu when the customer is signed in + eligible.
+   *  Shows a "your free X will be added" callout in the confirm summary so
+   *  the reward is visible BEFORE hitting submit. */
+  rewardPreview?: { rewardItemName: string } | null;
 }) {
   const [step, setStep] = useState<"cart" | "method" | "info" | "confirm" | "tracking">(
     trackingOrder ? "tracking" : "cart"
@@ -108,6 +113,8 @@ export function OrderModal({
     | { status: "ok"; code: string; description: string; discountAmount: number }
     | { status: "error"; message: string }
   >({ status: "idle" });
+  // (rewardPreview arrives via props from StoreMenu; that parent already
+  // fetches /api/rewards/progress once for the FloatingCart hint.)
   // Soft-intercept: when transfer/MP is picked and no receipt is attached, the
   // Send button shows a one-step nudge instead of firing immediately. Customer
   // can choose to upload or send anyway. Improves attach rate without forcing.
@@ -830,6 +837,16 @@ _Pedido realizado desde MenuSanJuan_`;
                     </button>
                   </div>
                 ))}
+                {rewardPreview && (
+                  <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm">
+                    <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
+                      <span>🎁</span>
+                      <span>{rewardPreview.rewardItemName}</span>
+                    </span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-300">GRATIS</span>
+                  </div>
+                )}
+
                 <div className="mt-2 border-t border-border/50 pt-2 flex justify-between text-sm">
                   <span className="text-text-secondary">Subtotal</span>
                   <span className="font-semibold text-text">${total.toLocaleString("es-AR")}</span>
