@@ -86,6 +86,11 @@ export function PosBoard({
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Mobile tab: only one of Menú / Carrito visible at a time under md:. On
+  // desktop both sides always render (flex row split). Auto-flips to
+  // 'cart' when the cashier taps an item — reduces the taps needed to add
+  // + confirm on a phone.
+  const [posTab, setPosTab] = useState<"menu" | "cart">("menu");
 
   // ─── Load menu ───
   useEffect(() => {
@@ -536,9 +541,40 @@ export function PosBoard({
 
       {/* ─── Ordering view (mostrador OR mesa-with-table) ─── */}
       {view === "ordering" && (
-        <div className="flex-1 flex overflow-hidden" style={{ minHeight: 0 }}>
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden" style={{ minHeight: 0 }}>
+          {/* Mobile tab switcher (only under md:) — swaps between Menú and
+              Carrito. Cart tab shows the running line count so the cashier
+              knows something's in there before switching. */}
+          <div className="md:hidden shrink-0 flex border-b border-white/5 bg-slate-900/50">
+            <button
+              type="button"
+              onClick={() => setPosTab("menu")}
+              className={`flex-1 py-3 text-xs font-semibold transition-colors ${
+                posTab === "menu" ? "text-primary border-b-2 border-primary" : "text-slate-400 border-b-2 border-transparent"
+              }`}
+            >
+              Menú
+            </button>
+            <button
+              type="button"
+              onClick={() => setPosTab("cart")}
+              className={`flex-1 py-3 text-xs font-semibold transition-colors flex items-center justify-center gap-2 ${
+                posTab === "cart" ? "text-primary border-b-2 border-primary" : "text-slate-400 border-b-2 border-transparent"
+              }`}
+            >
+              Carrito
+              {cart.length > 0 && (
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  posTab === "cart" ? "bg-primary text-white" : "bg-primary/20 text-primary"
+                }`}>
+                  {cart.length}
+                </span>
+              )}
+            </button>
+          </div>
+
           {/* Menu side */}
-          <div className="flex-1 flex flex-col overflow-hidden border-r border-white/5">
+          <div className={`${posTab === "menu" ? "flex" : "hidden"} md:flex flex-1 flex-col overflow-hidden md:border-r md:border-white/5`}>
             <div className="shrink-0 px-3 py-2 border-b border-white/5">
               <input
                 value={search}
@@ -628,7 +664,7 @@ export function PosBoard({
           </div>
 
           {/* Cart side */}
-          <div className="w-72 sm:w-80 shrink-0 flex flex-col bg-slate-900/30">
+          <div className={`${posTab === "cart" ? "flex" : "hidden"} md:flex flex-1 md:flex-none md:w-72 md:sm:w-80 md:shrink-0 flex-col bg-slate-900/30`}>
             <div className="shrink-0 px-4 py-2 border-b border-white/5 space-y-1.5">
               <h2 className="text-xs font-bold text-white">
                 {mode === "DINE_IN"
