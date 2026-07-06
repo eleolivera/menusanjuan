@@ -178,9 +178,9 @@ export default function RestauranteDashboard() {
               {/* Back */}
               <button
                 onClick={goBack}
-                className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
+                className="rounded-lg p-2.5 text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                 </svg>
               </button>
@@ -226,9 +226,9 @@ export default function RestauranteDashboard() {
               <button
                 onClick={goForward}
                 disabled={isToday}
-                className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                className="rounded-lg p-2.5 text-slate-400 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                 </svg>
               </button>

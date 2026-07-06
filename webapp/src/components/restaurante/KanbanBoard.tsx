@@ -70,11 +70,13 @@ export function KanbanBoard({
 
   return (
     <>
-      {/* Filter chips */}
+      {/* Filter chips — bumped from py-1 text-[10px] (~24px) to py-2 text-xs
+          (~36px) so they clear the iOS/WCAG 44px minimum with room for
+          fingers on a phone. Desktop looks the same. */}
       <div className="shrink-0 flex gap-1.5 mb-2 overflow-x-auto">
         {FILTER_CHIPS.map((c) => (
           <button key={c.value} onClick={() => setFilter(c.value)}
-            className={`shrink-0 rounded-lg px-3 py-1 text-[10px] font-semibold transition-all flex items-center gap-1 ${
+            className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-all flex items-center gap-1 ${
               filter === c.value ? "bg-primary text-white" : "border border-white/10 text-slate-400 hover:bg-white/5"
             }`}>
             {c.emoji && <span>{c.emoji}</span>}
