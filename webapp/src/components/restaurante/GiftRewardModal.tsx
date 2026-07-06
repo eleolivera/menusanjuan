@@ -96,12 +96,15 @@ export function GiftRewardModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-900 shadow-2xl"
+        className="w-full sm:max-w-2xl max-h-[95vh] rounded-t-3xl sm:rounded-2xl border border-white/10 bg-slate-900 shadow-2xl flex flex-col animate-slide-up sm:animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between border-b border-white/10 p-5">
+        <header className="shrink-0 flex items-center justify-between border-b border-white/10 p-5">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-primary/10 p-2">
               <Gift className="h-5 w-5 text-primary" strokeWidth={2} />
@@ -116,7 +119,7 @@ export function GiftRewardModal({
           </button>
         </header>
 
-        <div className="p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Type picker */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-2">Tipo de regalo</label>
@@ -231,7 +234,7 @@ export function GiftRewardModal({
           )}
         </div>
 
-        <footer className="flex items-center justify-end gap-3 border-t border-white/10 p-5">
+        <footer className="shrink-0 flex items-center justify-end gap-3 border-t border-white/10 p-5" style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
           <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/5">
             Cancelar
           </button>
