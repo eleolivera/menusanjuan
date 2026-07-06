@@ -56,7 +56,10 @@ export function FloatingCart({
         </span>
       </div>
       <div className="text-left">
-        <div className="text-xs font-medium opacity-80">Tu pedido</div>
+        <div className="text-xs font-medium opacity-80 flex items-center gap-1">
+          Tu pedido
+          {rewardHint && <span className="text-[10px] rounded-full bg-white/25 px-1.5 py-0.5 font-semibold">+ 🎁</span>}
+        </div>
         <div className="text-sm font-bold tracking-tight">
           ${total.toLocaleString("es-AR")}
         </div>
