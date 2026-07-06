@@ -597,9 +597,29 @@ _Pedido realizado desde MenuSanJuan_`;
                 ))}
               </div>
 
+              {rewardPreview && (
+                <div className="mb-3 flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 text-sm">
+                  <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
+                    <span>🎁</span>
+                    <span>
+                      {cartHasRewardItem
+                        ? `${rewardPreview.rewardItemName} gratis (canje)`
+                        : `${rewardPreview.rewardItemName} de regalo`}
+                    </span>
+                  </span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                    {cartHasRewardItem && rewardDiscount > 0
+                      ? `−$${rewardDiscount.toLocaleString("es-AR")}`
+                      : "GRATIS"}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between rounded-xl bg-gradient-to-br from-primary/5 to-orange-50 p-4 mb-5">
                 <span className="text-sm font-semibold text-text">Subtotal</span>
-                <span className="text-xl font-extrabold text-text tracking-tight">${total.toLocaleString("es-AR")}</span>
+                <span className="text-xl font-extrabold text-text tracking-tight">
+                  ${(total - rewardDiscount).toLocaleString("es-AR")}
+                </span>
               </div>
 
               <button
