@@ -51,6 +51,7 @@ export default function ProfilePage() {
     mercadoPagoAlias: "", mercadoPagoCvu: "", bankInfo: "", posEnabled: false,
     deliveryEnabled: true, pickupEnabled: true,
     deliveryPricingEnabled: false,
+    deliveryMode: "MANUAL" as "MANUAL" | "OWN" | "NETWORK" | "HYBRID",
     pickupHours: null as string | null, deliveryHours: null as string | null,
     deliveryZones: null as string | null,
     deliveryCloseRadius: null, deliveryClosePrice: null,
@@ -74,6 +75,7 @@ export default function ProfilePage() {
     posEnabled: { tier: "instant" as const },
     deliveryEnabled: { tier: "instant" as const },
     deliveryPricingEnabled: { tier: "instant" as const },
+    deliveryMode: { tier: "instant" as const },
     pickupEnabled: { tier: "instant" as const },
     // Tier 3 — explicit save. Complex structured editors that should commit
     // atomically (zones + schedules). User clicks "Guardar" inside the section
@@ -208,6 +210,7 @@ export default function ProfilePage() {
           posEnabled: d.posEnabled || false,
           deliveryEnabled: d.deliveryEnabled ?? true,
           deliveryPricingEnabled: d.deliveryPricingEnabled ?? false,
+          deliveryMode: d.deliveryMode ?? "MANUAL",
           pickupEnabled: d.pickupEnabled ?? true,
           pickupHours: d.pickupHours || null,
           deliveryHours: d.deliveryHours || null,
@@ -425,6 +428,56 @@ export default function ProfilePage() {
             </div>
           )}
         </section>
+
+        {/* Delivery mode — how deliveries actually happen. MANUAL keeps the
+            current copy-paste WhatsApp workflow; OWN/NETWORK/HYBRID route
+            through the MenuSanJuan Repartidor PWA. See the Delivery Network
+            docs for the dispatch semantics. */}
+        {deliveryEnabled && (
+          <section className="rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-white">Cómo hacés los envíos</h2>
+                <p className="text-xs text-slate-400 mt-1">Elegí cómo se le asigna un repartidor a cada pedido con envío.</p>
+              </div>
+              <SaveIndicator status={statuses.deliveryMode} />
+            </div>
+            <div className="space-y-2">
+              {([
+                { key: "MANUAL",  emoji: "📱", title: "Manual (como hoy)",   desc: "Copiás el mensaje a tu grupo de WhatsApp con tu repartidor de siempre." },
+                { key: "OWN",     emoji: "🛵", title: "Mis repartidores",      desc: "Tus repartidores usan la app MenuSanJuan Repartidor. Cobrás el envío directo." },
+                { key: "NETWORK", emoji: "🚚", title: "Red MenuSanJuan",       desc: "Repartidores de MenuSanJuan toman tus pedidos. Nos quedamos con el envío del ticket; vos cobrás la comida." },
+                { key: "HYBRID",  emoji: "🔁", title: "Mis repartidores + red", desc: "Tus repartidores tienen preferencia. Si están ocupados, entra la red como refuerzo." },
+              ] as const).map((mode) => {
+                const active = values.deliveryMode === mode.key;
+                return (
+                  <button
+                    type="button"
+                    key={mode.key}
+                    onClick={() => setValue("deliveryMode", mode.key)}
+                    className={`w-full text-left rounded-xl border-2 p-4 transition-colors ${
+                      active ? "border-primary/60 bg-primary/10" : "border-white/10 bg-white/5 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl leading-none">{mode.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-bold ${active ? "text-primary" : "text-white"}`}>{mode.title}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{mode.desc}</div>
+                      </div>
+                      <div className={`shrink-0 h-4 w-4 rounded-full border-2 mt-1 ${active ? "border-primary bg-primary" : "border-slate-600"}`} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {(values.deliveryMode === "OWN" || values.deliveryMode === "HYBRID") && (
+              <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+                💡 Cargá tus repartidores en <a className="underline font-semibold" href="/restaurante/drivers">Repartidores</a> del panel.
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Delivery pricing — wrapped behind a toggle so restas that prefer to
             negotiate the fee per-order via WhatsApp don't have to fill anything in. */}

@@ -31,6 +31,7 @@ export async function GET() {
       description: session.activeRestaurant?.description,
       logoUrl: session.activeRestaurant?.logoUrl,
       coverUrl: session.activeRestaurant?.coverUrl,
+      deliveryMode: (session.activeRestaurant as { deliveryMode?: string })?.deliveryMode ?? null,
       email: session.user.email,
       mustChangePassword: session.user.mustChangePassword,
     });

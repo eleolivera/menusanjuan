@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { RestaurantQrCard } from "@/components/RestaurantQrCard";
-import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, Gift, Users, Menu as MenuIcon, X as XIcon, type LucideIcon } from "lucide-react";
+import { ChevronDown, ExternalLink, LogOut, ChevronRight, UtensilsCrossed, Store, ClipboardList, Wallet, BarChart3, Gift, Users, Bike, Menu as MenuIcon, X as XIcon, type LucideIcon } from "lucide-react";
 
 // Nav uses Lucide line icons (same style as the rest of the app) instead of
 // emoji — emoji read as "consumer / playful" which felt off for the owner-side
@@ -64,18 +64,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // sidebar's nav + account section. Bottom-nav (Pedidos/Menú/POS) always
   // stays visible; the drawer surfaces the rest.
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Delivery mode from the current resta — drives whether the "Repartidores"
+  // nav entry is visible. Only shown when the resta has OWN or HYBRID.
+  const [deliveryMode, setDeliveryMode] = useState<string | null>(null);
 
   const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
-  // Sort nav by usage after threshold
+  // Sort nav by usage after threshold. Adds "Repartidores" only when the
+  // resta's delivery mode uses the PWA (OWN or HYBRID) — MANUAL/NETWORK
+  // don't need it since those modes never surface resta-owned drivers.
   const navItems = useMemo(() => {
-    if (typeof window === "undefined") return DEFAULT_NAV;
+    const base = deliveryMode === "OWN" || deliveryMode === "HYBRID"
+      ? [...DEFAULT_NAV, { href: "/restaurante/drivers", label: "Repartidores", Icon: Bike as LucideIcon }]
+      : DEFAULT_NAV;
+    if (typeof window === "undefined") return base;
     const usage = getUsage();
     const totalClicks = Object.values(usage).reduce((s, v) => s + v, 0);
-    if (totalClicks < USAGE_THRESHOLD) return DEFAULT_NAV;
-    return [...DEFAULT_NAV].sort((a, b) => (usage[b.href] || 0) - (usage[a.href] || 0));
+    if (totalClicks < USAGE_THRESHOLD) return base;
+    return [...base].sort((a, b) => (usage[b.href] || 0) - (usage[a.href] || 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navVersion]);
+  }, [navVersion, deliveryMode]);
 
   // Track page visits
   useEffect(() => {
@@ -122,6 +130,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           setSlug(data.slug);
           setRestaurantName(data.name || data.slug);
+          setDeliveryMode(data.deliveryMode ?? null);
           setAuthed(true);
           if (!localStorage.getItem(WELCOME_KEY)) setShowWelcome(true);
         } else {

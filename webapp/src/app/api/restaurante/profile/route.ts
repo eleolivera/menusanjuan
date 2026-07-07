@@ -71,6 +71,7 @@ export async function GET() {
     posEnabled: dealer.posEnabled,
     deliveryEnabled: dealer.deliveryEnabled,
     deliveryPricingEnabled: dealer.deliveryPricingEnabled,
+    deliveryMode: dealer.deliveryMode,
     pickupEnabled: dealer.pickupEnabled,
     pickupHours: dealer.pickupHours,
     deliveryHours: dealer.deliveryHours,
@@ -106,9 +107,15 @@ export async function PATCH(request: NextRequest) {
     name, phone, address, latitude, longitude, cuisineType,
     description, logoUrl, coverUrl, openHours,
     mercadoPagoAlias, mercadoPagoCvu, bankInfo, posEnabled,
-    isActive, deliveryEnabled, deliveryPricingEnabled, pickupEnabled, pickupHours, deliveryHours, deliveryZones, deliveryCloseRadius, deliveryClosePrice,
+    isActive, deliveryEnabled, deliveryPricingEnabled, deliveryMode, pickupEnabled, pickupHours, deliveryHours, deliveryZones, deliveryCloseRadius, deliveryClosePrice,
     deliveryFarRadius, deliveryFarPrice, deliveryFee, deliveryTimeMin,
   } = body;
+
+  // Validate deliveryMode against the DeliveryMode enum. Anything else drops.
+  const VALID_MODES = ["MANUAL", "OWN", "NETWORK", "HYBRID"] as const;
+  const validatedMode = deliveryMode !== undefined && VALID_MODES.includes(deliveryMode as typeof VALID_MODES[number])
+    ? (deliveryMode as typeof VALID_MODES[number])
+    : undefined;
 
   // Validate deliveryZones up-front so we can return 400 with a friendly message
   let zonesJson: string | null | undefined = undefined;
@@ -140,6 +147,7 @@ export async function PATCH(request: NextRequest) {
       ...(isActive !== undefined && { isActive }),
       ...(deliveryEnabled !== undefined && { deliveryEnabled }),
       ...(deliveryPricingEnabled !== undefined && { deliveryPricingEnabled }),
+      ...(validatedMode !== undefined && { deliveryMode: validatedMode }),
       ...(pickupEnabled !== undefined && { pickupEnabled }),
       ...(pickupHours !== undefined && { pickupHours }),
       ...(deliveryHours !== undefined && { deliveryHours }),

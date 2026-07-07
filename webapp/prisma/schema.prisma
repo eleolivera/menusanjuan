@@ -130,6 +130,11 @@ model Dealer {
   posEnabled             Boolean   @default(false) // Show POS / pre-pay tablet UI
   tableSuggestions       Json? // Recently used table names for autocomplete
   rewardsEnabled         Boolean   @default(false) // Master per-dealer kill switch for the rewards / loyalty program
+  // Delivery network mode. MANUAL preserves the current copy-paste WhatsApp
+  // block workflow (default). OWN = resta's own drivers on the PWA. NETWORK
+  // = MenuSanJuan network drivers. HYBRID = own drivers first, network as
+  // overflow. See the Delivery Network plan for the full dispatch semantics.
+  deliveryMode           DeliveryMode @default(MANUAL)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -142,6 +147,7 @@ model Dealer {
   onboardingCard OnboardingCard?
   printAgents    PrintAgent[]
   rewardProgram  RewardProgram?
+  drivers        Driver[]            @relation("DealerDrivers")
 
   @@index([slug])
   @@index([cuisineType])
@@ -405,12 +411,20 @@ model Order {
   // status flips to DELIVERED; never overwritten after. Values used today:
   // "driver" (QR page), "owner" (kanban), "pos" (POS tablet), "print-agent".
   markedDeliveredBy   String?
+  // Delivery network fields — populated only when the order goes through a
+  // Driver (network or resta-owned). See DeliveryOffer for the assignment
+  // audit trail. assignedDriverId is set on offer acceptance; pickedUpAt is
+  // set when the driver taps "Retiré el pedido" between accept and deliver.
+  assignedDriverId    String?
+  pickedUpAt          DateTime?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
-  dealer     Dealer?     @relation(fields: [dealerId], references: [id], onDelete: SetNull)
-  customer   Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  redemption Redemption? @relation("OrderRedemption")
+  dealer          Dealer?          @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  customer        Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  redemption      Redemption?      @relation("OrderRedemption")
+  assignedDriver  Driver?          @relation("DriverAssignments", fields: [assignedDriverId], references: [id], onDelete: SetNull)
+  deliveryOffers  DeliveryOffer[]
 
   @@index([restauranteSlug, status])
   @@index([restauranteSlug, createdAt])
@@ -661,4 +675,126 @@ model BotPrompt {
   content   String // the system prompt template
   updatedAt DateTime @updatedAt
   updatedBy String? // admin email
+}
+
+// ─── Delivery Network ────────────────────────────────────────────────────────
+// Per-resta config for how deliveries get fulfilled. MANUAL = current
+// copy-paste WhatsApp flow (default, no schema disruption). Higher modes
+// route orders through the Driver PWA.
+
+enum DeliveryMode {
+  MANUAL
+  OWN
+  NETWORK
+  HYBRID
+}
+
+// Offer lifecycle. PENDING when created, ACCEPTED when the driver taps
+// accept, REJECTED when they decline, EXPIRED when the 30s TTL elapses,
+// CANCELLED when admin overrides / order is cancelled upstream.
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+model Driver {
+  id                 String    @id @default(cuid())
+  phone              String    @unique              // E.164 mobile
+  displayName        String
+  isActive           Boolean   @default(true)
+  vehicleType        String?                        // "moto" | "auto" | "bike"
+  loginCode          String?   @unique              // 6-char one-shot login code
+  loginCodeExpiresAt DateTime?
+
+  // Ownership: NULL = MenuSanJuan network driver (Elio owns), set = resta-owned.
+  // Cash reconciles under whichever side. Dispatch respects Dealer.deliveryMode
+  // to decide which pool a given order gets offered to first.
+  ownerDealerId      String?
+  owner              Dealer?   @relation("DealerDrivers", fields: [ownerDealerId], references: [id], onDelete: Cascade)
+
+  currentLat         Float?
+  currentLng         Float?
+  lastPingAt         DateTime?
+  onShift            Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  shifts             DriverShift[]
+  offers             DeliveryOffer[]
+  cashEvents         DriverCashEvent[]
+  pushSubs           DriverPushSubscription[]
+  assignedOrders     Order[]   @relation("DriverAssignments")
+
+  @@index([isActive, onShift])
+  @@index([ownerDealerId])
+  @@index([currentLat, currentLng])
+}
+
+model DriverShift {
+  id              String    @id @default(cuid())
+  driverId        String
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  cashOnHandStart Int       @default(0)             // ARS at shift start
+  cashOnHandEnd   Int?                              // ARS at close (driver-entered)
+  discrepancy     Int?                              // computed at close
+  notes           String?
+
+  driver          Driver           @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  cashEvents      DriverCashEvent[]
+
+  @@index([driverId, endedAt])
+}
+
+model DeliveryOffer {
+  id             String       @id @default(cuid())
+  orderId        String
+  driverId       String
+  offeredAt      DateTime     @default(now())
+  expiresAt      DateTime                            // offeredAt + 30s
+  respondedAt    DateTime?
+  status         OfferStatus  @default(PENDING)
+  distanceKm     Float?                              // driver → resta at offer time
+  notifiedByPush Boolean      @default(false)
+  notifiedByWa   Boolean      @default(false)        // WABA fallback fired
+
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driver         Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, status])
+  @@index([driverId, status, expiresAt])
+}
+
+model DriverCashEvent {
+  id        String      @id @default(cuid())
+  driverId  String
+  shiftId   String
+  orderId   String?
+  amount    Int                                     // + collected, − returned
+  kind      String                                  // "collect" | "refund" | "adjust"
+  note      String?
+  createdAt DateTime    @default(now())
+
+  driver    Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  shift     DriverShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@index([driverId, createdAt])
+  @@index([shiftId])
+}
+
+model DriverPushSubscription {
+  id        String   @id @default(cuid())
+  driverId  String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
 }

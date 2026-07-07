@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateBotReply } from "@/lib/bot";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN!;
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN!;
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID!;
 
 // ── Webhook verification ──
 export async function GET(req: NextRequest) {
@@ -62,22 +61,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ status: "ok" });
 }
 
-async function sendWhatsAppMessage(to: string, text: string) {
-  const res = await fetch(`https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: { preview_url: true, body: text },
-    }),
-  });
-
-  if (!res.ok) {
-    console.error("[WhatsApp] Send failed:", await res.text());
-  }
-}
+// sendWhatsAppMessage now lives in lib/whatsapp.ts so any server code can
+// call it. Bot webhook is one caller among many going forward (driver
+// onboarding, offer push fallbacks, shift summaries, heartbeat-lost alerts).
