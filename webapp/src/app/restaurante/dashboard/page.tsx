@@ -11,6 +11,18 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 type Analytics = {
   period: string;
@@ -30,6 +42,24 @@ type Analytics = {
   dailyBreakdown: { date: string; label: string; count: number; revenue: number; delivered: number; cancelled: number }[];
 };
 
+type ItemsAnalytics = {
+  topByRevenue: Array<{ menuItemId: string | null; name: string; category: string; qty: number; revenue: number; ordersWithItem: number }>;
+  topByQuantity: Array<{ menuItemId: string | null; name: string; category: string; qty: number; revenue: number; ordersWithItem: number }>;
+  categoryRollup: Array<{ category: string; qty: number; revenue: number; share: number }>;
+  deadSkus: Array<{ menuItemId: string; name: string; category: string; priceARS: number }>;
+  attachPairs: Array<{ whenBuying: string; alsoBuys: string; bothOrders: number; whenOrders: number; rate: number }>;
+};
+
+type FulfillmentAnalytics = {
+  timing: { avgMinsToDelivered: number | null; p50MinsToDelivered: number | null; p90MinsToDelivered: number | null; sample: number };
+  cancelByChannel: Array<{ channel: string; total: number; cancelled: number; rate: number }>;
+  receiptAttach: { nonCash: number; withReceipt: number; rate: number };
+  paymentAssumed: { delivered: number; assumed: number; rate: number };
+  markedDeliveredBy: Array<{ surface: string; count: number }>;
+};
+
+type Tab = "resumen" | "items" | "ops";
+
 const PERIODS = [
   { value: "today", label: "Hoy" },
   { value: "yesterday", label: "Ayer" },
@@ -48,6 +78,11 @@ export default function AnalyticsPage() {
   const [period, setPeriod] = useState("week");
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>("resumen");
+  const [items, setItems] = useState<ItemsAnalytics | null>(null);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [ops, setOps] = useState<FulfillmentAnalytics | null>(null);
+  const [opsLoading, setOpsLoading] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,6 +105,27 @@ export default function AnalyticsPage() {
         setLoading(false);
       });
   }, [slug, period]);
+
+  // Items tab: fetch on tab-activation and period-change. On-demand keeps
+  // the initial page load fast for the 90% of visits that stay on Resumen.
+  useEffect(() => {
+    if (!slug || tab !== "items") return;
+    setItemsLoading(true);
+    fetch(`/api/restaurante/analytics/items?period=${period}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { setItems(d); setItemsLoading(false); })
+      .catch(() => setItemsLoading(false));
+  }, [slug, tab, period]);
+
+  // Ops tab: fetch fulfillment data on activation.
+  useEffect(() => {
+    if (!slug || tab !== "ops") return;
+    setOpsLoading(true);
+    fetch(`/api/restaurante/analytics/fulfillment?period=${period}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { setOps(d); setOpsLoading(false); })
+      .catch(() => setOpsLoading(false));
+  }, [slug, tab, period]);
 
   function handlePrint() {
     window.print();
@@ -133,6 +189,29 @@ export default function AnalyticsPage() {
             {PERIODS.find((p) => p.value === period)?.label} — {slug}
           </p>
         </div>
+
+        {/* Tab bar */}
+        <div className="border-b border-white/5 flex gap-1 print:hidden -mt-2">
+          {([
+            { key: "resumen" as Tab, label: "Resumen" },
+            { key: "items" as Tab, label: "Ítems" },
+            { key: "ops" as Tab, label: "Operaciones" },
+          ]).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                tab === t.key
+                  ? "text-primary border-primary"
+                  : "text-slate-400 border-transparent hover:text-slate-200"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "resumen" && <>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -338,6 +417,13 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </div>
+
+        </>}
+
+        {tab === "items" && <ItemsTab data={items} loading={itemsLoading} />}
+
+        {tab === "ops" && <OpsTab data={ops} loading={opsLoading} />}
+
       </div>
 
       {/* Print styles */}
@@ -355,6 +441,225 @@ export default function AnalyticsPage() {
           .hidden.print\\:block { display: block !important; }
         }
       `}</style>
+    </div>
+  );
+}
+
+// ─── Ítems tab ─────────────────────────────────────────────────────────────
+
+const CATEGORY_COLORS = ["#f97316", "#f59e0b", "#eab308", "#84cc16", "#10b981", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899", "#ef4444"];
+
+function ItemsTab({ data, loading }: { data: ItemsAnalytics | null; loading: boolean }) {
+  if (loading || !data) {
+    return <div className="flex items-center justify-center py-16"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+  }
+  const hasData = data.topByRevenue.length > 0;
+  if (!hasData) {
+    return <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-8 text-center text-sm text-slate-400">No hay ventas en este período todavía.</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Top by revenue */}
+      <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+        <h3 className="text-sm font-bold text-white mb-4">💰 Top ítems por ingresos</h3>
+        <ResponsiveContainer width="100%" height={Math.max(240, data.topByRevenue.length * 34)}>
+          <BarChart data={data.topByRevenue.slice(0, 10)} layout="vertical" margin={{ top: 5, right: 40, left: 0, bottom: 5 }}>
+            <CartesianGrid stroke="#ffffff10" horizontal={false} />
+            <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `$${(v as number).toLocaleString("es-AR")}`} />
+            <YAxis type="category" dataKey="name" tick={{ fill: "#e2e8f0", fontSize: 11 }} width={140} interval={0} />
+            <Tooltip
+              contentStyle={{ background: "#0f172a", border: "1px solid #ffffff20", borderRadius: 8, fontSize: 12 }}
+              formatter={(v, k) => k === "revenue" ? [`$${(v as number).toLocaleString("es-AR")}`, "Ingresos"] : [v, k]}
+              labelStyle={{ color: "#e2e8f0" }}
+            />
+            <Bar dataKey="revenue" fill="#f97316" radius={[0, 4, 4, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Two-column: category rollup + top-by-quantity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <h3 className="text-sm font-bold text-white mb-4">🏷️ Ingresos por categoría</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie
+                data={data.categoryRollup}
+                dataKey="revenue"
+                nameKey="category"
+                cx="50%"
+                cy="50%"
+                outerRadius={90}
+                label={(props: any) => `${props.category ?? ""} ${((props.share ?? 0) * 100).toFixed(0)}%`}
+                labelLine={false}
+              >
+                {data.categoryRollup.map((_, i) => (
+                  <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ background: "#0f172a", border: "1px solid #ffffff20", borderRadius: 8, fontSize: 12 }}
+                formatter={(v) => `$${(v as number).toLocaleString("es-AR")}`}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <h3 className="text-sm font-bold text-white mb-4">🔥 Más vendidos (cantidad)</h3>
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {data.topByQuantity.slice(0, 10).map((it, i) => (
+              <div key={it.menuItemId || it.name} className="flex items-center gap-3">
+                <span className="w-6 text-xs font-bold text-slate-500">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-white truncate">{it.name}</div>
+                  <div className="text-[11px] text-slate-500">{it.category}</div>
+                </div>
+                <span className="text-sm font-bold text-primary tabular-nums">{it.qty}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Attach pairs */}
+      {data.attachPairs.length > 0 && (
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <h3 className="text-sm font-bold text-white mb-1">🤝 Se llevan juntos</h3>
+          <p className="text-xs text-slate-500 mb-4">Cuando alguien pide el primero, con qué frecuencia también lleva el segundo.</p>
+          <div className="space-y-2">
+            {data.attachPairs.map((p, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2 text-sm">
+                <span className="text-white truncate flex-1">{p.whenBuying}</span>
+                <span className="text-slate-500">→</span>
+                <span className="text-white truncate flex-1">{p.alsoBuys}</span>
+                <span className="font-bold text-primary whitespace-nowrap">{(p.rate * 100).toFixed(0)}%</span>
+                <span className="text-[11px] text-slate-500 whitespace-nowrap">({p.bothOrders}/{p.whenOrders})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Dead SKUs */}
+      {data.deadSkus.length > 0 && (
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <h3 className="text-sm font-bold text-white mb-1">💤 Sin ventas en este período</h3>
+          <p className="text-xs text-slate-500 mb-4">Ítems disponibles que no se vendieron. Considerá promocionarlos o revisarlos.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+            {data.deadSkus.map((sku) => (
+              <div key={sku.menuItemId} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <div className="text-white truncate">{sku.name}</div>
+                  <div className="text-[11px] text-slate-500">{sku.category}</div>
+                </div>
+                <span className="text-xs text-slate-400 whitespace-nowrap">${sku.priceARS.toLocaleString("es-AR")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Operaciones tab ───────────────────────────────────────────────────────
+
+function OpsTab({ data, loading }: { data: FulfillmentAnalytics | null; loading: boolean }) {
+  if (loading || !data) {
+    return <div className="flex items-center justify-center py-16"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+  }
+  const t = data.timing;
+  const totalMarked = data.markedDeliveredBy.reduce((s, r) => s + r.count, 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Timing tiles */}
+      <div>
+        <h3 className="text-sm font-bold text-white mb-3">⏱️ Tiempo a entrega</h3>
+        <div className="grid grid-cols-3 gap-3">
+          <StatTile label="Promedio" value={t.avgMinsToDelivered != null ? `${t.avgMinsToDelivered} min` : "—"} tint="emerald" />
+          <StatTile label="Mediana (p50)" value={t.p50MinsToDelivered != null ? `${t.p50MinsToDelivered} min` : "—"} tint="blue" />
+          <StatTile label="Alto (p90)" value={t.p90MinsToDelivered != null ? `${t.p90MinsToDelivered} min` : "—"} tint="amber" hint={`sobre ${t.sample.toLocaleString("es-AR")} entregados`} />
+        </div>
+      </div>
+
+      {/* Cancel by channel */}
+      {data.cancelByChannel.length > 0 && (
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <h3 className="text-sm font-bold text-white mb-3">🚫 Cancelación por canal</h3>
+          <div className="space-y-3">
+            {data.cancelByChannel.map((c) => (
+              <div key={c.channel}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-slate-400">{c.channel}</span>
+                  <span className="text-slate-300"><b>{c.cancelled}</b> de {c.total} · <span className="text-red-400 font-bold">{(c.rate * 100).toFixed(1)}%</span></span>
+                </div>
+                <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                  <div className="h-full bg-red-500" style={{ width: `${c.rate * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Payment reconciliation */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Comprobantes</h4>
+          <div className="text-2xl font-extrabold text-white">{(data.receiptAttach.rate * 100).toFixed(0)}%</div>
+          <p className="text-xs text-slate-500 mt-1">
+            {data.receiptAttach.withReceipt} de {data.receiptAttach.nonCash} pedidos no-efectivo con comprobante adjunto
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Cobros asumidos</h4>
+          <div className="text-2xl font-extrabold text-white">{(data.paymentAssumed.rate * 100).toFixed(0)}%</div>
+          <p className="text-xs text-slate-500 mt-1">
+            {data.paymentAssumed.assumed} de {data.paymentAssumed.delivered} entregas marcadas pagadas sin verificar
+          </p>
+        </div>
+      </div>
+
+      {/* markedDeliveredBy */}
+      {totalMarked > 0 && (
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-5">
+          <h3 className="text-sm font-bold text-white mb-1">📦 Quién cierra los pedidos</h3>
+          <p className="text-xs text-slate-500 mb-4">En qué superficie se marca DELIVERED cada pedido.</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie
+                data={data.markedDeliveredBy}
+                dataKey="count"
+                nameKey="surface"
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                label={(props: any) => `${props.surface ?? ""} (${props.count ?? 0})`}
+                labelLine={false}
+              >
+                {data.markedDeliveredBy.map((_, i) => (
+                  <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #ffffff20", borderRadius: 8, fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatTile({ label, value, hint, tint }: { label: string; value: string; hint?: string; tint: "emerald" | "blue" | "amber" }) {
+  const color = tint === "emerald" ? "text-emerald-400" : tint === "blue" ? "text-blue-400" : "text-amber-400";
+  return (
+    <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-4">
+      <div className="text-[11px] text-slate-500 uppercase tracking-wide">{label}</div>
+      <div className={`text-2xl font-extrabold tracking-tight mt-1 ${color}`}>{value}</div>
+      {hint && <div className="text-[10px] text-slate-600 mt-1">{hint}</div>}
     </div>
   );
 }
