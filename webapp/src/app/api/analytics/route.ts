@@ -32,9 +32,44 @@ export async function GET(request: NextRequest) {
   const cancelled = orders.filter((o) => o.status === "CANCELLED");
   const active = orders.filter((o) => !["CANCELLED"].includes(o.status));
 
-  const totalRevenue = delivered.reduce((s, o) => s + o.total, 0);
+  // Total delivered revenue now includes deliveryFee, matching the LTV
+  // convention in /api/restaurante/customers/route.ts (SUM(total + deliveryFee)
+  // WHERE status='DELIVERED'). totalRevenueFood is the food-only subtotal
+  // for owners who want to separate food revenue from delivery fee revenue.
+  const totalRevenueFood = delivered.reduce((s, o) => s + o.total, 0);
+  const deliveryFeeRevenue = delivered.reduce((s, o) => s + (o.deliveryFee || 0), 0);
+  const totalRevenue = totalRevenueFood + deliveryFeeRevenue;
   const pendingRevenue = active.filter((o) => o.status !== "DELIVERED").reduce((s, o) => s + o.total, 0);
   const avgOrderValue = delivered.length > 0 ? totalRevenue / delivered.length : 0;
+
+  // Breakdowns over DELIVERED orders — revenue + count per dimension. Owners
+  // use these to understand where the money is actually coming from.
+  const groupCount = <K extends string>(arr: Order[], key: (o: Order) => K | null | undefined) => {
+    const acc: Record<string, { count: number; revenue: number }> = {};
+    for (const o of arr) {
+      const k = key(o);
+      if (!k) continue;
+      if (!acc[k]) acc[k] = { count: 0, revenue: 0 };
+      acc[k].count++;
+      acc[k].revenue += (o.total || 0) + (o.deliveryFee || 0);
+    }
+    return acc;
+  };
+  const channelBreakdown = groupCount(delivered, (o) => (o.channel || "ONLINE") as string);
+  const paymentMethodBreakdown = groupCount(delivered, (o) => (o.paymentMethod || "unknown") as string);
+  const deliveryMethodBreakdown = groupCount(delivered, (o) => (o.deliveryMethod || "delivery") as string);
+
+  // paymentIntent (what customer said at checkout) × paymentMethod (what was
+  // actually recorded). Surfaces mismatches — e.g. intent=transfer but
+  // method=cash means the cashier ended up taking cash instead. Only orders
+  // where both fields are set are counted.
+  const paymentIntentVsActual: Record<string, Record<string, number>> = {};
+  for (const o of delivered) {
+    const intent = o.paymentIntent || "none";
+    const method = o.paymentMethod || "unknown";
+    if (!paymentIntentVsActual[intent]) paymentIntentVsActual[intent] = {};
+    paymentIntentVsActual[intent][method] = (paymentIntentVsActual[intent][method] || 0) + 1;
+  }
 
   // Item aggregation
   const itemMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
@@ -113,6 +148,8 @@ export async function GET(request: NextRequest) {
       deliveredOrders: delivered.length,
       cancelledOrders: cancelled.length,
       totalRevenue,
+      totalRevenueFood,       // food only (excludes deliveryFee)
+      deliveryFeeRevenue,     // delivery fee income only
       pendingRevenue,
       avgOrderValue: Math.round(avgOrderValue),
       peakHour: `${String(peakHour.hour).padStart(2, "0")}:00`,
@@ -124,5 +161,9 @@ export async function GET(request: NextRequest) {
       .map(([h, data]) => ({ hour: Number(h), label: `${String(h).padStart(2, "0")}:00`, ...data }))
       .filter((h) => h.count > 0),
     dailyBreakdown,
+    channelBreakdown,
+    paymentMethodBreakdown,
+    deliveryMethodBreakdown,
+    paymentIntentVsActual,
   });
 }
