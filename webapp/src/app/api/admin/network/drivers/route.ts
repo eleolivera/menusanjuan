@@ -44,21 +44,38 @@ export async function POST(request: NextRequest) {
   if (!displayName) return NextResponse.json({ error: "missing_name" }, { status: 400 });
   const vehicleType = body.vehicleType ? String(body.vehicleType).slice(0, 20) : null;
 
+  // Resurrect if this phone belongs to a soft-deleted network driver. A phone
+  // owned by any resta, or active anywhere, still 409s.
   const existing = await prisma.driver.findUnique({ where: { phone: phoneCanonical } });
-  if (existing) return NextResponse.json({ error: "phone_in_use", isNetwork: existing.ownerDealerId === null }, { status: 409 });
+  if (existing && (existing.ownerDealerId !== null || existing.isActive)) {
+    return NextResponse.json({ error: "phone_in_use", isNetwork: existing.ownerDealerId === null }, { status: 409 });
+  }
 
   const loginCode = generateDriverLoginCode();
-  const driver = await prisma.driver.create({
-    data: {
-      phone: phoneCanonical,
-      displayName,
-      vehicleType,
-      loginCode,
-      loginCodeExpiresAt: driverCodeExpiry(),
-      ownerDealerId: null,
-    },
-    select: { id: true, phone: true, displayName: true, vehicleType: true, loginCode: true, loginCodeExpiresAt: true },
-  });
+  const driver = existing
+    ? await prisma.driver.update({
+        where: { id: existing.id },
+        data: {
+          displayName,
+          vehicleType,
+          isActive: true,
+          onShift: false,
+          loginCode,
+          loginCodeExpiresAt: driverCodeExpiry(),
+        },
+        select: { id: true, phone: true, displayName: true, vehicleType: true, loginCode: true, loginCodeExpiresAt: true },
+      })
+    : await prisma.driver.create({
+        data: {
+          phone: phoneCanonical,
+          displayName,
+          vehicleType,
+          loginCode,
+          loginCodeExpiresAt: driverCodeExpiry(),
+          ownerDealerId: null,
+        },
+        select: { id: true, phone: true, displayName: true, vehicleType: true, loginCode: true, loginCodeExpiresAt: true },
+      });
 
   return NextResponse.json({ driver }, { status: 201 });
 }

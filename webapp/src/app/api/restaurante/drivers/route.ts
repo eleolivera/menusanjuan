@@ -50,24 +50,39 @@ export async function POST(request: NextRequest) {
   if (!displayName) return NextResponse.json({ error: "missing_name" }, { status: 400 });
   const vehicleType = body.vehicleType ? String(body.vehicleType).slice(0, 20) : null;
 
-  // Phone must be globally unique across drivers (one identity per person).
+  // Phone is globally unique across drivers. Exception: if this same resta
+  // previously soft-deleted a driver with this phone, re-adding resurrects
+  // the row (preserves shift + cash history via cascades on the same id).
   const existing = await prisma.driver.findUnique({ where: { phone: phoneCanonical } });
-  if (existing) {
+  if (existing && (existing.ownerDealerId !== dealer.id || existing.isActive)) {
     return NextResponse.json({ error: "phone_in_use", existingOwnedByYou: existing.ownerDealerId === dealer.id }, { status: 409 });
   }
 
   const loginCode = generateDriverLoginCode();
-  const driver = await prisma.driver.create({
-    data: {
-      phone: phoneCanonical,
-      displayName,
-      vehicleType,
-      loginCode,
-      loginCodeExpiresAt: driverCodeExpiry(),
-      ownerDealerId: dealer.id,
-    },
-    select: { id: true, phone: true, displayName: true, vehicleType: true, loginCode: true, loginCodeExpiresAt: true },
-  });
+  const driver = existing
+    ? await prisma.driver.update({
+        where: { id: existing.id },
+        data: {
+          displayName,
+          vehicleType,
+          isActive: true,
+          onShift: false,
+          loginCode,
+          loginCodeExpiresAt: driverCodeExpiry(),
+        },
+        select: { id: true, phone: true, displayName: true, vehicleType: true, loginCode: true, loginCodeExpiresAt: true },
+      })
+    : await prisma.driver.create({
+        data: {
+          phone: phoneCanonical,
+          displayName,
+          vehicleType,
+          loginCode,
+          loginCodeExpiresAt: driverCodeExpiry(),
+          ownerDealerId: dealer.id,
+        },
+        select: { id: true, phone: true, displayName: true, vehicleType: true, loginCode: true, loginCodeExpiresAt: true },
+      });
 
   return NextResponse.json({ driver }, { status: 201 });
 }
