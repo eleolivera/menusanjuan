@@ -1,0 +1,16 @@
+{
+  "name": "MenuSanJuan Repartidor",
+  "short_name": "Repartidor",
+  "description": "App para repartidores de MenuSanJuan",
+  "start_url": "/repartidor",
+  "scope": "/repartidor",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#f97316",
+  "icons": [
+    { "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

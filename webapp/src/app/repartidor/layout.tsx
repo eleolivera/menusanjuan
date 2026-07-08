@@ -5,6 +5,10 @@ import type { Metadata, Viewport } from "next";
 // login form never surfaces publicly.
 export const metadata: Metadata = {
   title: "MenuSanJuan Repartidor",
+  // Dedicated PWA manifest scoped to /repartidor so "Add to home screen"
+  // installs a driver-launching icon (start_url = /repartidor) instead of
+  // inheriting the site-wide manifest that lands on the marketing home.
+  manifest: "/manifest-repartidor.json",
   robots: {
     index: false,
     follow: false,
