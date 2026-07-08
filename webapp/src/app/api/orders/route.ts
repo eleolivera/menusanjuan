@@ -13,7 +13,6 @@ import { rewardsFlag, upsertCustomerByPhone, applyPendingRedemption, attachRedem
 import { isValidPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { getCustomerFromSession } from "@/lib/customer-auth";
-import { dispatchOrder } from "@/lib/dispatch";
 
 // POST — create a new order
 export async function POST(request: NextRequest) {
@@ -182,20 +181,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // P3 dispatch — AWAIT so Vercel doesn't kill the invocation after response.
-    // Never rethrow: order creation must succeed even if dispatch fails.
-    // MANUAL restas short-circuit fast (manual_mode); pickup orders short-circuit
-    // as not_delivery. Both are expected warns, not errors.
-    try {
-      const dispatchResult = await dispatchOrder(order.id);
-      if (dispatchResult.ok) {
-        console.info("dispatchOrder success", { orderId: order.id, ...dispatchResult });
-      } else {
-        console.warn("dispatchOrder skipped/failed", { orderId: order.id, reason: dispatchResult.reason });
-      }
-    } catch (err) {
-      console.error("dispatchOrder threw:", err);
-    }
+    // Dispatch is NOT fired here — it fires when the resta transitions the order
+    // to PROCESSING ("Mandar a Cocina") in /api/orders/[id] PATCH. Firing at
+    // order creation pinged drivers before the kitchen even acknowledged the
+    // order, so drivers arrived to raw food.
 
     // Fire-and-forget email notification to restaurant owner
     notifyRestaurantOfNewOrder(order).catch(() => {});

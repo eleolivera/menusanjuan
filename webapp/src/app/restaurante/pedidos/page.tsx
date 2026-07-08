@@ -40,6 +40,10 @@ export default function RestauranteDashboard() {
   const router = useRouter();
   const [slug, setSlug] = useState<string | null>(null);
   const [restaurantName, setRestaurantName] = useState("");
+  // Tenant-level delivery routing mode (`MANUAL` | `NETWORK` | ...). Task B
+  // exposes this on `/api/restaurante/session`. Fall back to `MANUAL` while
+  // the session response still lacks it so nothing accidentally dispatches.
+  const [deliveryMode, setDeliveryMode] = useState<string>("MANUAL");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(getArDateString(0));
@@ -57,6 +61,9 @@ export default function RestauranteDashboard() {
       .then((data) => {
         setSlug(data.slug);
         setRestaurantName(data.name || data.slug);
+        if (typeof data.deliveryMode === "string") {
+          setDeliveryMode(data.deliveryMode);
+        }
       })
       .catch(() => router.push("/restaurante/login"));
   }, [router]);
@@ -262,7 +269,13 @@ export default function RestauranteDashboard() {
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <KanbanBoard orders={orders} onUpdateStatus={updateStatus} restaurantName={restaurantName || slug} />
+            <KanbanBoard
+              orders={orders}
+              onUpdateStatus={updateStatus}
+              restaurantName={restaurantName || slug}
+              deliveryMode={deliveryMode}
+              onDispatched={fetchOrders}
+            />
           )}
         </div>
       </div>

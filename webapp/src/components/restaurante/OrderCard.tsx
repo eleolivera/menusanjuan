@@ -6,6 +6,7 @@ import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCol
 import { MoneyInput } from "@/components/MoneyInput";
 import { buildDeliveryInstructions } from "@/lib/delivery-instructions";
 import { ReceiptValidationModal } from "./ReceiptValidationModal";
+import { DriverChip } from "./DriverChip";
 import {
   FileText,
   Wallet,
@@ -75,10 +76,21 @@ export function OrderCard({
   order,
   onUpdateStatus,
   restaurantName,
+  deliveryMode,
+  onDispatched,
 }: {
   order: Order;
   onUpdateStatus: (orderId: string, status: OrderStatus, extras?: { markPaid?: boolean; paymentMethod?: "cash" | "transfer" | "mercadopago" }) => void;
   restaurantName: string;
+  // Tenant-level delivery routing mode from `/api/restaurante/session`. When
+  // "MANUAL" the resta hand-copies delivery instructions (existing
+  // CopyDeliveryButton flow); anything else routes through the driver
+  // network and renders <DriverChip>. Optional for back-compat with legacy
+  // callers (admin surfaces) that don't pass it yet.
+  deliveryMode?: string;
+  // Called after a successful POST /dispatch so the parent can refetch
+  // immediately instead of waiting for the next 10s poll tick.
+  onDispatched?: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   // "charge"  = full PaymentCollector with cash calculator (cobrar ahora, in-person)
@@ -387,11 +399,33 @@ export function OrderCard({
                 Maps
               </a>
             )}
-            {order.deliveryMethod === "delivery" && (
-              <CopyDeliveryButton order={order} restaurantName={restaurantName} variant="subtle" />
-            )}
+            {/* Copy-instructions affordance is the MANUAL-mode fallback:
+                the owner pastes into their own WhatsApp delivery group. For
+                network-mode restas the DriverChip below owns the dispatch
+                flow, so hide this to avoid two competing "start delivery"
+                paths. When `deliveryMode` is unspecified (legacy callers)
+                we err on the side of keeping the existing button visible. */}
+            {order.deliveryMethod === "delivery" &&
+              (deliveryMode ?? "MANUAL") === "MANUAL" && (
+                <CopyDeliveryButton order={order} restaurantName={restaurantName} variant="subtle" />
+              )}
           </div>
         </div>
+
+        {/* Driver network chip / dispatch button — only for network-mode
+            restas on delivery orders that have hit the kitchen (PROCESSING)
+            or are already out for delivery / done. Below Cliente, above
+            Marcar Entregado transition, per §3 of the design. */}
+        {order.deliveryMethod === "delivery" &&
+          deliveryMode &&
+          deliveryMode !== "MANUAL" &&
+          (order.status === "PROCESSING" || order.status === "DELIVERED") && (
+            <DriverChip
+              order={order}
+              deliveryMode={deliveryMode}
+              onDispatched={() => onDispatched?.()}
+            />
+          )}
 
           {/* Delivery fee — three states: missing (warning + add), set (display + edit), editing (form) */}
           {order.deliveryMethod === "delivery" && !editingFee && needsDeliveryFee && (

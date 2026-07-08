@@ -12,10 +12,16 @@ export function KanbanBoard({
   orders,
   onUpdateStatus,
   restaurantName,
+  deliveryMode,
+  onDispatched,
 }: {
   orders: Order[];
   onUpdateStatus: (orderId: string, status: OrderStatus, extras?: { markPaid?: boolean; paymentMethod?: "cash" | "transfer" | "mercadopago" }) => void;
   restaurantName: string;
+  // Tenant delivery routing — threaded down to OrderCard so it can decide
+  // between the manual copy-to-clipboard flow and the network dispatch chip.
+  deliveryMode?: string;
+  onDispatched?: () => void;
 }) {
   const [dragOverCol, setDragOverCol] = useState<OrderStatus | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
@@ -194,7 +200,13 @@ export function KanbanBoard({
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedOrder(null)}>
             <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-slate-950 rounded-2xl border border-white/10 p-1" onClick={(e) => e.stopPropagation()}>
-              <OrderCard order={order} onUpdateStatus={onUpdateStatus} restaurantName={restaurantName} />
+              <OrderCard
+                order={order}
+                onUpdateStatus={onUpdateStatus}
+                restaurantName={restaurantName}
+                deliveryMode={deliveryMode}
+                onDispatched={onDispatched}
+              />
               <div className="px-4 pb-3">
                 <button onClick={() => setSelectedOrder(null)} className="w-full rounded-xl border border-white/10 py-2 text-xs text-slate-400 hover:bg-white/5 transition-colors">
                   Cerrar

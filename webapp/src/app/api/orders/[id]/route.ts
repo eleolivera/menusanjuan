@@ -94,8 +94,10 @@ export async function PATCH(
       }
     }
 
-    // Owner kanban path — fall-through when the auto-pay branch didn't fire
-    // (already PAID, or owner picked "Aún no cobré" via the new confirm modal).
+    // Owner kanban path — fall-through when the auto-pay branch didn't fire.
+    // Dispatch to delivery network is no longer implicit on PROCESSING —
+    // owner clicks explicit "🛵 Enviar a delivery" button which hits
+    // POST /api/restaurante/orders/[orderId]/dispatch.
     const order = await updateOrderStatus(id, body.status, { markedDeliveredBy: "owner" });
     if (!order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     if (body.status === "DELIVERED") {

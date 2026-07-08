@@ -63,6 +63,19 @@ export type Order = {
   customerAccessToken: string | null;
   driverAccessToken: string | null;
   deliveredAt: string | null;
+  assignedDriver: {
+    id: string;
+    displayName: string;
+    currentLat: number | null;
+    currentLng: number | null;
+  } | null;
+  latestOffer: {
+    id: string;
+    status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CANCELLED";
+    offeredAt: string;
+    expiresAt: string;
+    distanceKm: number | null;
+  } | null;
   // POS fields
   channel: OrderChannel;
   tableNumber: string | null;
@@ -237,6 +250,23 @@ function mapOrder(dbOrder: any): Order {
     customerAccessToken: dbOrder.customerAccessToken || null,
     driverAccessToken: dbOrder.driverAccessToken || null,
     deliveredAt: dbOrder.deliveredAt ? dbOrder.deliveredAt.toISOString() : null,
+    assignedDriver: dbOrder.assignedDriver
+      ? {
+          id: dbOrder.assignedDriver.id,
+          displayName: dbOrder.assignedDriver.displayName,
+          currentLat: dbOrder.assignedDriver.currentLat ?? null,
+          currentLng: dbOrder.assignedDriver.currentLng ?? null,
+        }
+      : null,
+    latestOffer: dbOrder.deliveryOffers?.[0]
+      ? {
+          id: dbOrder.deliveryOffers[0].id,
+          status: dbOrder.deliveryOffers[0].status,
+          offeredAt: dbOrder.deliveryOffers[0].offeredAt.toISOString(),
+          expiresAt: dbOrder.deliveryOffers[0].expiresAt.toISOString(),
+          distanceKm: dbOrder.deliveryOffers[0].distanceKm ?? null,
+        }
+      : null,
     channel: (dbOrder.channel || "ONLINE") as OrderChannel,
     tableNumber: dbOrder.tableNumber || null,
     paymentMethod: dbOrder.paymentMethod || null,
@@ -354,6 +384,22 @@ export async function getOrdersByRestaurante(
   const dbOrders = await prisma.order.findMany({
     where,
     orderBy: { createdAt: "desc" },
+    include: {
+      assignedDriver: {
+        select: { id: true, displayName: true, currentLat: true, currentLng: true },
+      },
+      deliveryOffers: {
+        orderBy: { offeredAt: "desc" },
+        take: 1,
+        select: {
+          id: true,
+          status: true,
+          offeredAt: true,
+          expiresAt: true,
+          distanceKm: true,
+        },
+      },
+    },
   });
 
   return dbOrders.map(mapOrder);
