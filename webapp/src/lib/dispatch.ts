@@ -25,8 +25,8 @@ export type DispatchReason =
   | "no_available_drivers";
 
 export type DispatchResult =
-  | { ok: true; offerId: string; driverId: string; poolUsed: "OWN" | "NETWORK" }
-  | { ok: false; reason: DispatchReason };
+  | { ok: true; offerId: string; driverId: string; poolUsed: "OWN" | "NETWORK"; debug?: Record<string, unknown> }
+  | { ok: false; reason: DispatchReason; debug?: Record<string, unknown> };
 
 const OFFER_TTL_MS = 30_000;
 const HEARTBEAT_WINDOW_MS = 90_000;
@@ -92,23 +92,48 @@ export async function dispatchOrder(orderId: string): Promise<DispatchResult> {
         : ["OWN", "NETWORK"]; // HYBRID
 
   const heartbeatFloor = new Date(Date.now() - HEARTBEAT_WINDOW_MS);
+
+  // Pre-fetch drivers with in-flight assignments (any non-DELIVERED assigned
+  // Order). Prisma's `assignedOrders: { none: ... }` filter proved unreliable
+  // in prod (returned zero candidates even when raw SQL showed matches), so we
+  // resolve the "busy driver" set explicitly and merge into the blacklist.
+  const busy = await prisma.order.findMany({
+    where: { assignedDriverId: { not: null }, status: { not: "DELIVERED" } },
+    select: { assignedDriverId: true },
+  });
+  for (const b of busy) if (b.assignedDriverId) blacklist.add(b.assignedDriverId);
   const blacklistArr = Array.from(blacklist);
+
+  const debug: Record<string, unknown> = {
+    dealerId: dealer.id,
+    deliveryMode: dealer.deliveryMode,
+    pools,
+    heartbeatFloor: heartbeatFloor.toISOString(),
+    blacklistSize: blacklistArr.length,
+    perPoolCandidateCount: {} as Record<string, number>,
+  };
 
   // 10-11. Try each pool in order.
   for (const pool of pools) {
+    const where: Record<string, unknown> = {
+      isActive: true,
+      onShift: true,
+      lastPingAt: { gte: heartbeatFloor },
+      ownerDealerId: pool === "OWN" ? dealer.id : null,
+      currentLat: { not: null },
+      currentLng: { not: null },
+    };
+    // Only pass notIn when non-empty — Prisma 7 has an edge case where
+    // `{ notIn: [] }` can behave unexpectedly.
+    if (blacklistArr.length > 0) where.id = { notIn: blacklistArr };
+
     const candidates = await prisma.driver.findMany({
-      where: {
-        isActive: true,
-        onShift: true,
-        lastPingAt: { gte: heartbeatFloor },
-        id: { notIn: blacklistArr },
-        ownerDealerId: pool === "OWN" ? dealer.id : null,
-        currentLat: { not: null },
-        currentLng: { not: null },
-        assignedOrders: { none: { status: { not: "DELIVERED" } } },
-      },
+      where,
       select: { id: true, currentLat: true, currentLng: true },
     });
+
+    (debug.perPoolCandidateCount as Record<string, number>)[pool] = candidates.length;
+    console.info("[dispatch]", { orderId, pool, ...debug });
 
     if (candidates.length === 0) continue;
 
@@ -152,10 +177,10 @@ export async function dispatchOrder(orderId: string): Promise<DispatchResult> {
       });
     });
 
-    if (offer === null) return { ok: false, reason: "already_assigned" };
-    return { ok: true, offerId: offer.id, driverId: offer.driverId, poolUsed: pool };
+    if (offer === null) return { ok: false, reason: "already_assigned", debug };
+    return { ok: true, offerId: offer.id, driverId: offer.driverId, poolUsed: pool, debug };
   }
 
   // 12. All pools exhausted with zero candidates.
-  return { ok: false, reason: "no_available_drivers" };
+  return { ok: false, reason: "no_available_drivers", debug };
 }
