@@ -12,6 +12,7 @@ import { DeliveryZonesEditor, ZonesSummary } from "@/components/DeliveryZonesEdi
 import { ProfileSection, ProfileSectionFooter, SectionStatus } from "@/components/restaurante/ProfileSection";
 import { useSmartSave } from "@/hooks/useSmartSave";
 import { SaveIndicator } from "@/components/SaveIndicator";
+import { resizeImageForUpload } from "@/lib/resize-image";
 
 type Restaurant = {
   id: string; name: string; slug: string; phone: string; address: string | null;
@@ -157,6 +158,7 @@ export default function AdminRestaurantDetail() {
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadError, setUploadError] = useState<{ type: "logo" | "cover"; msg: string } | null>(null);
 
   // Owner assignment
   const [assignEmail, setAssignEmail] = useState("");
@@ -223,21 +225,52 @@ export default function AdminRestaurantDetail() {
     setLoading(false);
   }
 
-  async function handleImageUpload(file: File, type: "logo" | "cover") {
+  async function handleImageUpload(rawFile: File, type: "logo" | "cover") {
     const setUploading = type === "logo" ? setUploadingLogo : setUploadingCover;
     setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", type);
+    setUploadError(null);
     try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const d = await res.json();
-      if (res.ok) {
-        // setValue with "instant" tier autosaves immediately
-        setValue(type === "logo" ? "logoUrl" : "coverUrl", d.url);
+      // Client-side resize before POST — logos are shown at ≤200 px and covers
+      // top out around 1600 px wide. Skipping resize meant multi-MB phone JPEGs
+      // silently 413'd against Vercel's 4.5 MB body limit and the old empty
+      // catch made it look like the button just didn't work.
+      let file: File = rawFile;
+      if (rawFile.type.startsWith("image/")) {
+        try {
+          file = await resizeImageForUpload(rawFile, type === "logo"
+            ? { maxWidth: 200, maxHeight: 200, quality: 0.9 }
+            : { maxWidth: 1600, maxHeight: 1600, quality: 0.85 });
+        } catch (err) {
+          setUploadError({ type, msg: `No pude procesar la imagen: ${err instanceof Error ? err.message : "error desconocido"}` });
+          setUploading(false);
+          return;
+        }
       }
-    } catch {}
-    setUploading(false);
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
+
+      let res: Response;
+      try {
+        res = await fetch("/api/upload", { method: "POST", body: formData });
+      } catch (err) {
+        setUploadError({ type, msg: `Falló la conexión: ${err instanceof Error ? err.message : "sin respuesta"}` });
+        setUploading(false);
+        return;
+      }
+
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setUploadError({ type, msg: (d as { error?: string }).error || `Error ${res.status}` });
+        setUploading(false);
+        return;
+      }
+      // setValue with "instant" tier autosaves immediately
+      setValue(type === "logo" ? "logoUrl" : "coverUrl", (d as { url: string }).url);
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleAssign() {
@@ -471,6 +504,23 @@ Probalo y decime qué te parece!`;
                   </div>
                 </div>
               </div>
+              {uploadError && (
+                <div className="mx-4 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300 flex items-start justify-between gap-2">
+                  <span>
+                    <span className="font-semibold">
+                      {uploadError.type === "logo" ? "Logo" : "Portada"}:
+                    </span>{" "}
+                    {uploadError.msg}
+                  </span>
+                  <button
+                    onClick={() => setUploadError(null)}
+                    className="text-red-300/70 hover:text-red-200 shrink-0"
+                    aria-label="Descartar error"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Admin-only quick controls */}
