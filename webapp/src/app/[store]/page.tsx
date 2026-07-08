@@ -4,7 +4,6 @@ import { getRestaurantBySlug } from "@/lib/get-restaurant";
 import { getMenuBySlug } from "@/lib/get-restaurant-menu";
 import { StoreMenu } from "@/components/StoreMenu";
 import { RewardBadge } from "@/components/RewardBadge";
-import { ClaimBanner } from "@/components/ClaimBanner";
 import { coverGradient } from "@/lib/gradients";
 import { prisma } from "@/lib/prisma";
 import { Star, Clock, MapPin } from "lucide-react";
@@ -216,16 +215,7 @@ export default async function StorePage({
         </div>
       </div>
 
-      {/* Claim Banner — only for unclaimed/unverified restaurants with no pre-assigned owner */}
-      {restaurant.dealerId && !restaurant.isVerified && !restaurant.hasPendingOwner && (
-        <ClaimBanner
-          dealerId={restaurant.dealerId}
-          restaurantName={restaurant.name}
-          slug={restaurant.slug}
-        />
-      )}
-
-      {/* Rewards progress badge — only mounted when this resta has rewards on.
+{/* Rewards progress badge — only mounted when this resta has rewards on.
           Server-side gate prevents the client-side fetch from flickering the
           badge in seconds after page load. */}
       {rewardsAvailable && <RewardBadge slug={restaurant.slug} />}
