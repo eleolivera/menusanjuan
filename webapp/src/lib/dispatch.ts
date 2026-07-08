@@ -14,6 +14,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { haversineDistance } from "@/lib/delivery";
+import { sendPushToDriver } from "@/lib/push";
 
 export type DispatchReason =
   | "order_not_found"
@@ -28,7 +29,8 @@ export type DispatchResult =
   | { ok: true; offerId: string; driverId: string; poolUsed: "OWN" | "NETWORK"; debug?: Record<string, unknown> }
   | { ok: false; reason: DispatchReason; debug?: Record<string, unknown> };
 
-const OFFER_TTL_MS = 30_000;
+// 45s: gives real drivers time to react to a push notification (animation + finger travel).
+const OFFER_TTL_MS = 45_000;
 const HEARTBEAT_WINDOW_MS = 90_000;
 
 export async function dispatchOrder(orderId: string): Promise<DispatchResult> {
@@ -41,6 +43,7 @@ export async function dispatchOrder(orderId: string): Promise<DispatchResult> {
       status: true,
       assignedDriverId: true,
       deliveryMethod: true,
+      deliveryFee: true,
     },
   });
   if (!order) return { ok: false, reason: "order_not_found" };
@@ -53,7 +56,7 @@ export async function dispatchOrder(orderId: string): Promise<DispatchResult> {
   // 5. Load dealer.
   const dealer = await prisma.dealer.findUnique({
     where: { slug: order.restauranteSlug },
-    select: { id: true, latitude: true, longitude: true, deliveryMode: true },
+    select: { id: true, name: true, latitude: true, longitude: true, deliveryMode: true },
   });
   if (!dealer) return { ok: false, reason: "no_dealer_coords" };
 
@@ -178,6 +181,20 @@ export async function dispatchOrder(orderId: string): Promise<DispatchResult> {
     });
 
     if (offer === null) return { ok: false, reason: "already_assigned", debug };
+
+    // P4 — fire-and-forget web push. Never blocks or fails dispatch; offer is
+    // already committed, push is best-effort (poll is the fallback channel).
+    const expiresAtIso = new Date(Date.now() + OFFER_TTL_MS).toISOString();
+    sendPushToDriver(offer.driverId, {
+      type: "offer",
+      offerId: offer.id,
+      orderId,
+      restauranteName: dealer.name,
+      deliveryFee: order.deliveryFee ?? 0,
+      distanceKm: chosen.distanceKm,
+      expiresAt: expiresAtIso,
+    }).catch((err) => console.warn("[dispatch] push send failed:", err));
+
     return { ok: true, offerId: offer.id, driverId: offer.driverId, poolUsed: pool, debug };
   }
 

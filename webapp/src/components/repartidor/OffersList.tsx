@@ -51,7 +51,8 @@ export function OffersList() {
 
   useEffect(() => {
     refetch();
-    const id = setInterval(refetch, 10_000);
+    // P4: push is the primary delivery channel; poll is the fallback for backgrounded push failure.
+    const id = setInterval(refetch, 30_000);
     return () => clearInterval(id);
   }, [refetch]);
 

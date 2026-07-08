@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShiftToggle } from "./ShiftToggle";
 import { LocationTracker } from "./LocationTracker";
+import { PushRegistrar } from "./PushRegistrar";
 import { OffersList } from "./OffersList";
 import { ActiveOrderCard } from "./ActiveOrderCard";
 import { CashTile } from "./CashTile";
@@ -147,6 +148,7 @@ export function HomeClient({ driver, activeShift, activeOrder, cashInHand }: Pro
       </main>
 
       {onShift && <LocationTracker active={onShift} />}
+      {onShift && <PushRegistrar active={onShift} />}
     </div>
   );
 }

@@ -111,7 +111,6 @@ export function DriverChip({
         onDispatched();
         return;
       }
-      // 4xx / 5xx — try to parse a `reason` from the JSON body and map it.
       let reason: string | undefined;
       try {
         const body = await res.json();
