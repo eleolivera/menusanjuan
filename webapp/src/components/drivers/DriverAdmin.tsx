@@ -81,20 +81,15 @@ export function DriverAdmin({
     }
   }
 
-  async function sendCode(driver: Driver) {
-    setBusyId(driver.id);
-    const res = await fetch(`${apiBase}/${driver.id}/send-code`, { method: "POST" });
-    setBusyId(null);
-    if (res.ok) {
-      alert(`Código enviado por WhatsApp a ${driver.displayName}.`);
-    } else {
-      const j = await res.json().catch(() => ({}));
-      const detail = j.graphError?.message ? `\n\n${j.graphError.message}` : "";
-      const hint = j.graphError?.code === 190 || j.error === "graph_401"
-        ? "\n\nProbable causa: el token de WhatsApp expiró o el número destinatario no está autorizado en modo de pruebas. Compartí el código con el repartidor manualmente por ahora."
-        : "";
-      alert(`No pude enviar el WhatsApp: ${j.error || "error"}${detail}${hint}`);
-    }
+  function sendCode(driver: Driver) {
+    if (!driver.loginCode) return;
+    const firstName = driver.displayName.split(/\s+/)[0] || driver.displayName;
+    const message =
+      `Hola ${firstName}! Tu código para MenuSanJuan Repartidor: *${driver.loginCode}*\n\n` +
+      `Instalá desde https://menusanjuan.com/repartidor y usá ese código junto a tu número.`;
+    const cleanPhone = driver.phone.replace(/\D/g, "");
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   if (error) return <div className="p-8 text-red-400 text-sm">Error cargando repartidores: {error}</div>;
