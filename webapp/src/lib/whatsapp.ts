@@ -11,7 +11,7 @@ const GRAPH_API_VERSION = "v21.0";
 
 export type SendResult =
   | { ok: true; whatsappMessageId: string | null }
-  | { ok: false; error: string };
+  | { ok: false; error: string; graphError?: { code?: number; type?: string; message?: string } };
 
 /**
  * Send a plain-text WhatsApp message to `to` (E.164 without leading +, or
@@ -60,7 +60,14 @@ export async function sendWhatsAppMessage(
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.error("[whatsapp] send failed:", res.status, body);
-      return { ok: false, error: `graph_${res.status}` };
+      // Try to surface Meta's structured error so callers can distinguish
+      // "token expired" (auth) from "recipient not allowed" (test mode).
+      let graphError: { code?: number; type?: string; message?: string } | undefined;
+      try {
+        const parsed = JSON.parse(body) as { error?: { code?: number; type?: string; message?: string } };
+        if (parsed?.error) graphError = { code: parsed.error.code, type: parsed.error.type, message: parsed.error.message };
+      } catch {}
+      return { ok: false, error: `graph_${res.status}`, graphError };
     }
 
     const json = await res.json().catch(() => null);

@@ -89,7 +89,11 @@ export function DriverAdmin({
       alert(`Código enviado por WhatsApp a ${driver.displayName}.`);
     } else {
       const j = await res.json().catch(() => ({}));
-      alert(`No pude enviar el WhatsApp: ${j.error || "error desconocido"}`);
+      const detail = j.graphError?.message ? `\n\n${j.graphError.message}` : "";
+      const hint = j.graphError?.code === 190 || j.error === "graph_401"
+        ? "\n\nProbable causa: el token de WhatsApp expiró o el número destinatario no está autorizado en modo de pruebas. Compartí el código con el repartidor manualmente por ahora."
+        : "";
+      alert(`No pude enviar el WhatsApp: ${j.error || "error"}${detail}${hint}`);
     }
   }
 

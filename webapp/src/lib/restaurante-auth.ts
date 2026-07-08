@@ -161,6 +161,9 @@ export async function getFullSession() {
               id: true, name: true, slug: true, cuisineType: true,
               logoUrl: true, coverUrl: true, phone: true, address: true,
               description: true, isActive: true, isVerified: true,
+              // Needed by DashboardShell to conditionally show the
+              // 'Repartidores' nav entry when the resta is on OWN/HYBRID.
+              deliveryMode: true,
             },
           },
         },

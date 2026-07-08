@@ -31,7 +31,14 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     `Instalá desde https://menusanjuan.com/repartidor y usá ese código junto a tu número.`;
 
   const result = await sendWhatsAppMessage(driver.phone, message);
-  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
+  if (!result.ok) {
+    // Surface Meta's structured error verbatim so the UI can tell the owner
+    // "token expired" vs "recipient not approved" vs a generic auth issue.
+    return NextResponse.json(
+      { error: result.error, graphError: result.graphError },
+      { status: 502 }
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

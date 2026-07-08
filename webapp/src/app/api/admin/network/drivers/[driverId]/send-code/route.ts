@@ -23,7 +23,12 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     `Instalá desde https://menusanjuan.com/repartidor y usá ese código junto a tu número.`;
 
   const result = await sendWhatsAppMessage(driver.phone, message);
-  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error, graphError: result.graphError },
+      { status: 502 }
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }
