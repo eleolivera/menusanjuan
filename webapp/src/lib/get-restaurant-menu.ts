@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import type { MenuCategoryData, MenuItemData, OptionGroupData } from "@/data/menus";
+import { defaultImageForCategory } from "./category-defaults";
 
 /**
  * Flatten Prisma OptionGroup rows (with their preset / inline options) into
@@ -48,13 +49,15 @@ function mapItemBase(item: {
   rating: number | null;
   available: boolean;
   optionGroups: Parameters<typeof flattenOptionGroups>[0];
-}): MenuItemData {
+}, fallbackImageUrl: string | null = null): MenuItemData {
   return {
     id: item.id,
     name: item.name,
     description: item.description || "",
     price: item.price,
-    imageUrl: item.imageUrl || "",
+    // Prefer the item's own image; fall back to the category-default if the
+    // item has none. Resolved server-side so downstream renderers stay dumb.
+    imageUrl: item.imageUrl || fallbackImageUrl || "",
     badge: item.badge || undefined,
     rating: item.rating || undefined,
     available: item.available,
@@ -104,25 +107,30 @@ export async function getMenuBySlug(slug: string): Promise<MenuCategoryData[]> {
     orderBy: { sortOrder: "asc" },
   });
 
-  return dbCategories.map((cat) => ({
-    id: cat.id,
-    name: cat.name,
-    emoji: cat.emoji || "🍽️",
-    items: cat.items.map((item) => {
-      const base = mapItemBase(item);
-      if (item.componentsOf.length === 0) return base;
-      // Attach components — each references a fully-resolved child item so the
-      // customize sheet can render the child's option groups inline.
-      return {
-        ...base,
-        components: item.componentsOf.map((c) => ({
-          id: c.id,
-          childItemId: c.childItemId,
-          label: c.label || c.childItem.name,
-          sortOrder: c.sortOrder,
-          child: mapItemBase(c.childItem),
-        })),
-      };
-    }),
-  }));
+  return dbCategories.map((cat) => {
+    const catFallback = defaultImageForCategory(cat.name);
+    return {
+      id: cat.id,
+      name: cat.name,
+      emoji: cat.emoji || "🍽️",
+      items: cat.items.map((item) => {
+        const base = mapItemBase(item, catFallback);
+        if (item.componentsOf.length === 0) return base;
+        // Attach components — each references a fully-resolved child item so the
+        // customize sheet can render the child's option groups inline. Child
+        // items intentionally don't inherit the parent category fallback —
+        // they usually have their own imageUrl (or none is fine for combos).
+        return {
+          ...base,
+          components: item.componentsOf.map((c) => ({
+            id: c.id,
+            childItemId: c.childItemId,
+            label: c.label || c.childItem.name,
+            sortOrder: c.sortOrder,
+            child: mapItemBase(c.childItem),
+          })),
+        };
+      }),
+    };
+  });
 }
