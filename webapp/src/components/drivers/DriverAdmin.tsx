@@ -51,21 +51,10 @@ export function DriverAdmin({
     if (r.ok) setDrivers((await r.json()).drivers);
   }
 
-  async function deactivate(driver: Driver) {
-    if (!confirm(`Desactivar a ${driver.displayName}? No podrá aceptar nuevos pedidos.`)) return;
+  async function remove(driver: Driver) {
+    if (!confirm(`Eliminar a ${driver.displayName}? Se borra el repartidor y todo su historial (turnos, cobros, ofertas). No se puede deshacer.`)) return;
     setBusyId(driver.id);
     await fetch(`${apiBase}/${driver.id}`, { method: "DELETE" });
-    setBusyId(null);
-    reload();
-  }
-
-  async function reactivate(driver: Driver) {
-    setBusyId(driver.id);
-    await fetch(`${apiBase}/${driver.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: true }),
-    });
     setBusyId(null);
     reload();
   }
@@ -173,24 +162,14 @@ export function DriverAdmin({
                     <Send className="h-3.5 w-3.5" />
                     WhatsApp
                   </button>
-                  {d.isActive ? (
-                    <button
-                      onClick={() => deactivate(d)}
-                      disabled={busy}
-                      className="rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-300 px-2.5 py-2 text-xs text-slate-400 inline-flex items-center gap-1"
-                      title="Desactivar"
-                    >
-                      <PowerOff className="h-3.5 w-3.5" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => reactivate(d)}
-                      disabled={busy}
-                      className="rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-2 text-xs text-emerald-300"
-                    >
-                      Reactivar
-                    </button>
-                  )}
+                  <button
+                    onClick={() => remove(d)}
+                    disabled={busy}
+                    className="rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-300 px-2.5 py-2 text-xs text-slate-400 inline-flex items-center gap-1"
+                    title="Eliminar repartidor"
+                  >
+                    <PowerOff className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             );

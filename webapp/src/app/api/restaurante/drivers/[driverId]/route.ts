@@ -2,7 +2,7 @@
 //
 //   PATCH  /api/restaurante/drivers/[driverId]  → update {isActive, displayName, vehicleType}
 //   POST   /api/restaurante/drivers/[driverId]/regenerate-code  → new one-shot login code (kept separate route)
-//   DELETE /api/restaurante/drivers/[driverId]  → soft-deactivate (we never hard-delete a Driver with orders)
+//   DELETE /api/restaurante/drivers/[driverId]  → hard-delete (cascades wipe shifts/cash/offers/pushSubs)
 //
 // Every op verifies Driver.ownerDealerId === session dealer.id — a resta owner
 // can NOT touch network drivers or another resta's drivers.
@@ -56,10 +56,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const found = await ownedDriver(driverId, dealer.id);
   if (!found) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  // Soft-deactivate. Preserves cash history, past shifts, past offers.
-  await prisma.driver.update({
-    where: { id: driverId },
-    data: { isActive: false, onShift: false },
-  });
+  await prisma.driver.delete({ where: { id: driverId } });
   return NextResponse.json({ ok: true });
 }

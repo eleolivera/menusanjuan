@@ -48,9 +48,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const found = await networkDriver(driverId);
   if (!found) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  await prisma.driver.update({
-    where: { id: driverId },
-    data: { isActive: false, onShift: false },
-  });
+  await prisma.driver.delete({ where: { id: driverId } });
   return NextResponse.json({ ok: true });
 }
