@@ -1,10 +1,11 @@
 // Driver PWA login: `{ phone, code }` → sets the msj_driver_session cookie.
 //
-// Single-use login codes are minted elsewhere (admin/owner triggers a code
-// send via WhatsApp). Here we normalize the incoming phone, atomically clear
-// the code on success (so the same code can't be replayed), and stamp the
-// session cookie. The code is uppercased before compare so drivers can type
-// it lowercase without failing auth.
+// Login codes stay valid until loginCodeExpiresAt (~7 days by default). We do
+// NOT clear the code on login — drivers routinely install the PWA on multiple
+// devices (phone + tablet, or lose browser data and reinstall) and asking the
+// resta owner to regenerate the code every time is friction. Session cookie
+// is 30 days and is what carries the actual identity; the code is just the
+// device-onboarding step.
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -48,10 +49,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
   }
 
-  await prisma.driver.update({
-    where: { id: driver.id },
-    data: { loginCode: null, loginCodeExpiresAt: null },
-  });
   await setDriverSessionCookie(driver.id);
 
   return NextResponse.json({
