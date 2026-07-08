@@ -5,7 +5,12 @@
 import { prisma } from "./prisma";
 import type { Prisma, PrismaClient } from "@/generated/prisma";
 import { RedemptionStatus } from "@/generated/prisma";
-import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { normalizePhoneE164 } from "./phone-normalize";
+
+// Re-exported so existing server-side callers (`@/lib/rewards`) keep working.
+// The implementation lives in `./phone-normalize` — a Prisma-free module that
+// is safe to import from client components (e.g. the driver PWA login page).
+export { normalizePhoneE164 };
 
 // Master feature-flag gate. Every route + every UI component should call
 // this — if false, all rewards code is dark and routes return 404.
@@ -15,29 +20,8 @@ export function rewardsFlag(): boolean {
 
 type Tx = Prisma.TransactionClient | PrismaClient;
 
-/**
- * Canonicalize a raw phone string to E.164 for Customer.phone lookups.
- * AR mobile numbers ALWAYS end up as `+549…` regardless of whether the input
- * was `+54…` (no 9), plain `264…`, or already `+549…`. This is the same
- * convention formatForWhatsApp() uses, so backfilled Customers match what
- * new orders + rewards-progress lookups will produce.
- *
- * Returns null when libphonenumber can't parse the input — caller decides
- * whether to skip or fall back to raw.
- */
-export function normalizePhoneE164(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const parsed = parsePhoneNumberFromString(raw.trim(), "AR");
-  if (!parsed || !parsed.isValid()) return null;
-  const country = parsed.countryCallingCode;
-  const national = parsed.nationalNumber;
-  if (country === "54") {
-    let arNum = national.replace(/^0/, "").replace(/^15/, "");
-    if (!arNum.startsWith("9")) arNum = "9" + arNum;
-    return `+54${arNum}`;
-  }
-  return parsed.number; // already E.164 for non-AR
-}
+// `normalizePhoneE164` moved to `./phone-normalize` so it can be imported
+// safely from client components. Re-exported above for backwards compat.
 
 /**
  * Find-or-create a Customer keyed by canonical E.164 phone. Returns the row.

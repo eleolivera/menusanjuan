@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
-const CHROMELESS_PREFIXES = ["/admin", "/restaurante"];
+const CHROMELESS_PREFIXES = ["/admin", "/restaurante", "/repartidor"];
 
 export function ConditionalChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
