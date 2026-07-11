@@ -52,7 +52,18 @@ async function fireTestPush(driverIdArg: string | undefined, driverPhoneArg: str
     distanceKm: 1.2,
     expiresAt: new Date(Date.now() + 45_000).toISOString(),
   });
-  return { status: 200, body: { ok: true, driverId, subscriptions: subCount, ...result } };
+  // Diagnostic — surfaces which env vars the runtime actually sees. Truthy
+  // means the var is present + non-empty at the server. If push shows
+  // sent=0/failed=0/unsubscribed=0 with subscriptions>=1, at least one of
+  // these is false and that's the bug.
+  const env = {
+    VAPID_SUBJECT: !!process.env.VAPID_SUBJECT,
+    VAPID_PUBLIC_KEY: !!process.env.VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY: !!process.env.VAPID_PRIVATE_KEY,
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    CRON_SECRET: !!process.env.CRON_SECRET,
+  };
+  return { status: 200, body: { ok: true, driverId, subscriptions: subCount, ...result, env } };
 }
 
 export async function POST(request: NextRequest) {
