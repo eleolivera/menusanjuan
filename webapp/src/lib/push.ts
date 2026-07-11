@@ -58,6 +58,17 @@ export async function sendPushToDriver(
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
           body,
+          {
+            // FCM priority=high → Android shows as heads-up banner + plays the
+            // default notification sound + is displayed even in Doze mode.
+            // Without this, the notification lands silently in the shade and
+            // drivers routinely miss it. Legitimate use — an actual pending
+            // order deserves a heads-up.
+            urgency: "high",
+            // TTL 45s matches the offer TTL — if the driver's phone was
+            // offline > 45s, the offer has expired anyway, no point queueing.
+            TTL: 45,
+          },
         );
         sent++;
       } catch (err: unknown) {

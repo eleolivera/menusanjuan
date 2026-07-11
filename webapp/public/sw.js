@@ -40,19 +40,24 @@ self.addEventListener('push', (event) => {
     const fee = '$' + Number(payload.deliveryFee || 0).toLocaleString('es-AR');
 
     await self.registration.showNotification(
-      '🛵 Nuevo pedido — ' + payload.restauranteName,
+      '🛵 ¡Nuevo pedido! — ' + payload.restauranteName,
       {
-        body: km + fee,
+        body: km + fee + '  ·  ¡Tocá para aceptar!',
         tag: payload.offerId,
         renotify: true,
         requireInteraction: true,
-        vibrate: [300, 100, 300],
+        // Long, high-attention vibrate — 3 sharp pulses over ~3.5s.
+        // Drivers routinely miss quick single buzzes when the phone is in a
+        // pocket. FCM `urgency: 'high'` from lib/push.ts pairs with this to
+        // trigger heads-up display + default sound on Android.
+        vibrate: [500, 200, 500, 200, 500, 200, 500],
+        silent: false,
         icon: '/icon-512.png',
         badge: '/icon-192.svg',
         data: payload,
         actions: [
-          { action: 'accept', title: 'Aceptar' },
-          { action: 'reject', title: 'Rechazar' },
+          { action: 'accept', title: '✅ Aceptar' },
+          { action: 'reject', title: '❌ Rechazar' },
         ],
       }
     );
