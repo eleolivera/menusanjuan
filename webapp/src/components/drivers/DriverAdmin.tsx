@@ -17,6 +17,7 @@ type Driver = {
   displayName: string;
   vehicleType: string | null;
   isActive: boolean;
+  pendingApproval: boolean;
   loginCode: string | null;
   loginCodeExpiresAt: string | null;
   onShift: boolean;
@@ -84,12 +85,15 @@ export function DriverAdmin({
   if (error) return <div className="p-8 text-red-400 text-sm">Error cargando repartidores: {error}</div>;
   if (!drivers) return <div className="p-8 text-slate-400 text-sm">Cargando…</div>;
 
+  const pending = drivers.filter(d => d.pendingApproval);
+  const active = drivers.filter(d => !d.pendingApproval);
+
   return (
     <div className="p-6 sm:p-8 space-y-6 max-w-5xl mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Repartidores</h1>
-          <p className="text-sm text-slate-400 mt-1">{contextLabel} · {drivers.filter(d => d.isActive).length} activos</p>
+          <p className="text-sm text-slate-400 mt-1">{contextLabel} · {active.filter(d => d.isActive).length} activos{pending.length ? ` · ${pending.length} pendientes` : ""}</p>
         </div>
         <button
           onClick={() => setAddOpen(true)}
@@ -106,8 +110,23 @@ export function DriverAdmin({
           <p className="text-xs text-slate-500">Agregá al menos uno para que reciba pedidos desde la app MenuSanJuan Repartidor.</p>
         </div>
       ) : (
+        <div className="space-y-4">
+          {pending.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-amber-400/80">⏳ Pendientes de aprobación</div>
+              {pending.map((d) => (
+                <PendingDriverCard
+                  key={d.id}
+                  driver={d}
+                  apiBase={apiBase}
+                  onApproved={(updated) => { setShowCodeFor(updated); reload(); }}
+                  onRejected={reload}
+                />
+              ))}
+            </div>
+          )}
         <div className="space-y-2">
-          {drivers.map((d) => {
+          {active.map((d) => {
             const VIcon = d.vehicleType && (d.vehicleType in VEHICLE_ICON) ? VEHICLE_ICON[d.vehicleType as keyof typeof VEHICLE_ICON] : Bike;
             const busy = busyId === d.id;
             return (
@@ -175,6 +194,7 @@ export function DriverAdmin({
             );
           })}
         </div>
+        </div>
       )}
 
       {addOpen && (
@@ -190,6 +210,76 @@ export function DriverAdmin({
       )}
 
       {showCodeFor && <CodeSheet driver={showCodeFor} onClose={() => setShowCodeFor(null)} onSend={() => sendCode(showCodeFor)} />}
+    </div>
+  );
+}
+
+function PendingDriverCard({
+  driver,
+  apiBase,
+  onApproved,
+  onRejected,
+}: {
+  driver: Driver;
+  apiBase: string;
+  onApproved: (d: Driver) => void;
+  onRejected: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const ageMin = Math.max(1, Math.round((Date.now() - new Date(driver.createdAt).getTime()) / 60000));
+
+  async function approve() {
+    setBusy(true);
+    const res = await fetch(`${apiBase}/${driver.id}/approve`, { method: "POST" });
+    setBusy(false);
+    if (res.ok) {
+      const { driver: updated } = await res.json();
+      onApproved(updated);
+    }
+  }
+
+  async function reject() {
+    if (!confirm(`¿Rechazar solicitud de ${driver.displayName}? Se elimina el registro.`)) return;
+    setBusy(true);
+    await fetch(`${apiBase}/${driver.id}`, { method: "DELETE" });
+    setBusy(false);
+    onRejected();
+  }
+
+  const VIcon = driver.vehicleType && driver.vehicleType in VEHICLE_ICON
+    ? VEHICLE_ICON[driver.vehicleType as keyof typeof VEHICLE_ICON]
+    : Bike;
+
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <VIcon className="h-4 w-4 text-amber-300 shrink-0" />
+          <span className="text-sm font-semibold text-white truncate">{driver.displayName}</span>
+          <span className="text-[10px] rounded-full bg-amber-500/20 px-2 py-0.5 text-amber-200 font-bold">PENDIENTE</span>
+        </div>
+        <div className="text-xs text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+          <span>{driver.phone}</span>
+          <span>·</span>
+          <span>Solicitó hace {ageMin < 60 ? `${ageMin} min` : `${Math.round(ageMin / 60)} h`}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 sm:shrink-0">
+        <button
+          onClick={approve}
+          disabled={busy}
+          className="rounded-lg bg-gradient-to-r from-primary to-amber-500 px-4 py-2 text-xs font-semibold text-white shadow disabled:opacity-50"
+        >
+          {busy ? "Aprobando…" : "Aprobar"}
+        </button>
+        <button
+          onClick={reject}
+          disabled={busy}
+          className="rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-300 px-3 py-2 text-xs text-slate-400"
+        >
+          Rechazar
+        </button>
+      </div>
     </div>
   );
 }

@@ -26,6 +26,7 @@ export async function GET() {
       displayName: true,
       vehicleType: true,
       isActive: true,
+      pendingApproval: true,
       loginCode: true,
       loginCodeExpiresAt: true,
       onShift: true,

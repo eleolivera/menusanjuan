@@ -120,6 +120,8 @@ export async function dispatchOrder(orderId: string): Promise<DispatchResult> {
   for (const pool of pools) {
     const where: Record<string, unknown> = {
       isActive: true,
+      // Skip drivers who haven't been approved yet.
+      pendingApproval: false,
       onShift: true,
       lastPingAt: { gte: heartbeatFloor },
       ownerDealerId: pool === "OWN" ? dealer.id : null,

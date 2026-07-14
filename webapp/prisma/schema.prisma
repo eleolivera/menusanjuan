@@ -705,6 +705,7 @@ model Driver {
   phone              String    @unique              // E.164 mobile
   displayName        String
   isActive           Boolean   @default(true)
+  pendingApproval    Boolean   @default(false)      // self-registered via /repartidor/registrar; admin/owner-created stay false
   vehicleType        String?                        // "moto" | "auto" | "bike"
   loginCode          String?   @unique              // 6-char one-shot login code
   loginCodeExpiresAt DateTime?
@@ -731,6 +732,7 @@ model Driver {
   @@index([isActive, onShift])
   @@index([ownerDealerId])
   @@index([currentLat, currentLng])
+  @@index([pendingApproval, ownerDealerId])
 }
 
 model DriverShift {
