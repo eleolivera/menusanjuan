@@ -27,6 +27,10 @@ export default function NuevoReferidoPage() {
   const [menuFiles, setMenuFiles] = useState<UploadedFile[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  // Anti-self-referral guardrail — soft. Real check is Elio's manual review
+  // at conversion time comparing referrer phone vs resta owner phone.
+  const [notOwner, setNotOwner] = useState(false);
+
   async function handleFile(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
@@ -60,6 +64,7 @@ export default function NuevoReferidoPage() {
     if (!referrerPhone.trim()) return setError("Tu WhatsApp es obligatorio (lo usamos para mandarte el kit).");
     if (!restaName.trim()) return setError("Cuál es el nombre del restaurante?");
     if (menuFiles.length === 0) return setError("Subí al menos una foto del menú.");
+    if (!notOwner) return setError("Confirmá que no sos el dueño del local. Si lo sos, mejor entrá a /para-restaurantes.");
 
     setSubmitting(true);
     try {
@@ -113,10 +118,14 @@ export default function NuevoReferidoPage() {
         <header className="text-center space-y-2">
           <h1 className="text-2xl font-bold">Referí un restaurante</h1>
           <p className="text-sm text-slate-300 leading-relaxed">
-            Conocés un local en San Juan que podría usar MenuSanJuan? Pasanos los datos
-            y te armamos un kit de venta para que se lo muestres. Si se suma, te
-            mandamos una recompensa.
+            Conocés un local en San Juan que podría usar MenuSanJuan? Pasanos los
+            datos y te armamos un kit de venta para que se lo muestres.
           </p>
+          <div className="mt-3 inline-block rounded-xl border border-orange-500/40 bg-orange-500/10 px-3 py-2 text-sm">
+            <span className="text-orange-300">Si el resta se suma y recibe su primer pedido, te pagamos </span>
+            <strong className="text-white">$25.000</strong>
+            <span className="text-orange-300"> por Mercado Pago.</span>
+          </div>
         </header>
 
         {/* Referrer block */}
@@ -148,7 +157,7 @@ export default function NuevoReferidoPage() {
               className="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2.5 text-white placeholder-slate-500"
             />
           </Field>
-          <Field label="Alias de Mercado Pago (opcional)" hint="Para pagarte la recompensa cuando el resta se sume.">
+          <Field label="Alias de Mercado Pago (opcional)" hint="Para pagarte los $25.000 apenas el resta reciba su primer pedido.">
             <input
               type="text"
               value={referrerMpAlias}
@@ -267,6 +276,23 @@ export default function NuevoReferidoPage() {
             </label>
           )}
         </Section>
+
+        {/* Anti-self-referral guardrail. Required client-side; admin also
+            manually compares referrer phone vs resta owner phone at conversion
+            time to catch any that slip through. */}
+        <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 cursor-pointer hover:border-white/20 transition-colors">
+          <input
+            type="checkbox"
+            checked={notOwner}
+            onChange={(e) => setNotOwner(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-primary shrink-0"
+          />
+          <span className="text-xs text-slate-300 leading-relaxed">
+            Confirmo que <strong className="text-white">no soy el dueño</strong> del local
+            que estoy referiendo. Si sos dueño, mejor entrá a{" "}
+            <a href="/para-restaurantes" className="text-primary underline">/para-restaurantes</a>.
+          </span>
+        </label>
 
         {error && (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">

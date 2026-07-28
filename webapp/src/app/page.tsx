@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Smartphone, MessageCircle, UtensilsCrossed, ArrowRight, MapPin, Sparkles } from "lucide-react";
+import { Smartphone, MessageCircle, UtensilsCrossed, ArrowRight, MapPin, Sparkles, Users, MessageSquare, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 
 // Marketing landing page at the apex / route. Replaces the previous bot entry
@@ -79,7 +79,7 @@ export default async function HomePage() {
         </section>
 
         {/* HOW IT WORKS — 3 steps */}
-        <section className="py-16 sm:py-20 bg-white border-y border-slate-100">
+        <section id="como-funciona" className="py-16 sm:py-20 bg-white border-y border-slate-100">
           <div className="max-w-5xl mx-auto px-5">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 text-center">
               Cómo funciona
@@ -111,7 +111,7 @@ export default async function HomePage() {
 
         {/* SOCIAL PROOF */}
         {restas.length > 0 && (
-          <section className="py-16 sm:py-20">
+          <section id="restaurantes" className="py-16 sm:py-20">
             <div className="max-w-5xl mx-auto px-5">
               <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 text-center">
                 Algunos lugares que ya lo usan
@@ -164,6 +164,83 @@ export default async function HomePage() {
             </div>
           </section>
         )}
+
+        {/* REFERRAL PROGRAM — aimed at teammates / vendedores, NOT resta owners.
+            Kept off /para-restaurantes on purpose so a resta signing up there
+            isn't tempted to also self-refer for the reward. Anti-self-referral
+            copy at the bottom nudges owners to the right page. */}
+        <section id="referir" className="py-16 sm:py-20 bg-gradient-to-b from-white to-amber-50/50 border-y border-slate-100">
+          <div className="max-w-5xl mx-auto px-5">
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white border border-orange-200 px-3 py-1 text-xs font-semibold text-orange-700 shadow-sm">
+                <Users className="h-3.5 w-3.5" strokeWidth={2.5} />
+                Ayudanos a crecer
+              </div>
+              <h2 className="mt-4 text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+                Referí un local, cobrás{" "}
+                <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
+                  $25.000
+                </span>
+              </h2>
+              <p className="mt-3 max-w-2xl mx-auto text-base text-slate-600 leading-relaxed">
+                Conocés un resta en San Juan que podría estar acá? Pasanos sus
+                datos. Si se suma y recibe su primer pedido, te pagamos <strong className="text-slate-900">$25.000</strong> por Mercado Pago.
+              </p>
+            </div>
+
+            <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-5">
+              <Step
+                num={1}
+                Icon={MessageSquare}
+                title="Nos pasás los datos"
+                desc="Nombre, contacto, unas fotos del menú. Te toma 3 minutos."
+              />
+              <Step
+                num={2}
+                Icon={Sparkles}
+                title="Nosotros hablamos con el resta"
+                desc="Armamos un kit de venta personalizado y se lo mostramos al dueño."
+              />
+              <Step
+                num={3}
+                Icon={Wallet}
+                title="Cobrás $25.000"
+                desc="Cuando el resta se sume y reciba su primer pedido, te transferimos por MP."
+              />
+            </div>
+
+            {/* Payout callout — gradient border card */}
+            <div className="mt-10 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 p-[2px] shadow-lg shadow-orange-500/20 max-w-xl mx-auto">
+              <div className="rounded-2xl bg-white px-6 py-6 sm:px-8 sm:py-7 text-center">
+                <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                  $25.000 <span className="text-lg font-bold text-slate-500">ARS</span>
+                </div>
+                <div className="mt-1 text-sm text-slate-600">
+                  por cada resta que traigas · sin límite de referidos
+                </div>
+              </div>
+            </div>
+
+            {/* CTA + anti-self-referral framing */}
+            <div className="mt-8 text-center">
+              <Link
+                href="/referidos/nuevo"
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-500/30 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+              >
+                Cargar un referido
+                <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
+              </Link>
+              <p className="mt-4 max-w-xl mx-auto text-xs text-slate-500 leading-relaxed">
+                Este programa es para amigos y vendedores que quieran ayudarnos
+                a crecer. Si sos dueño de un local,{" "}
+                <Link href="/para-restaurantes" className="text-orange-600 font-semibold hover:text-orange-700 underline underline-offset-2">
+                  entrá acá
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* FOR RESTAURANTS — mini section */}
         <section className="py-16 sm:py-20 bg-gradient-to-br from-slate-900 to-slate-800 text-white">

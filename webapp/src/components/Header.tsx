@@ -96,6 +96,7 @@ export function Header() {
             <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Inicio</Link>
             <Link href="/#restaurantes" scroll={false} onClick={() => { if (window.location.pathname === "/") { document.getElementById("restaurantes")?.scrollIntoView({ behavior: "smooth" }); } }} className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</Link>
             <Link href="/#como-funciona" scroll={false} onClick={() => { if (window.location.pathname === "/") { document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" }); } }} className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</Link>
+            <Link href="/#referir" scroll={false} onClick={() => { if (window.location.pathname === "/") { document.getElementById("referir")?.scrollIntoView({ behavior: "smooth" }); } }} className="rounded-lg px-3 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/5 transition-all">Referí y ganá</Link>
             <Link href="/mis-pedidos" className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Mis Pedidos</Link>
           </nav>
 
@@ -256,6 +257,7 @@ export function Header() {
             <Link href="/" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Inicio</Link>
             <Link href="/#restaurantes" onClick={() => { setMobileOpen(false); if (window.location.pathname === "/") { setTimeout(() => document.getElementById("restaurantes")?.scrollIntoView({ behavior: "smooth" }), 100); } }} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Restaurantes</Link>
             <Link href="/#como-funciona" onClick={() => { setMobileOpen(false); if (window.location.pathname === "/") { setTimeout(() => document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" }), 100); } }} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Cómo Funciona</Link>
+            <Link href="/#referir" onClick={() => { setMobileOpen(false); if (window.location.pathname === "/") { setTimeout(() => document.getElementById("referir")?.scrollIntoView({ behavior: "smooth" }), 100); } }} className="rounded-lg px-3 py-3 text-sm font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/5 transition-all">Referí y ganá</Link>
             <Link href="/mis-pedidos" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary/5 transition-all">Mis Pedidos</Link>
             {!hasRestas && (
               <Link href={session ? "/restaurante/register" : "/para-restaurantes"} onClick={() => setMobileOpen(false)}

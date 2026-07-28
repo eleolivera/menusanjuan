@@ -41,6 +41,11 @@ export function Footer() {
                   Cómo Funciona
                 </Link>
               </li>
+              <li>
+                <Link href="/referidos/nuevo" className="text-sm text-orange-600 hover:text-orange-700 font-semibold transition-colors">
+                  Referí y ganá $25.000
+                </Link>
+              </li>
             </ul>
           </div>
 
