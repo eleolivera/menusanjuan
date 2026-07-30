@@ -193,6 +193,45 @@ export default function ParaRestaurantes() {
         </div>
       </section>
 
+      {/* PASO A PASO — full customer→owner→driver→analytics walkthrough. Uses
+          a seeded 'demo-burger-bar' resta with fake data (no real customer
+          names or phones) so screenshots reflect the actual UI without
+          leaking anyone. Placeholders render until Elio drops the real
+          screenshots into /public/showcase/demo/ and flips the `ready` flag. */}
+      <section className="py-20 bg-gradient-to-b from-white to-amber-50/40 border-y border-border/50">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white border border-orange-200 px-3 py-1 text-xs font-semibold text-orange-700 shadow-sm">
+              📸 Recorrido guiado
+            </div>
+            <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold text-text tracking-tight">
+              De la orden al reparto, paso a paso
+            </h2>
+            <p className="mt-3 text-text-secondary max-w-2xl mx-auto">
+              Así funciona en la vida real. Cada pantalla es del sistema tal cual la vas a usar.
+            </p>
+          </div>
+
+          <div className="space-y-16 sm:space-y-20">
+            {DEMO_STEPS.map((step, i) => (
+              <DemoStep key={step.num} step={step} reverse={i % 2 === 1} />
+            ))}
+          </div>
+
+          <div className="mt-16 text-center">
+            <Link
+              href="/demo-burger-bar"
+              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-amber-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+            >
+              Probá el demo en vivo →
+            </Link>
+            <p className="mt-3 text-xs text-text-muted">
+              Es un local ficticio con menú y pedidos de ejemplo, para que juegues sin miedo.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Social proof */}
       <section className="py-14 bg-surface-alt">
         <div className="mx-auto max-w-4xl px-4">
@@ -272,6 +311,174 @@ export default function ParaRestaurantes() {
           </Link>
         </div>
       </section>
+    </div>
+  );
+}
+
+// ─── DEMO WALKTHROUGH SECTION ────────────────────────────────────────────
+// 8 steps rendered in alternating left/right rows. `ready: false` shows a
+// placeholder card; flip to true once the corresponding file lands in
+// /public/showcase/demo/. Filename convention: step-<n>-<label>.png (or .jpg
+// for the ticket photo). See docs when the recipe ships.
+
+type DemoStepData = {
+  num: number;
+  kicker: string;
+  title: string;
+  desc: string;
+  imageSrc: string;
+  frame: "phone" | "tablet" | "ticket";
+  ready: boolean;
+  highlight?: boolean;
+};
+
+const DEMO_STEPS: DemoStepData[] = [
+  {
+    num: 1,
+    kicker: "El cliente",
+    title: "Elige tu resta y arma el pedido",
+    desc: "Entra al link de tu local desde WhatsApp, Instagram o Google. Ve el menú con fotos, precios y descripciones. No baja ninguna app.",
+    imageSrc: "/showcase/demo/step-1-menu.png",
+    frame: "phone",
+    ready: false,
+  },
+  {
+    num: 2,
+    kicker: "El cliente",
+    title: "Confirma dirección y modo de envío",
+    desc: "Elige delivery o retiro en el local. Si es delivery, marca la dirección en el mapa y ve el costo del envío al instante — lo calcula por zona.",
+    imageSrc: "/showcase/demo/step-2-checkout.png",
+    frame: "phone",
+    ready: false,
+  },
+  {
+    num: 3,
+    kicker: "En tu Kanban",
+    title: "El pedido cae en 'Pendiente'",
+    desc: "En segundos aparece una tarjeta en tu tablero: número de pedido, cliente, ítems, total, dirección. Todo ordenado, listo para confirmar.",
+    imageSrc: "/showcase/demo/step-3-kanban.png",
+    frame: "tablet",
+    ready: false,
+  },
+  {
+    num: 4,
+    kicker: "En tu Kanban",
+    title: "Lo pasás a 'En Cocina'",
+    desc: "Un tap y el pedido pasa a preparación. La cocina lo ve en el mismo tablero. Cambios al menú (agotados, precios) se ven al instante.",
+    imageSrc: "/showcase/demo/step-4-cocina.png",
+    frame: "tablet",
+    ready: false,
+  },
+  {
+    num: 5,
+    kicker: "En la impresora",
+    title: "Sale el ticket con QR",
+    desc: "Imprimís el ticket estilo comanda con el resumen del pedido y un QR único. Se lo pegás al pedido para tu repartidor.",
+    imageSrc: "/showcase/demo/step-5-ticket.jpg",
+    frame: "ticket",
+    ready: false,
+  },
+  {
+    num: 6,
+    kicker: "En el celu del repartidor",
+    title: "Escanea el QR y ve TODO",
+    desc: "El repartidor escanea el QR con la cámara. Se abre una página con nombre del cliente, teléfono (tap para llamar), dirección con link directo a Google Maps con coordenadas, ítems del pedido y estado del pago. No tiene que llamarte para preguntar 'dónde va?'.",
+    imageSrc: "/showcase/demo/step-6-driver.png",
+    frame: "phone",
+    ready: false,
+    highlight: true,
+  },
+  {
+    num: 7,
+    kicker: "En tu panel",
+    title: "Dashboard del día",
+    desc: "Cuántos pedidos hoy, cuánto facturaste, qué ítems se vendieron más. Métricas en vivo, sin Excel ni cuentas manuales.",
+    imageSrc: "/showcase/demo/step-7-dashboard.png",
+    frame: "tablet",
+    ready: false,
+  },
+  {
+    num: 8,
+    kicker: "En tu panel",
+    title: "Tus clientes VIP",
+    desc: "Ves quiénes son tus mejores clientes, cuánto gastaron, cuándo pidieron por última vez. Podés mimarlos con descuentos o mensajes personalizados.",
+    imageSrc: "/showcase/demo/step-8-vip.png",
+    frame: "tablet",
+    ready: false,
+  },
+];
+
+function DemoStep({ step, reverse }: { step: DemoStepData; reverse: boolean }) {
+  const imageCol = (
+    <div className="w-full flex justify-center">
+      <StepImage src={step.imageSrc} num={step.num} frame={step.frame} ready={step.ready} />
+    </div>
+  );
+  const textCol = (
+    <div>
+      <div className="text-xs font-bold uppercase tracking-wider text-orange-600">
+        {step.kicker}
+      </div>
+      <div className="mt-2 flex items-baseline gap-3">
+        <span className="text-4xl sm:text-5xl font-extrabold text-slate-300 leading-none">
+          {String(step.num).padStart(2, "0")}
+        </span>
+        <h3 className={`text-xl sm:text-2xl font-extrabold tracking-tight ${step.highlight ? "text-orange-600" : "text-text"}`}>
+          {step.title}
+        </h3>
+      </div>
+      <p className="mt-3 text-text-secondary leading-relaxed">{step.desc}</p>
+      {step.highlight && (
+        <div className="mt-4 rounded-xl border border-orange-500/30 bg-orange-500/5 px-4 py-3 text-sm text-orange-800">
+          🎯 <strong>Este es el ahorro grande.</strong> Tu repartidor no te llama para preguntar dirección ni teléfono. Todo está en la pantalla.
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
+      {reverse ? (
+        <>
+          {textCol}
+          {imageCol}
+        </>
+      ) : (
+        <>
+          {imageCol}
+          {textCol}
+        </>
+      )}
+    </div>
+  );
+}
+
+function StepImage({ src, num, frame, ready }: { src: string; num: number; frame: DemoStepData["frame"]; ready: boolean }) {
+  const wrapperClass =
+    frame === "phone"
+      ? "max-w-[280px] w-full rounded-[2.5rem] border-[6px] border-slate-800 bg-slate-800 shadow-2xl overflow-hidden"
+      : frame === "tablet"
+        ? "max-w-[560px] w-full rounded-2xl border-[4px] border-slate-800 bg-slate-800 shadow-2xl overflow-hidden"
+        : "max-w-[240px] w-full rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden";
+
+  const placeholderAspect =
+    frame === "phone" ? "aspect-[9/19]" : frame === "tablet" ? "aspect-[4/3]" : "aspect-[1/2.4]";
+
+  if (!ready) {
+    return (
+      <div className={wrapperClass}>
+        <div className={`w-full ${placeholderAspect} bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center text-slate-500`}>
+          <div className="text-3xl mb-2">📸</div>
+          <div className="text-xs font-semibold">Screenshot pendiente</div>
+          <div className="text-[10px] text-slate-400 mt-1">Paso {num}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={wrapperClass}>
+      <img src={src} alt={`Paso ${num}`} className="w-full" />
     </div>
   );
 }
