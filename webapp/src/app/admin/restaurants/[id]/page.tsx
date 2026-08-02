@@ -429,6 +429,25 @@ Probalo y decime qué te parece!`;
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-slate-500">Guardado automático</span>
             <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 transition-colors">Ver pública</a>
+            <button
+              onClick={async () => {
+                const res = await fetch("/api/admin/impersonate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ dealerSlug: data.slug }),
+                });
+                const body = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  alert(`No pude entrar como dueño: ${body.error || "error"}`);
+                  return;
+                }
+                window.location.href = body.redirectTo || "https://www.menusanjuan.com/restaurante";
+              }}
+              className="rounded-lg bg-primary/15 border border-primary/30 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors"
+              title="Abrir el panel del dueño (menú, pedidos, dashboard, clientes) como si fueras el dueño de este local"
+            >
+              👁️ Ver como dueño
+            </button>
           </div>
         </div>
       </header>

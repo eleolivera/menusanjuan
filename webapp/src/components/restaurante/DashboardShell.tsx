@@ -67,6 +67,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // Delivery mode from the current resta — drives whether the "Repartidores"
   // nav entry is visible. Only shown when the resta has OWN or HYBRID.
   const [deliveryMode, setDeliveryMode] = useState<string | null>(null);
+  // True when the admin (Elio) is "viewing as" this dealer's owner via the
+  // menusj_admin_as impersonation cookie. Drives the top banner + rewires
+  // the logout button to exit impersonation instead of destroying a session
+  // (that wouldn't exist anyway when impersonating).
+  const [impersonating, setImpersonating] = useState(false);
 
   const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
@@ -131,8 +136,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           setSlug(data.slug);
           setRestaurantName(data.name || data.slug);
           setDeliveryMode(data.deliveryMode ?? null);
+          setImpersonating(!!data.impersonatedByAdmin);
           setAuthed(true);
-          if (!localStorage.getItem(WELCOME_KEY)) setShowWelcome(true);
+          // Skip the first-time welcome popup for admin — Elio's seen it plenty
+          if (!localStorage.getItem(WELCOME_KEY) && !data.impersonatedByAdmin) setShowWelcome(true);
         } else {
           setAuthed(false);
           router.push("/restaurante/login");
@@ -168,8 +175,44 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     DEFAULT_NAV.find((n) => n.href === "/restaurante/pos"),
   ].filter(Boolean) as typeof DEFAULT_NAV;
 
+  // Shared exit handler for logout buttons. When impersonating, hit the
+  // impersonate DELETE (clears menusj_admin_as, admin cookie stays) and
+  // hop back to admin. Otherwise standard owner-session destroy.
+  async function handleExit() {
+    if (impersonating) {
+      const res = await fetch("/api/admin/impersonate", { method: "DELETE" }).catch(() => null);
+      const data = await res?.json().catch(() => null);
+      window.location.href = data?.redirectTo || "https://admin.menusanjuan.com/admin";
+      return;
+    }
+    await fetch("/api/restaurante/session", { method: "DELETE" });
+    router.push("/restaurante/login");
+  }
+
   return (
-    <div className="flex h-screen overflow-hidden">
+    <>
+      {/* Impersonation banner — only when admin is viewing as this dealer's
+          owner. Sticky at very top; the flex layout below shifts down under it. */}
+      {impersonating && (
+        <div className="sticky top-0 z-[60] w-full bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2 shadow-md">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 text-xs sm:text-sm text-white">
+            <div className="flex items-center gap-2 min-w-0">
+              <span aria-hidden>🔍</span>
+              <span className="font-semibold truncate">
+                Viendo como <span className="font-bold">{restaurantName}</span>
+              </span>
+              <span className="hidden sm:inline text-white/80 shrink-0">· modo admin</span>
+            </div>
+            <button
+              onClick={handleExit}
+              className="shrink-0 rounded-lg bg-white/20 hover:bg-white/30 px-3 py-1 text-xs font-bold text-white transition-colors"
+            >
+              Salir →
+            </button>
+          </div>
+        </div>
+      )}
+    <div className={`flex ${impersonating ? "h-[calc(100vh-2.75rem)] sm:h-[calc(100vh-2.5rem)]" : "h-screen"} overflow-hidden`}>
       {/* Sidebar (desktop only — mobile uses the drawer + bottom nav below) */}
       <aside
         className={`hidden lg:flex flex-col border-r border-white/5 bg-slate-900 transition-all duration-200 shrink-0 ${
@@ -336,17 +379,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         {/* Logout + collapse */}
         <div className="border-t border-white/5 p-2 space-y-1">
           <button
-            onClick={async () => {
-              await fetch("/api/restaurante/session", { method: "DELETE" });
-              router.push("/restaurante/login");
-            }}
-            title={collapsed ? "Cerrar sesión" : undefined}
+            onClick={handleExit}
+            title={collapsed ? (impersonating ? "Salir del modo admin" : "Cerrar sesión") : undefined}
             className={`flex w-full items-center rounded-lg py-2 text-slate-500 hover:bg-white/5 hover:text-slate-300 transition-colors ${
               collapsed ? "justify-center" : "px-3 gap-2"
             }`}
           >
             <LogOut className="h-4 w-4" strokeWidth={1.5} />
-            {!collapsed && <span className="text-xs font-medium">Cerrar sesión</span>}
+            {!collapsed && <span className="text-xs font-medium">{impersonating ? "Salir del modo admin" : "Cerrar sesión"}</span>}
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -477,14 +517,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             {/* Drawer footer — logout */}
             <div className="border-t border-white/5 p-2">
               <button
-                onClick={async () => {
-                  await fetch("/api/restaurante/session", { method: "DELETE" });
-                  router.push("/restaurante/login");
-                }}
+                onClick={handleExit}
                 className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
               >
                 <LogOut className="h-4 w-4" strokeWidth={1.75} />
-                Cerrar sesión
+                {impersonating ? "Salir del modo admin" : "Cerrar sesión"}
               </button>
             </div>
           </div>
@@ -560,5 +597,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
     </div>
+    </>
   );
 }

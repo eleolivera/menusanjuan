@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { prisma } from "./prisma";
 import { cookieDomain } from "./cookie-domain";
+import { getActiveImpersonation } from "./admin-auth";
 import crypto from "crypto";
 
 const COOKIE_NAME = "menusj_session";
@@ -92,6 +93,11 @@ export const createRestauranteSession = async (slug: string) => {
 export type SessionData = {
   userId: string;
   activeSlug: string | null;
+  // True when the admin (menusj_admin cookie) is currently "viewing as" a
+  // specific dealer's owner via a signed menusj_admin_as cookie. Owner-side
+  // APIs behave identically; only DashboardShell reads this to surface a
+  // banner + rewire the logout button to exit impersonation.
+  impersonatedByAdmin?: boolean;
 };
 
 // Parse cookie value — supports new "token:slug" format and plain token
@@ -114,7 +120,19 @@ function parseCookieValue(raw: string): { token: string; activeSlug: string | nu
 
 export async function getSession(): Promise<SessionData | null> {
   const cookieStore = await cookies();
-  // Hard boundary: if an admin session is present, the user session is ignored.
+  // If an admin is impersonating a dealer owner, synthesize an OWNER session
+  // pointing at the target user/slug. Admin cookie is required — getActiveImpersonation
+  // validates both the admin session AND the signed impersonation cookie.
+  const imp = await getActiveImpersonation();
+  if (imp) {
+    return {
+      userId: imp.ownerUserId,
+      activeSlug: imp.dealerSlug,
+      impersonatedByAdmin: true,
+    };
+  }
+  // Otherwise: keep the hard XOR — an admin session (without impersonation)
+  // means "you're operating as an admin, not any owner".
   if (cookieStore.get("menusj_admin")?.value) return null;
   const raw = cookieStore.get(COOKIE_NAME)?.value;
   if (!raw) return null;
@@ -200,6 +218,7 @@ export async function getFullSession() {
     restaurants,
     activeRestaurant: activeRestaurant || null,
     pendingClaims: user.claimRequests,
+    impersonatedByAdmin: !!session.impersonatedByAdmin,
   };
 }
 

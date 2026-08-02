@@ -254,6 +254,25 @@ Cualquier duda te ayudamos por aca, por llamada, o podemos pasar por el local. E
             <a href={`https://menusanjuan.com/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-slate-400 hover:bg-white/5 transition-colors">Ver publica</a>
             <a href={`https://www.google.com/search?q=${encodeURIComponent(data.name + " San Juan")}`} target="_blank" className="rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-slate-400 hover:bg-white/5 transition-colors">Google</a>
             <a href={`/admin/orders/${data.slug}`} target="_blank" className="rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-slate-400 hover:bg-white/5 transition-colors">Pedidos</a>
+            <button
+              onClick={async () => {
+                const res = await fetch("/api/admin/impersonate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ dealerSlug: data.slug }),
+                });
+                const body = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  alert(`No pude entrar como dueño: ${body.error || "error"}`);
+                  return;
+                }
+                window.location.href = body.redirectTo || "https://www.menusanjuan.com/restaurante";
+              }}
+              className="rounded-lg bg-primary/15 border border-primary/30 px-2.5 py-1 text-[10px] font-semibold text-primary hover:bg-primary/25 transition-colors"
+              title="Abre /restaurante en la web pública como si fueras el dueño de este local"
+            >
+              👁️ Ver como dueño
+            </button>
             {data.phone && data.phone !== "0000000000" && (
               <button onClick={openWhatsApp} className="rounded-lg bg-[#25D366]/10 border border-[#25D366]/20 px-2.5 py-1 text-[10px] font-medium text-[#25D366] hover:bg-[#25D366]/20 transition-colors">WhatsApp</button>
             )}

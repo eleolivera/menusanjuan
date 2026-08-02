@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFullSession, switchActiveRestaurant, destroyRestauranteSession } from "@/lib/restaurante-auth";
-import { getAdminSession } from "@/lib/admin-auth";
 
 export async function GET() {
   try {
-    // If admin is logged in, don't return restaurant session
-    const adminSession = await getAdminSession();
-    if (adminSession) {
-      return NextResponse.json({ authenticated: false }, { status: 401 });
-    }
-
+    // getFullSession now returns either a real owner session OR an
+    // admin-impersonation synth-session (when both admin + admin_as cookies
+    // are valid). If it returns null, either no owner cookie exists or an
+    // admin cookie is present without impersonation — either way, 401.
     const session = await getFullSession();
     if (!session) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
@@ -21,6 +18,9 @@ export async function GET() {
       restaurants: session.restaurants,
       activeRestaurant: session.activeRestaurant,
       pendingClaims: session.pendingClaims,
+      // True when admin is currently viewing this resta via impersonation.
+      // Consumed by DashboardShell to render the "Salir del modo admin" banner.
+      impersonatedByAdmin: session.impersonatedByAdmin,
       userId: session.user.id,
       dealerId: session.activeRestaurant?.id,
       slug: session.activeRestaurant?.slug,
