@@ -845,6 +845,7 @@ type TeamMember = {
   role: "OWNER" | "STAFF";
   createdAt: string;
   isPlaceholder: boolean;
+  notifyNewOrders: boolean;
 };
 
 // Owner-only: add employees by Gmail so they can log in and see pedidos.
@@ -915,6 +916,27 @@ function TeamSection() {
     }
   }
 
+  async function handleToggleNotify(m: TeamMember) {
+    // Optimistic: flip locally so the switch feels instant, roll back on error.
+    const nextVal = !m.notifyNewOrders;
+    setMembers((prev) => prev.map((x) => x.userId === m.userId ? { ...x, notifyNewOrders: nextVal } : x));
+    try {
+      const res = await fetch(`/api/restaurante/team/${m.userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notifyNewOrders: nextVal }),
+      });
+      if (!res.ok) {
+        setMembers((prev) => prev.map((x) => x.userId === m.userId ? { ...x, notifyNewOrders: m.notifyNewOrders } : x));
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "No se pudo guardar");
+      }
+    } catch {
+      setMembers((prev) => prev.map((x) => x.userId === m.userId ? { ...x, notifyNewOrders: m.notifyNewOrders } : x));
+      setError("Error de conexión");
+    }
+  }
+
   return (
     <section id="equipo" className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 scroll-mt-6">
       <div className="flex items-start gap-3 mb-4">
@@ -965,7 +987,7 @@ function TeamSection() {
           {members.map((m) => (
             <li
               key={m.userId}
-              className="rounded-2xl border border-white/5 bg-slate-900/50 p-4 flex items-center gap-3"
+              className="rounded-2xl border border-white/5 bg-slate-900/50 p-4 flex items-center gap-3 flex-wrap"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -983,6 +1005,24 @@ function TeamSection() {
                   Agregado {new Date(m.createdAt).toLocaleDateString("es-AR")}
                 </p>
               </div>
+
+              {/* Per-member "recibir avisos" toggle. Placeholder rows skip
+                  it — mails don't route to @menusanjuan.com anyway. */}
+              {!m.isPlaceholder && (
+                <button
+                  type="button"
+                  onClick={() => handleToggleNotify(m)}
+                  className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-medium text-slate-300 hover:bg-white/10 transition-colors"
+                  aria-pressed={m.notifyNewOrders}
+                  title={m.notifyNewOrders ? "Recibiendo avisos de pedidos" : "Sin avisos de pedidos"}
+                >
+                  <span className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors ${m.notifyNewOrders ? "bg-emerald-500" : "bg-slate-700"}`}>
+                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-150 ease-in-out mt-0.5 ${m.notifyNewOrders ? "translate-x-3.5" : "translate-x-0.5"}`} />
+                  </span>
+                  <span>Avisos</span>
+                </button>
+              )}
+
               {m.role === "STAFF" ? (
                 <button
                   onClick={() => handleRemove(m)}

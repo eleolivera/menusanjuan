@@ -37,6 +37,7 @@ export async function GET() {
       role: m.role,
       createdAt: m.createdAt.toISOString(),
       isPlaceholder: m.user.email.endsWith("@menusanjuan.com"),
+      notifyNewOrders: m.notifyNewOrders,
     })),
   );
 }
@@ -123,5 +124,6 @@ export async function POST(request: NextRequest) {
     role: "STAFF",
     createdAt: result.member.createdAt.toISOString(),
     isPlaceholder: false,
+    notifyNewOrders: result.member.notifyNewOrders,
   }, { status: 201 });
 }

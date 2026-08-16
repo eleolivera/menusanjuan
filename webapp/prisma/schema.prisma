@@ -168,12 +168,17 @@ model Dealer {
 // gated from team management, financial fields, resta identity fields, and
 // resta deletion.
 model DealerMember {
-  id            String   @id @default(cuid())
-  dealerId      String
-  userId        String
-  role          String // "OWNER" | "STAFF"
-  createdAt     DateTime @default(now())
-  addedByUserId String?
+  id              String   @id @default(cuid())
+  dealerId        String
+  userId          String
+  role            String // "OWNER" | "STAFF"
+  createdAt       DateTime @default(now())
+  addedByUserId   String?
+  // Per-member opt-in for "new order" email notifications. Defaults true so
+  // an added employee is pinged from her very first shift; owner can toggle
+  // off from the Equipo section (e.g., for a temp help who shouldn't get
+  // 40 emails/night). Owner's own toggle is respected too.
+  notifyNewOrders Boolean  @default(true)
 
   dealer  Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
   user    User   @relation("DealerMemberUser", fields: [userId], references: [id], onDelete: Cascade)

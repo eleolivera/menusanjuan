@@ -1,23 +1,28 @@
-// Email notification to restaurant owner when a new order arrives
+// Email notifications to restaurant team when a new order arrives.
+// Fans out to every DealerMember with notifyNewOrders=true (owner + staff),
+// skipping placeholder (@menusanjuan.com) emails.
 
 import { sendEmail } from "./email";
 import { prisma } from "./prisma";
 import type { Order, OrderItem } from "./orders-store";
 
 /**
- * Look up the restaurant owner's email via Dealer -> Account -> User,
- * then send a branded email with the order summary.
+ * Look up all opted-in DealerMember users for this resta and send a branded
+ * email with the order summary to each. Individual sends (not a shared to:)
+ * so each recipient gets a personal delivery status + it works cleanly if
+ * MailerSend rate-limits one address.
  *
  * This function never throws — it logs errors and returns silently.
  * Designed to be called fire-and-forget from the API route.
  */
 export async function notifyRestaurantOfNewOrder(order: Order): Promise<void> {
   try {
-    // Resolve Dealer -> Account -> User to get the owner email
     const dealer = await prisma.dealer.findUnique({
       where: { slug: order.restauranteSlug },
-      include: {
-        account: {
+      select: {
+        name: true,
+        members: {
+          where: { notifyNewOrders: true },
           include: { user: { select: { email: true, name: true } } },
         },
       },
@@ -28,10 +33,14 @@ export async function notifyRestaurantOfNewOrder(order: Order): Promise<void> {
       return;
     }
 
-    const ownerEmail = dealer.account.user.email;
+    // Filter out placeholder-owned mailboxes (imported restas with no real
+    // owner) + empty emails (defensive; User.email is NOT NULL @unique but
+    // an OAuth-only user could have "").
+    const recipients = dealer.members
+      .map((m) => ({ email: m.user.email, name: m.user.name }))
+      .filter((r) => r.email && !r.email.endsWith("@menusanjuan.com"));
 
-    // Skip placeholder emails (imported restaurants that have no real owner)
-    if (ownerEmail.endsWith("@menusanjuan.com")) {
+    if (recipients.length === 0) {
       return;
     }
 
@@ -96,11 +105,17 @@ export async function notifyRestaurantOfNewOrder(order: Order): Promise<void> {
     </div>
     `;
 
-    await sendEmail({
-      to: ownerEmail,
-      subject: `Nuevo pedido ${order.orderNumber} - ${escapeHtml(order.customerName)}`,
-      html,
-    });
+    // Fan out to every opted-in member. Independent sends so one bad address
+    // doesn't block the others. Errors on any single send are swallowed +
+    // logged — outer try/catch still guards the whole function.
+    const subject = `Nuevo pedido ${order.orderNumber} - ${escapeHtml(order.customerName)}`;
+    await Promise.all(
+      recipients.map((r) =>
+        sendEmail({ to: r.email, subject, html }).catch((err) => {
+          console.error(`[order-notification] send to ${r.email} failed:`, err);
+        }),
+      ),
+    );
   } catch (err) {
     console.error("[order-notification] Failed to send notification:", err);
   }
