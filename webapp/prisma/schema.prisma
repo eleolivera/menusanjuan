@@ -24,10 +24,12 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  claimRequests ClaimRequest[]
-  oauthAccounts OAuthAccount[]
+  accounts           Account[]
+  sessions           Session[]
+  claimRequests      ClaimRequest[]
+  oauthAccounts      OAuthAccount[]
+  dealerMemberships  DealerMember[] @relation("DealerMemberUser")
+  addedDealerMembers DealerMember[] @relation("DealerMemberAddedBy")
 }
 
 model OAuthAccount {
@@ -148,11 +150,38 @@ model Dealer {
   printAgents    PrintAgent[]
   rewardProgram  RewardProgram?
   drivers        Driver[]            @relation("DealerDrivers")
+  members        DealerMember[]
 
   @@index([slug])
   @@index([cuisineType])
   @@index([isActive])
   @@index([sourceProfileId])
+}
+
+// ─── Dealer members (multi-user access per resta) ───
+// Additive to Dealer.accountId (which still points to the single "owner"
+// Account). Every dealer has exactly ONE role="OWNER" row (backfilled +
+// maintained by setDealerOwner helper) plus zero or more role="STAFF" rows
+// added via the owner's Equipo section on /restaurante/profile. Ownership
+// changes go through the helper so this table never drifts from
+// Account.userId. Staff users see the same dashboard as the owner but are
+// gated from team management, financial fields, resta identity fields, and
+// resta deletion.
+model DealerMember {
+  id            String   @id @default(cuid())
+  dealerId      String
+  userId        String
+  role          String // "OWNER" | "STAFF"
+  createdAt     DateTime @default(now())
+  addedByUserId String?
+
+  dealer  Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  user    User   @relation("DealerMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User?  @relation("DealerMemberAddedBy", fields: [addedByUserId], references: [id])
+
+  @@unique([dealerId, userId])
+  @@index([userId])
+  @@index([dealerId])
 }
 
 // ─── Print agent (local desktop) ───
