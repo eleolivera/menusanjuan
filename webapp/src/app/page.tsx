@@ -32,6 +32,24 @@ export default async function HomePage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <main className="min-h-screen bg-gradient-to-b from-amber-50 via-white to-white">
+        {/* Top nav — brand on left, sign-in on right. Kept minimal so it
+            doesn't compete with the hero's primary CTAs. */}
+        <header className="relative z-20">
+          <div className="max-w-5xl mx-auto px-5 pt-5 flex items-center justify-between">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 text-white font-extrabold shadow-sm">M</span>
+              <span className="text-base font-extrabold text-slate-900 tracking-tight">MenuSanJuan</span>
+            </Link>
+            <Link
+              href="/restaurante/login"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/80 backdrop-blur px-4 py-2 text-xs font-semibold text-slate-700 hover:border-orange-300 hover:text-orange-700 transition-colors"
+            >
+              Iniciar sesión
+              <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </Link>
+          </div>
+        </header>
+
         {/* HERO */}
         <section className="relative overflow-hidden">
           <div aria-hidden="true" className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-orange-300/30 blur-3xl" />
