@@ -202,7 +202,15 @@ export function KanbanBoard({
             <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-slate-950 rounded-2xl border border-white/10 p-1" onClick={(e) => e.stopPropagation()}>
               <OrderCard
                 order={order}
-                onUpdateStatus={onUpdateStatus}
+                // Close the modal on any status transition so the card visibly
+                // jumps to the next kanban column — before this, the modal
+                // stayed open and the button silently relabeled ("Mover a
+                // cocina" → "Marcar entregado"), which read as "nothing
+                // happened" on a phone.
+                onUpdateStatus={(id, status, extras) => {
+                  onUpdateStatus(id, status, extras);
+                  setSelectedOrder(null);
+                }}
                 restaurantName={restaurantName}
                 deliveryMode={deliveryMode}
                 onDispatched={onDispatched}

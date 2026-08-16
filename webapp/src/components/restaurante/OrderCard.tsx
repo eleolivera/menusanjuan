@@ -102,6 +102,7 @@ export function OrderCard({
   const [savingFee, setSavingFee] = useState(false);
   const [showKitchenPrompt, setShowKitchenPrompt] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [itemsCopied, setItemsCopied] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   // Confirm-paid modal — shown when cashier hits "Marcar Entregado" on an order
   // that hasn't been recorded as PAID yet (any deliveryMethod). Forces an
@@ -156,6 +157,50 @@ export function OrderCard({
   function confirmKitchen() {
     onUpdateStatus(order.id, "PROCESSING");
     setShowKitchenPrompt(false);
+  }
+
+  // Printer-down fallback: copy an itemized, price-free list to the clipboard so
+  // the owner can paste it into the kitchen's WhatsApp. Same status nudge as
+  // print — treat "sent to kitchen via WhatsApp" and "printed comanda" as
+  // equivalent triggers for the Mandar-a-cocina prompt.
+  async function handleCopyItems() {
+    const dest = order.channel === "DINE_IN"
+      ? `Mesa ${order.tableNumber || ""}`.trim()
+      : order.deliveryMethod === "delivery" ? "Delivery" : "Retiro";
+    const lines: string[] = [`*${order.orderNumber}* · ${dest}`, ""];
+    for (const item of (order.items as any[])) {
+      lines.push(`${item.quantity}× ${item.name}`);
+      if (item.selectedOptions?.length) {
+        const opts = item.selectedOptions
+          .map((so: any) => `${so.group}: ${so.choices.map((c: any) => c.name).join(", ")}`)
+          .join(" / ");
+        lines.push(`   · ${opts}`);
+      }
+      if (item.componentSelections?.length) {
+        for (const comp of item.componentSelections) {
+          const compOpts = comp.selectedOptions?.length
+            ? comp.selectedOptions.map((so: any) => `${so.group}: ${so.choices.map((c: any) => c.name).join(", ")}`).join(" / ")
+            : "sin extras";
+          lines.push(`   ↳ ${comp.label}: ${compOpts}`);
+        }
+      }
+      if (item.overrideNote) lines.push(`   · Nota: ${item.overrideNote}`);
+    }
+    if (order.notes) { lines.push(""); lines.push(`📝 ${order.notes}`); }
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setItemsCopied(true);
+      setTimeout(() => setItemsCopied(false), 2000);
+      if (order.status === "GENERATED" || order.status === "PAID") setShowKitchenPrompt(true);
+    } catch {
+      // Fallback for older webviews where clipboard API is blocked
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); setItemsCopied(true); setTimeout(() => setItemsCopied(false), 2000); }
+      finally { ta.remove(); }
+    }
   }
   const config = STATUS_CONFIG[order.status];
   const totalDue = (order.total || 0) + (order.deliveryFee || 0);
@@ -578,14 +623,29 @@ export function OrderCard({
             </>
           ) : null}
 
-          <button
-            type="button"
-            onClick={handlePrint}
-            disabled={printing}
-            className="block w-full mt-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-300 text-center hover:bg-white/10 transition-colors disabled:opacity-50"
-          >
-            {printing ? "🖨️ Imprimiendo..." : "🖨️ Imprimir comanda"}
-          </button>
+          {/* Print (2/3) + Copy items (1/3). Copy is the printer-down fallback:
+              pastes the item list (no prices) into the kitchen's WhatsApp. */}
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={printing}
+              className="basis-2/3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-300 text-center hover:bg-white/10 transition-colors disabled:opacity-50"
+            >
+              {printing ? "🖨️ Imprimiendo..." : "🖨️ Imprimir comanda"}
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyItems}
+              className={`basis-1/3 rounded-xl border px-2 py-2.5 text-xs font-medium text-center transition-colors ${
+                itemsCopied
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                  : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+              }`}
+            >
+              {itemsCopied ? "✓ Copiado" : "📋 Copiar items"}
+            </button>
+          </div>
 
           {paymentSheet && (
             <PaymentCollector
