@@ -179,6 +179,13 @@ server.tool(
        args.description || null, args.logoUrl || null, args.coverUrl || null,
        args.sourceProfileId || null, args.sourceSite || null, args.rating || null]);
 
+    // Seed the DealerMember(OWNER) row — the session layer needs this to
+    // surface the new dealer for the placeholder user (and later for any
+    // real owner reassigned via setDealerOwner).
+    await query(`INSERT INTO "DealerMember" (id, "dealerId", "userId", role, "createdAt")
+      VALUES ($1, $2, $3, 'OWNER', NOW())`,
+      [cuid(), dealerId, userId]);
+
     return { content: [{ type: "text", text: JSON.stringify({ id: dealerId, slug, email, name: args.name, message: "Created (inactive). Activate via admin or set isActive=true." }, null, 2) }] };
   }
 );

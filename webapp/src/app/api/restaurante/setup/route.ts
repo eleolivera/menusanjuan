@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession, hashPassword, createSession } from "@/lib/restaurante-auth";
+import { setDealerOwner } from "@/lib/ownership";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -65,29 +66,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Este email ya esta registrado. Inicia sesion con ese email." }, { status: 400 });
     }
 
-    // Create new user
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        password: hashPassword(password),
-        name,
-        role: "BUSINESS",
-        emailVerified: false,
-        mustChangePassword: false,
-      },
-    });
+    // Transaction: create new user, transfer every dealer the placeholder
+    // owned (Account.userId + DealerMember(OWNER) both re-parented per
+    // dealer), then drop the placeholder if orphaned.
+    const newUser = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email,
+          password: hashPassword(password),
+          name,
+          role: "BUSINESS",
+          emailVerified: false,
+          mustChangePassword: false,
+        },
+      });
 
-    // Reassign all accounts from placeholder to new user
-    await prisma.account.updateMany({
-      where: { userId: user.id },
-      data: { userId: newUser.id },
-    });
+      const placeholderAccounts = await tx.account.findMany({
+        where: { userId: user.id },
+        include: { dealer: { select: { id: true } } },
+      });
+      for (const acc of placeholderAccounts) {
+        if (!acc.dealer) continue;
+        await setDealerOwner(tx, acc.dealer.id, created.id);
+      }
 
-    // Delete placeholder user if orphaned
-    const remainingAccounts = await prisma.account.count({ where: { userId: user.id } });
-    if (remainingAccounts === 0) {
-      await prisma.user.delete({ where: { id: user.id } }).catch(() => {});
-    }
+      const remaining = await tx.account.count({ where: { userId: user.id } });
+      if (remaining === 0) {
+        await tx.user.delete({ where: { id: user.id } }).catch(() => {});
+      }
+      return created;
+    });
 
     // Create session for new user
     const firstDealer = user.accounts[0]?.dealer;

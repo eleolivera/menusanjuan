@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession, getSession, hashPassword } from "@/lib/restaurante-auth";
 import { getAdminSession } from "@/lib/admin-auth";
+import { setDealerOwner, upsertOwnerMember } from "@/lib/ownership";
 
 function generateSlug(name: string): string {
   return name
@@ -63,6 +64,10 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Seed the DealerMember(OWNER) row so the new dealer shows up in the
+        // session union path from day one.
+        await upsertOwnerMember(tx, dealer.id, session.userId);
+
         // Update role to BUSINESS if not already
         await tx.user.update({
           where: { id: session.userId },
@@ -122,6 +127,9 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Seed DealerMember(OWNER) for the new dealer.
+      await upsertOwnerMember(tx, dealer.id, user.id);
+
       // Check for pending restaurant assignments
       const pendingRestaurants = await tx.dealer.findMany({
         where: { pendingOwnerEmail: email },
@@ -129,21 +137,20 @@ export async function POST(request: NextRequest) {
       });
 
       for (const pending of pendingRestaurants) {
-        // Re-link the restaurant's account to this new user
-        await tx.account.update({
-          where: { id: pending.account.id },
-          data: { userId: user.id },
-        });
+        const oldOwnerId = pending.account.userId;
+        // Transfer ownership via the helper — re-parents Account.userId +
+        // demotes prior OWNER DealerMember + upserts new OWNER row.
+        await setDealerOwner(tx, pending.id, user.id);
         await tx.dealer.update({
           where: { id: pending.id },
           data: { pendingOwnerEmail: null, isVerified: true, claimedAt: new Date() },
         });
         // Clean up old placeholder user
-        const oldAccounts = await tx.account.count({ where: { userId: pending.account.userId } });
+        const oldAccounts = await tx.account.count({ where: { userId: oldOwnerId } });
         if (oldAccounts === 0) {
-          const oldUser = await tx.user.findUnique({ where: { id: pending.account.userId } });
+          const oldUser = await tx.user.findUnique({ where: { id: oldOwnerId } });
           if (oldUser?.email.endsWith("@menusanjuan.com")) {
-            await tx.user.delete({ where: { id: pending.account.userId } });
+            await tx.user.delete({ where: { id: oldOwnerId } });
           }
         }
       }

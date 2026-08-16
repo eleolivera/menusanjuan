@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getRestauranteFromSession, hashPassword, verifyPassword } from "@/lib/restaurante-auth";
+import { getRestauranteContext, hashPassword, verifyPassword } from "@/lib/restaurante-auth";
 
-// PATCH — update email or password
+// PATCH — update email or password of the CURRENT user (not the resta owner
+// necessarily). Under multi-user access, a STAFF member changes THEIR own
+// email/password, not the OWNER's — otherwise a staff member could reset the
+// owner's password and lock them out.
 export async function PATCH(request: NextRequest) {
-  const dealer = await getRestauranteFromSession();
-  if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const ctx = await getRestauranteContext();
+  if (!ctx) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const userId = dealer.account.userId;
+  const userId = ctx.sessionUserId;
   const body = await request.json();
   const { action } = body;
 

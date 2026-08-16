@@ -6,14 +6,15 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getRestauranteFromSession } from "@/lib/restaurante-auth";
+import { getRestauranteContext } from "@/lib/restaurante-auth";
 import { createGiftRedemption, type GiftKind } from "@/lib/rewards";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ customerId: string }> }) {
   const { customerId } = await params;
 
-  const dealer = await getRestauranteFromSession();
-  if (!dealer) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const ctx = await getRestauranteContext();
+  if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const { dealer } = ctx;
 
   // Soft-scope: target customer must have ordered at this dealer.
   const anyOrder = await prisma.order.findFirst({
@@ -51,12 +52,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!item) return NextResponse.json({ error: "invalid_item" }, { status: 400 });
   }
 
-  // Owner user id for audit
-  const ownerUserId = dealer.account.userId;
+  // Attribute the gift to the acting user (owner or staff) for audit — the
+  // rewards helper preserves the parameter name `ownerUserId` for back-compat
+  // but any DealerMember is allowed to gift on behalf of the resta.
+  const actingUserId = ctx.sessionUserId;
 
   try {
     const gift = await createGiftRedemption({
-      ownerUserId,
+      ownerUserId: actingUserId,
       dealerId: dealer.id,
       customerId,
       kind: body.kind,

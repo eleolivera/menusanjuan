@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/admin-auth";
+import { setDealerOwner } from "@/lib/ownership";
 
 export async function GET() {
   if (!(await getAdminSession())) {
@@ -84,11 +85,11 @@ export async function DELETE(request: NextRequest) {
           });
         }
 
-        // Re-link the account to the placeholder
-        await tx.account.update({
-          where: { id: account.id },
-          data: { userId: placeholderUser.id },
-        });
+        // Re-parent Account + DealerMember(OWNER) to the placeholder. Any
+        // STAFF DealerMember rows on this dealer for OTHER users stay put.
+        // The current OWNER row (belonging to the user being deleted) is
+        // dropped by setDealerOwner as part of the transfer.
+        await setDealerOwner(tx, account.dealer.id, placeholderUser.id);
 
         // Mark restaurant as unclaimed
         await tx.dealer.update({

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getRestauranteFromSession } from "@/lib/restaurante-auth";
+import { getRestauranteContext } from "@/lib/restaurante-auth";
 import { isServiceOpenNow } from "@/lib/hours";
+import { assertProfilePatchAllowed, NotOwnerError } from "@/lib/ownership";
 
 /**
  * Accepts either a JSON string or an array. Validates max 5 zones, strict-asc radius (+1km).
@@ -37,18 +38,23 @@ function validateAndStringifyZones(input: unknown): string | null {
   return JSON.stringify(cleaned);
 }
 
-// GET — current restaurant profile
+// GET — current restaurant profile.
+// Under multi-user: the acting-user identity fields (email / hasPassword /
+// hasGoogle) reflect THE CALLER'S OWN User, not the Account owner.
+// SecuritySection on /restaurante/profile uses these to know which
+// credentials it is managing. A STAFF caller sees her own email + linkage.
 export async function GET() {
-  const dealer = await getRestauranteFromSession();
-  if (!dealer) {
+  const ctx = await getRestauranteContext();
+  if (!ctx) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const { dealer, sessionUserId } = ctx;
 
-  const user = dealer.account.user;
-  const hasPassword = !!user.password && user.password.includes(":");
-  const googleLinked = await prisma.oAuthAccount.count({
-    where: { userId: user.id, provider: "google" },
-  });
+  const actingUser = await prisma.user.findUnique({ where: { id: sessionUserId } });
+  const hasPassword = !!actingUser?.password && actingUser.password.includes(":");
+  const googleLinked = actingUser
+    ? await prisma.oAuthAccount.count({ where: { userId: sessionUserId, provider: "google" } })
+    : 0;
 
   return NextResponse.json({
     id: dealer.id,
@@ -89,20 +95,39 @@ export async function GET() {
     scheduledOpen:
       isServiceOpenNow(dealer.pickupHours || dealer.openHours) ||
       isServiceOpenNow(dealer.deliveryHours || dealer.openHours),
-    email: user.email,
+    email: actingUser?.email ?? null,
     hasPassword,
     hasGoogle: googleLinked > 0,
+    // Expose the acting user's role on this dealer so the client can hide
+    // owner-only sections (Equipo, financial fields) for STAFF.
+    role: ctx.role,
   });
 }
 
-// PATCH — update restaurant profile
+// PATCH — update restaurant profile.
+// Staff members may only edit the ops subset (open/close overrides,
+// enable/disable delivery/pickup, hours JSON, description, cover/logo,
+// cuisineType). Financial (mercadopago/bank), routing (deliveryMode +
+// pricing), rewards master toggle, POS toggle, and resta identity
+// (name/slug/address/city/lat/lng/phone) require OWNER. Enforced by
+// assertProfilePatchAllowed which throws NotOwnerError on the first
+// forbidden key — caught below and turned into a 403.
 export async function PATCH(request: NextRequest) {
-  const dealer = await getRestauranteFromSession();
-  if (!dealer) {
+  const ctx = await getRestauranteContext();
+  if (!ctx) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const { dealer, role } = ctx;
 
   const body = await request.json();
+  try {
+    assertProfilePatchAllowed(body, role);
+  } catch (err) {
+    if (err instanceof NotOwnerError) {
+      return NextResponse.json({ error: err.message }, { status: 403 });
+    }
+    throw err;
+  }
   const {
     name, phone, address, latitude, longitude, cuisineType,
     description, logoUrl, coverUrl, openHours,

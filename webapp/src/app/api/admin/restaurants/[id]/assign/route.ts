@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/admin-auth";
+import { setDealerOwner } from "@/lib/ownership";
 
 // POST — assign owner to restaurant by email
 export async function POST(
@@ -40,17 +41,10 @@ export async function POST(
   }
 
   if (user) {
-    // User exists — re-link the account to this user
-    await prisma.account.update({
-      where: { id: dealer.account.id },
-      data: { userId: user.id },
-    });
-
-    // Update user role
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { role: "BUSINESS" },
-    });
+    // Re-parent Account.userId AND upsert DealerMember(role=OWNER) in one
+    // transaction. Also demotes/removes any prior OWNER member row so we
+    // never end up with two owners.
+    await setDealerOwner(prisma, dealerId, user.id, { markUserBusiness: true });
 
     // Mark as verified + claimed
     await prisma.dealer.update({
@@ -113,25 +107,18 @@ export async function DELETE(
   // Check if placeholder email already exists
   const existingPlaceholder = await prisma.user.findUnique({ where: { email: placeholderEmail } });
 
-  if (existingPlaceholder) {
-    await prisma.account.update({
-      where: { id: dealer.account.id },
-      data: { userId: existingPlaceholder.id },
-    });
-  } else {
-    const newUser = await prisma.user.create({
-      data: {
-        email: placeholderEmail,
-        password: hashPassword("menusj2024"),
-        name: dealer.name,
-        phone: dealer.phone,
-      },
-    });
-    await prisma.account.update({
-      where: { id: dealer.account.id },
-      data: { userId: newUser.id },
-    });
-  }
+  const placeholderUser = existingPlaceholder ?? await prisma.user.create({
+    data: {
+      email: placeholderEmail,
+      password: hashPassword("menusj2024"),
+      name: dealer.name,
+      phone: dealer.phone,
+    },
+  });
+  // Re-parent Account.userId AND keep DealerMember(role=OWNER) in sync.
+  // markUserBusiness=false — placeholders are ops-only, not real business
+  // accounts.
+  await setDealerOwner(prisma, dealerId, placeholderUser.id);
 
   await prisma.dealer.update({
     where: { id: dealerId },

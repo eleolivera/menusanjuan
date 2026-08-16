@@ -44,6 +44,9 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [hasPassword, setHasPassword] = useState(true);
   const [hasGoogle, setHasGoogle] = useState(false);
+  // Role of the acting user on this resta. OWNER sees the Equipo section +
+  // financial fields; STAFF sees ops-only. Server enforces regardless.
+  const [role, setRole] = useState<"OWNER" | "STAFF" | null>(null);
   const [originalData, setOriginalData] = useState<Record<string, any>>({
     name: "", phone: "", address: "", latitude: null, longitude: null,
     cuisineType: "", description: "", logoUrl: "", coverUrl: "",
@@ -193,6 +196,7 @@ export default function ProfilePage() {
         setEmail(d.email || "");
         setHasPassword(d.hasPassword ?? true);
         setHasGoogle(d.hasGoogle ?? false);
+        setRole((d.role as "OWNER" | "STAFF" | null) ?? "OWNER");
         setOriginalData({
           name: d.name || "",
           phone: d.phone || "",
@@ -821,6 +825,9 @@ export default function ProfilePage() {
           )}
         </section>
 
+        {/* Equipo — owner only. Staff never sees this section. */}
+        {role === "OWNER" && <TeamSection />}
+
         {/* Security section */}
         <SecuritySection email={email} hasPassword={hasPassword} hasGoogle={hasGoogle} onPasswordSet={() => setHasPassword(true)} />
 
@@ -828,6 +835,169 @@ export default function ProfilePage() {
         <div className="pb-8" />
       </div>
     </div>
+  );
+}
+
+type TeamMember = {
+  userId: string;
+  email: string;
+  name: string;
+  role: "OWNER" | "STAFF";
+  createdAt: string;
+  isPlaceholder: boolean;
+};
+
+// Owner-only: add employees by Gmail so they can log in and see pedidos.
+// Silent invite — no email/WhatsApp is sent. Owner tells the employee
+// verbally to sign in with Google using the same email.
+function TeamSection() {
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [emailInput, setEmailInput] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [justAddedEmail, setJustAddedEmail] = useState<string | null>(null);
+
+  async function loadMembers() {
+    try {
+      const res = await fetch("/api/restaurante/team");
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as TeamMember[];
+      setMembers(data);
+    } catch {
+      setError("No pudimos cargar el equipo");
+    } finally {
+      setLoadingList(false);
+    }
+  }
+  useEffect(() => { loadMembers(); }, []);
+
+  async function handleAdd(e?: React.FormEvent) {
+    e?.preventDefault();
+    const email = emailInput.trim().toLowerCase();
+    if (!email.includes("@")) { setError("Email inválido"); return; }
+    setAdding(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/restaurante/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Error al agregar");
+        return;
+      }
+      setMembers((prev) => [...prev, data as TeamMember]);
+      setJustAddedEmail(email);
+      setEmailInput("");
+      setTimeout(() => setJustAddedEmail(null), 4000);
+    } catch {
+      setError("Error de conexión");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleRemove(m: TeamMember) {
+    if (!confirm(`¿Quitar a ${m.email} del equipo?`)) return;
+    try {
+      const res = await fetch(`/api/restaurante/team/${m.userId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "No se pudo quitar");
+        return;
+      }
+      setMembers((prev) => prev.filter((x) => x.userId !== m.userId));
+    } catch {
+      setError("Error de conexión");
+    }
+  }
+
+  return (
+    <section id="equipo" className="rounded-2xl border border-white/5 bg-slate-900/50 p-6 scroll-mt-6">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white font-bold text-lg">👥</div>
+        <div className="flex-1">
+          <h2 className="text-sm font-bold text-white">Equipo</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Sumá empleados para que también vean los pedidos, marquen entregado y cobren. Ellos entran con Google usando su Gmail.
+          </p>
+        </div>
+      </div>
+
+      {/* Add form */}
+      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-2 mb-4">
+        <input
+          type="email"
+          value={emailInput}
+          onChange={(e) => setEmailInput(e.target.value)}
+          placeholder="empleado@gmail.com"
+          disabled={adding}
+          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors disabled:opacity-50"
+        />
+        <button
+          type="submit"
+          disabled={adding || !emailInput.trim()}
+          className="shrink-0 rounded-xl bg-gradient-to-r from-primary to-amber-500 px-4 py-3 text-xs font-semibold text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+        >
+          {adding ? "Agregando…" : "Agregar"}
+        </button>
+      </form>
+
+      {error && (
+        <p className="mb-3 text-xs text-red-400">{error}</p>
+      )}
+      {justAddedEmail && (
+        <div className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+          ✓ {justAddedEmail} agregado. Decile que entre en <span className="font-mono">menusanjuan.com</span> → <span className="font-semibold">Iniciar sesión</span> con Google usando ese mismo email.
+        </div>
+      )}
+
+      {/* List */}
+      {loadingList ? (
+        <p className="text-xs text-slate-500">Cargando…</p>
+      ) : members.length === 0 ? (
+        <p className="text-xs text-slate-500">Todavía no hay miembros.</p>
+      ) : (
+        <ul className="space-y-2">
+          {members.map((m) => (
+            <li
+              key={m.userId}
+              className="rounded-2xl border border-white/5 bg-slate-900/50 p-4 flex items-center gap-3"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-white truncate">{m.email}</span>
+                  {m.role === "OWNER" ? (
+                    <span className="rounded-full bg-primary/15 text-primary px-2 py-0.5 text-[10px] font-bold border border-primary/30">Dueño</span>
+                  ) : (
+                    <span className="rounded-full bg-white/5 text-slate-300 px-2 py-0.5 text-[10px] font-semibold border border-white/10">Miembro</span>
+                  )}
+                  {m.isPlaceholder && (
+                    <span className="rounded bg-amber-400/15 text-amber-300 px-1.5 py-0.5 text-[9px] font-semibold">placeholder</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Agregado {new Date(m.createdAt).toLocaleDateString("es-AR")}
+                </p>
+              </div>
+              {m.role === "STAFF" ? (
+                <button
+                  onClick={() => handleRemove(m)}
+                  className="shrink-0 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-300 text-slate-400 px-3 py-1.5 text-xs font-semibold transition-colors"
+                >
+                  Quitar
+                </button>
+              ) : (
+                <span className="shrink-0 text-[10px] text-slate-600 italic">Vos</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

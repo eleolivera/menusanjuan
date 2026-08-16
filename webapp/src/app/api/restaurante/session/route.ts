@@ -32,6 +32,10 @@ export async function GET() {
       logoUrl: session.activeRestaurant?.logoUrl,
       coverUrl: session.activeRestaurant?.coverUrl,
       deliveryMode: (session.activeRestaurant as { deliveryMode?: string })?.deliveryMode ?? null,
+      // Role of the acting user on the currently active resta. UI hides
+      // owner-only controls (Equipo section, financial fields) when STAFF.
+      // Server enforces regardless via assertOwner() on the routes.
+      role: (session.activeRestaurant as { role?: "OWNER" | "STAFF" })?.role ?? null,
       email: session.user.email,
       mustChangePassword: session.user.mustChangePassword,
     });

@@ -4,6 +4,7 @@ import { hashPassword, createSession } from "@/lib/restaurante-auth";
 import { getAdminSession } from "@/lib/admin-auth";
 import { sendEmail, verificationEmailHtml } from "@/lib/email";
 import { authLimiter, getClientIp } from "@/lib/rate-limit";
+import { setDealerOwner } from "@/lib/ownership";
 
 // POST — create a user account (no restaurant). Auto-links pending restaurants.
 export async function POST(request: NextRequest) {
@@ -53,26 +54,22 @@ export async function POST(request: NextRequest) {
     let linkedSlug: string | null = null;
 
     for (const pending of pendingRestaurants) {
-      await tx.account.update({
-        where: { id: pending.account.id },
-        data: { userId: user.id },
-      });
+      const oldOwnerId = pending.account.userId;
+      // Transfer ownership: re-parent Account.userId + demote prior OWNER
+      // + upsert new OWNER DealerMember + promote user to BUSINESS.
+      await setDealerOwner(tx, pending.id, user.id, { markUserBusiness: true });
       await tx.dealer.update({
         where: { id: pending.id },
         data: { pendingOwnerEmail: null, isVerified: true, claimedAt: new Date() },
       });
-      await tx.user.update({
-        where: { id: user.id },
-        data: { role: "BUSINESS" },
-      });
       if (!linkedSlug) linkedSlug = pending.slug;
 
       // Clean up placeholder
-      const oldCount = await tx.account.count({ where: { userId: pending.account.userId } });
+      const oldCount = await tx.account.count({ where: { userId: oldOwnerId } });
       if (oldCount === 0) {
-        const old = await tx.user.findUnique({ where: { id: pending.account.userId } });
+        const old = await tx.user.findUnique({ where: { id: oldOwnerId } });
         if (old?.email.endsWith("@menusanjuan.com")) {
-          await tx.user.delete({ where: { id: pending.account.userId } });
+          await tx.user.delete({ where: { id: oldOwnerId } });
         }
       }
     }

@@ -163,7 +163,24 @@ export async function getRestauranteSession() {
   return { slug: session.activeSlug || "" };
 }
 
-// Get full user with all their restaurants + pending claims
+// Common dealer-projection used for restaurants[] entries in the switcher +
+// activeRestaurant. Extracted so the Account and DealerMember loads share it.
+const RESTA_SELECT = {
+  id: true, name: true, slug: true, cuisineType: true,
+  logoUrl: true, coverUrl: true, phone: true, address: true,
+  description: true, isActive: true, isVerified: true,
+  // Needed by DashboardShell to conditionally show the 'Repartidores' nav
+  // entry when the resta is on OWN/HYBRID.
+  deliveryMode: true,
+} as const;
+
+// Role the acting user has on a given dealer. OWNER = full access (team,
+// financial fields, resta identity); STAFF = ops access only (pedidos,
+// menu edits, hours, close-now, print, rewards operations). Enforced by
+// assertOwner() in lib/ownership.ts on the owner-only routes.
+export type MemberRole = "OWNER" | "STAFF";
+
+// Get full user with all their restaurants (owned + membership) + pending claims
 export async function getFullSession() {
   const session = await getSession();
   if (!session) return null;
@@ -173,18 +190,15 @@ export async function getFullSession() {
     include: {
       accounts: {
         where: { type: "dealer" },
-        include: {
-          dealer: {
-            select: {
-              id: true, name: true, slug: true, cuisineType: true,
-              logoUrl: true, coverUrl: true, phone: true, address: true,
-              description: true, isActive: true, isVerified: true,
-              // Needed by DashboardShell to conditionally show the
-              // 'Repartidores' nav entry when the resta is on OWN/HYBRID.
-              deliveryMode: true,
-            },
-          },
-        },
+        include: { dealer: { select: RESTA_SELECT } },
+      },
+      // NEW: dealers the user was added to via /restaurante/team. Union'd
+      // with `accounts` below, so a staff member sees the resta they were
+      // invited to alongside any they own themselves. Backfill guarantees
+      // every existing Account owner ALSO has a DealerMember(role="OWNER")
+      // row, so the union always covers today's owner path.
+      dealerMemberships: {
+        include: { dealer: { select: RESTA_SELECT } },
       },
       claimRequests: {
         where: { status: { in: ["PENDING", "CODE_SENT"] } },
@@ -198,12 +212,26 @@ export async function getFullSession() {
 
   if (!user) return null;
 
-  const restaurants = user.accounts
-    .map((a) => a.dealer)
-    .filter(Boolean);
+  // Dedupe by dealer.id — Account-owner + DealerMember(role=OWNER) rows
+  // point to the same dealer for existing owners; both surfacing would
+  // duplicate the switcher entry. Account path wins for role attribution
+  // (Account.userId is the authoritative owner regardless of what a
+  // DealerMember row says, so an out-of-sync member row can't demote an
+  // owner to STAFF).
+  type Resta = (typeof user.accounts)[number]["dealer"] & { role: MemberRole };
+  const byId = new Map<string, Resta>();
+  for (const a of user.accounts) {
+    if (a.dealer) byId.set(a.dealer.id, { ...a.dealer, role: "OWNER" });
+  }
+  for (const m of user.dealerMemberships) {
+    if (!m.dealer) continue;
+    if (byId.has(m.dealer.id)) continue; // Account-owner path already covered
+    byId.set(m.dealer.id, { ...m.dealer, role: m.role === "OWNER" ? "OWNER" : "STAFF" });
+  }
+  const restaurants = Array.from(byId.values());
 
   const activeRestaurant = session.activeSlug
-    ? restaurants.find((r) => r!.slug === session.activeSlug) || restaurants[0]
+    ? restaurants.find((r) => r.slug === session.activeSlug) || restaurants[0]
     : restaurants[0];
 
   return {
@@ -222,7 +250,11 @@ export async function getFullSession() {
   };
 }
 
-// Get the active dealer (backward compat for existing code)
+// Get the active dealer (backward compat for existing code — most routes).
+// Access is enforced upstream by getFullSession(): activeRestaurant is only
+// populated when the acting user owns the dealer OR is a DealerMember of it.
+// A user with a hand-crafted cookie pointing at a slug they don't own falls
+// back to their first accessible resta (never gets the requested slug).
 export async function getRestauranteFromSession() {
   const full = await getFullSession();
   if (!full?.activeRestaurant) return null;
@@ -233,6 +265,30 @@ export async function getRestauranteFromSession() {
   });
 
   return dealer;
+}
+
+// Get the active dealer WITH role + session userId, for routes that need to
+// gate owner-only operations or attribute audit fields to the acting user
+// (not the Account owner). Use this in the team endpoints, in profile PATCH
+// (financial fields), in rewards, and anywhere `giftedByUserId`-like audit
+// needs to reflect who actually pressed the button.
+export async function getRestauranteContext() {
+  const full = await getFullSession();
+  if (!full?.activeRestaurant) return null;
+
+  const dealer = await prisma.dealer.findUnique({
+    where: { slug: full.activeRestaurant.slug },
+    include: { account: { include: { user: true } } },
+  });
+
+  if (!dealer) return null;
+
+  return {
+    dealer,
+    role: full.activeRestaurant.role as MemberRole,
+    sessionUserId: full.user.id,
+    impersonatedByAdmin: !!full.impersonatedByAdmin,
+  };
 }
 
 export async function switchActiveRestaurant(slug: string) {
@@ -298,14 +354,22 @@ export async function loginWithEmail(email: string, password: string): Promise<{
         where: { type: "dealer" },
         include: { dealer: true },
       },
+      // Also consider member-dealers so a staff-only user (who has no
+      // Account row but was added via /restaurante/team) lands on the resta
+      // they were invited to instead of a stranded session with no slug.
+      dealerMemberships: {
+        include: { dealer: true },
+      },
     },
   });
 
   if (!user) return null;
   if (!verifyPassword(password, user.password)) return null;
 
-  const firstDealer = user.accounts[0]?.dealer;
-  await createSession(user.id, firstDealer?.slug || undefined);
+  const ownedSlug = user.accounts[0]?.dealer?.slug;
+  const memberSlug = user.dealerMemberships[0]?.dealer?.slug;
+  const activeSlug = ownedSlug || memberSlug;
+  await createSession(user.id, activeSlug || undefined);
 
-  return { slug: firstDealer?.slug || user.id, mustChangePassword: user.mustChangePassword };
+  return { slug: activeSlug || user.id, mustChangePassword: user.mustChangePassword };
 }

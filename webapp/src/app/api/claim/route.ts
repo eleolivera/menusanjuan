@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession, createSession } from "@/lib/restaurante-auth";
 import { getAdminSession } from "@/lib/admin-auth";
+import { setDealerOwner } from "@/lib/ownership";
 import crypto from "crypto";
 
 const CLAIM_SECRET = process.env.CLAIM_SECRET || "menusj-claim-2024";
@@ -102,22 +103,18 @@ export async function POST(request: NextRequest) {
         data: { status: "APPROVED", resolvedAt: new Date() },
       });
 
-      // Link the Account to the claiming user
-      await tx.account.update({
-        where: { id: claim.dealer.account.id },
-        data: { userId: claim.userId },
+      // Transfer ownership: re-parent Account.userId + keep DealerMember
+      // (role=OWNER) in sync + promote user to BUSINESS. The helper
+      // atomically demotes any prior OWNER DealerMember row.
+      await setDealerOwner(tx, claim.dealerId, claim.userId, {
+        addedByUserId: claim.userId,
+        markUserBusiness: true,
       });
 
       // Mark dealer as verified + claimed
       await tx.dealer.update({
         where: { id: claim.dealerId },
         data: { isVerified: true, claimedAt: new Date() },
-      });
-
-      // Update claiming user's role to BUSINESS
-      await tx.user.update({
-        where: { id: claim.userId },
-        data: { role: "BUSINESS" },
       });
 
       // Delete the placeholder user if it has no other accounts

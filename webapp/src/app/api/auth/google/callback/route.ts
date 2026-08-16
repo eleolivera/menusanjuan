@@ -7,6 +7,7 @@ import { cookieDomain } from "@/lib/cookie-domain";
 import { authLimiter, getClientIp } from "@/lib/rate-limit";
 import { exchangeCodeForTokens, fetchGoogleUserInfo } from "@/lib/google-oauth";
 import { handleCustomerGoogleCallback } from "@/lib/customer-auth";
+import { setDealerOwner } from "@/lib/ownership";
 
 // Small helper: pick the right "sorry that failed" landing page based on
 // whether the OAuth flow was customer-intent or owner-intent. Customer
@@ -100,7 +101,12 @@ export async function GET(request: NextRequest) {
     // Check if this Google account is already linked
     const existingOAuth = await prisma.oAuthAccount.findUnique({
       where: { provider_providerAccountId: { provider: "google", providerAccountId: googleUser.sub } },
-      include: { user: { include: { accounts: { where: { type: "dealer" }, include: { dealer: true } } } } },
+      include: { user: { include: {
+        accounts: { where: { type: "dealer" }, include: { dealer: true } },
+        // Staff-only users (added via /restaurante/team) have no Account row.
+        // Pull memberships so they land on their invited resta on login.
+        dealerMemberships: { include: { dealer: true } },
+      } } },
     });
 
     let userId: string;
@@ -114,12 +120,16 @@ export async function GET(request: NextRequest) {
         await createAdminSession(userId);
         return NextResponse.redirect(new URL("https://admin.menusanjuan.com"));
       }
-      activeSlug = existingOAuth.user.accounts[0]?.dealer?.slug;
+      activeSlug = existingOAuth.user.accounts[0]?.dealer?.slug
+        ?? existingOAuth.user.dealerMemberships[0]?.dealer?.slug;
     } else {
       // Check if a user with this email already exists
       const existingUser = await prisma.user.findUnique({
         where: { email: googleUser.email },
-        include: { accounts: { where: { type: "dealer" }, include: { dealer: true } } },
+        include: {
+          accounts: { where: { type: "dealer" }, include: { dealer: true } },
+          dealerMemberships: { include: { dealer: true } },
+        },
       });
 
       if (existingUser) {
@@ -146,7 +156,10 @@ export async function GET(request: NextRequest) {
           },
         });
         userId = existingUser.id;
-        activeSlug = existingUser.accounts[0]?.dealer?.slug;
+        // Fall back to member-dealer for staff-only users pre-created via
+        // the team invite endpoint.
+        activeSlug = existingUser.accounts[0]?.dealer?.slug
+          ?? existingUser.dealerMemberships[0]?.dealer?.slug;
       } else {
         // New user — create account + auto-link pending restaurants
         const result = await prisma.$transaction(async (tx) => {
@@ -167,26 +180,23 @@ export async function GET(request: NextRequest) {
           let linkedSlug: string | null = null;
 
           for (const pending of pendingRestaurants) {
-            await tx.account.update({
-              where: { id: pending.account.id },
-              data: { userId: user.id },
-            });
+            const oldOwnerId = pending.account.userId;
+            // Transfer ownership: re-parent Account.userId + demote prior
+            // OWNER DealerMember + upsert new OWNER row + promote user to
+            // BUSINESS. Single transaction.
+            await setDealerOwner(tx, pending.id, user.id, { markUserBusiness: true });
             await tx.dealer.update({
               where: { id: pending.id },
               data: { pendingOwnerEmail: null, isVerified: true, claimedAt: new Date() },
             });
-            await tx.user.update({
-              where: { id: user.id },
-              data: { role: "BUSINESS" },
-            });
             if (!linkedSlug) linkedSlug = pending.slug;
 
             // Clean up placeholder user
-            const oldCount = await tx.account.count({ where: { userId: pending.account.userId } });
+            const oldCount = await tx.account.count({ where: { userId: oldOwnerId } });
             if (oldCount === 0) {
-              const old = await tx.user.findUnique({ where: { id: pending.account.userId } });
+              const old = await tx.user.findUnique({ where: { id: oldOwnerId } });
               if (old?.email.endsWith("@menusanjuan.com")) {
-                await tx.user.delete({ where: { id: pending.account.userId } });
+                await tx.user.delete({ where: { id: oldOwnerId } });
               }
             }
           }

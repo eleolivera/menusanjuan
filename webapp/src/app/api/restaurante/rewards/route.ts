@@ -5,8 +5,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma";
-import { getRestauranteFromSession } from "@/lib/restaurante-auth";
+import { getRestauranteContext, getRestauranteFromSession } from "@/lib/restaurante-auth";
 import { rewardsFlag, getTopProgressForDealer } from "@/lib/rewards";
+import { assertOwner, NotOwnerError } from "@/lib/ownership";
 
 export async function GET() {
   if (!rewardsFlag()) return new NextResponse("Not found", { status: 404 });
@@ -39,8 +40,16 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   if (!rewardsFlag()) return new NextResponse("Not found", { status: 404 });
 
-  const dealer = await getRestauranteFromSession();
-  if (!dealer) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const ctx = await getRestauranteContext();
+  if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  // Rewards config is owner-only — changes affect payouts + program name
+  // visible to customers. Staff can view (GET) + gift via /gift route.
+  try { assertOwner(ctx.role); }
+  catch (err) {
+    if (err instanceof NotOwnerError) return NextResponse.json({ error: err.message }, { status: 403 });
+    throw err;
+  }
+  const { dealer } = ctx;
 
   let body: {
     rewardsEnabled?: boolean;
