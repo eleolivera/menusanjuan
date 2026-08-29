@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { MenuItemData, OptionGroupData } from "@/data/menus";
 import { X, Plus, Minus, Check } from "lucide-react";
+import { formatFraction } from "@/lib/order-item-display";
 
 export type SelectedOptions = {
   group: string;
@@ -20,6 +21,13 @@ export type ComponentSelection = {
   optionsDelta: number;
 };
 
+/** Extra pricing metadata added to a cart line when the source item has
+ * pricingMode ≠ FIXED. Populated by the customize sheet from the chosen
+ * tier or weight, consumed by money.ts + persisted into the OrderItem. */
+export type PricingExtras =
+  | { pricingMode: "PACKAGED"; tierLabel: string; tierAmount: number; tierPrice: number }
+  | { pricingMode: "BY_WEIGHT"; weight: number; weightUnit: string; quantityTiers: unknown };
+
 type Props = {
   item: MenuItemData;
   onAdd: (
@@ -28,6 +36,7 @@ type Props = {
     optionsDelta: number,
     note: string,
     componentSelections?: ComponentSelection[],
+    pricingExtras?: PricingExtras,
   ) => void;
   onClose: () => void;
 };
@@ -43,7 +52,30 @@ const PARENT_KEY = "__parent__";
 export function ItemCustomizeSheet({ item, onAdd, onClose }: Props) {
   const components = item.components || [];
   const hasComponents = components.length > 0;
-  const parentGroups = item.optionGroups || [];
+  // For PACKAGED / BY_WEIGHT items, suppress the migrated "Peso" OptionGroup
+  // (the stepper replaces it). Other groups (toppings, extras) stay.
+  const mode = item.pricingMode ?? "FIXED";
+  const parentGroups = (item.optionGroups || []).filter((g) => {
+    if (mode === "FIXED") return true;
+    return g.title.trim().toLowerCase() !== "peso";
+  });
+
+  // Extract tier ladder + weight config for the stepper. Only used when
+  // mode ≠ FIXED. Defaults are safe when the item is FIXED.
+  const packagedTiers: Array<{ label: string; amount: number; price: number }> =
+    mode === "PACKAGED" && Array.isArray(item.quantityTiers)
+      ? (item.quantityTiers as Array<{ label: string; amount: number; price: number }>).slice().sort((a, b) => a.amount - b.amount)
+      : [];
+  const weightStep = item.weightStep ?? 0.25;
+  const weightUnit = item.weightUnit ?? "kg";
+  const weightTiers = mode === "BY_WEIGHT" && Array.isArray(item.quantityTiers)
+    ? (item.quantityTiers as Array<{ fromAmount: number; pricePerUnit: number }>).slice().sort((a, b) => a.fromAmount - b.fromAmount)
+    : [];
+
+  // PACKAGED state: which tier is selected. Default = smallest (index 0).
+  const [tierIndex, setTierIndex] = useState(0);
+  // BY_WEIGHT state: current weight, defaulting to the smallest step.
+  const [weight, setWeight] = useState<number>(weightStep);
 
   // Build the initial selections map covering the parent's groups + each
   // component's child groups. All start empty; we mutate via toggleOption.
@@ -121,7 +153,29 @@ export function ItemCustomizeSheet({ item, onAdd, onClose }: Props) {
   const parentDelta = deltaForSurface(PARENT_KEY, parentGroups);
   const componentDeltas = components.map((c) => deltaForSurface(c.id, c.child.optionGroups || []));
   const totalOptionsDelta = parentDelta + componentDeltas.reduce((s, d) => s + d, 0);
-  const totalPrice = (item.price + totalOptionsDelta) * quantity;
+  // Mode-aware total. Options still apply on top for FIXED; PACKAGED reads
+  // the tier price × jarCount; BY_WEIGHT reads the applicable tier rate ×
+  // chosen weight. Options are ignored for PACKAGED/BY_WEIGHT (Peso group
+  // was suppressed above; extras like toppings would still work but no
+  // Nono-Luis item today has them alongside a tier ladder).
+  function perUnitRateForWeight(w: number): number {
+    if (weightTiers.length === 0) return item.price;
+    let best = weightTiers[0].pricePerUnit;
+    let bestFrom = -Infinity;
+    for (const t of weightTiers) {
+      if (t.fromAmount <= w && t.fromAmount >= bestFrom) {
+        bestFrom = t.fromAmount;
+        best = t.pricePerUnit;
+      }
+    }
+    return best;
+  }
+  const totalPrice: number =
+    mode === "PACKAGED" && packagedTiers.length > 0
+      ? Math.round(packagedTiers[tierIndex].price * quantity)
+      : mode === "BY_WEIGHT"
+        ? Math.round(perUnitRateForWeight(weight) * weight)
+        : (item.price + totalOptionsDelta) * quantity;
 
   function buildSelectedOptions(surface: string, groups: OptionGroupData[]): SelectedOptions {
     return groups
@@ -158,12 +212,30 @@ export function ItemCustomizeSheet({ item, onAdd, onClose }: Props) {
       optionsDelta: componentDeltas[i],
     }));
 
+    const pricingExtras: PricingExtras | undefined =
+      mode === "PACKAGED" && packagedTiers.length > 0
+        ? {
+            pricingMode: "PACKAGED",
+            tierLabel: packagedTiers[tierIndex].label,
+            tierAmount: packagedTiers[tierIndex].amount,
+            tierPrice: packagedTiers[tierIndex].price,
+          }
+        : mode === "BY_WEIGHT"
+          ? {
+              pricingMode: "BY_WEIGHT",
+              weight,
+              weightUnit,
+              quantityTiers: weightTiers,
+            }
+          : undefined;
+
     onAdd(
       quantity,
       parentSelectedOptions,
       totalOptionsDelta,
       note.trim(),
       hasComponents ? componentSelections : undefined,
+      pricingExtras,
     );
   }
 
@@ -196,8 +268,78 @@ export function ItemCustomizeSheet({ item, onAdd, onClose }: Props) {
           )}
           <h2 className="text-lg font-bold text-text">{item.name}</h2>
           {item.description && <p className="text-sm text-text-secondary mt-0.5">{item.description}</p>}
-          <p className="text-base font-bold text-primary mt-1">${item.price.toLocaleString("es-AR")}</p>
+          <p className="text-base font-bold text-primary mt-1">
+            {mode === "PACKAGED" && packagedTiers.length > 0
+              ? `Desde $${packagedTiers[0].price.toLocaleString("es-AR")}`
+              : mode === "BY_WEIGHT" && weightTiers.length > 0
+                ? `$${weightTiers[0].pricePerUnit.toLocaleString("es-AR")}/${weightUnit}`
+                : `$${item.price.toLocaleString("es-AR")}`}
+          </p>
         </div>
+
+        {/* Mode-aware picker: PACKAGED tier chips + BY_WEIGHT weight stepper.
+            Placed BEFORE the option groups since it's the primary control
+            for these items — "which jar" comes before "toppings on that jar". */}
+        {mode === "PACKAGED" && packagedTiers.length > 0 && (
+          <div className="px-5 pt-2 pb-2 shrink-0">
+            <div className="text-[10px] uppercase tracking-wider text-text-muted font-bold mb-2">Elegí el tamaño</div>
+            <div className="flex flex-wrap gap-2">
+              {packagedTiers.map((t, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setTierIndex(i)}
+                  className={`rounded-xl border-2 px-3 py-2 text-left transition-all ${
+                    i === tierIndex
+                      ? "border-primary bg-primary/10"
+                      : "border-border/50 bg-surface hover:border-primary/50"
+                  }`}
+                >
+                  <div className={`text-sm font-bold ${i === tierIndex ? "text-primary" : "text-text"}`}>{t.label}</div>
+                  <div className="text-xs text-text-secondary">${t.price.toLocaleString("es-AR")}</div>
+                  {i < packagedTiers.length - 1 && (
+                    <div className="text-[10px] text-emerald-600 mt-0.5">
+                      {(() => {
+                        const bigger = packagedTiers[i + 1];
+                        const savingPerKg = (t.price / t.amount) - (bigger.price / bigger.amount);
+                        return savingPerKg > 0 && i === tierIndex
+                          ? `+ $${Math.round(savingPerKg).toLocaleString("es-AR")}/kg si llevás ${bigger.label}`
+                          : "";
+                      })()}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mode === "BY_WEIGHT" && (
+          <div className="px-5 pt-2 pb-2 shrink-0">
+            <div className="text-[10px] uppercase tracking-wider text-text-muted font-bold mb-2">Cantidad</div>
+            <div className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setWeight((w) => Math.max(weightStep, Math.round((w - weightStep) * 100) / 100))}
+                disabled={weight <= weightStep}
+                className="h-9 w-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:border-primary hover:text-primary transition-colors disabled:opacity-30"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <div className="text-center">
+                <div className="text-lg font-bold text-text">{formatFraction(weight)} {weightUnit}</div>
+                <div className="text-[10px] text-text-muted">${Math.round(perUnitRateForWeight(weight)).toLocaleString("es-AR")}/{weightUnit}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWeight((w) => Math.round((w + weightStep) * 100) / 100)}
+                className="h-9 w-9 rounded-full bg-primary text-white flex items-center justify-center shadow-sm hover:shadow-md transition-all"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable content: option groups + notes */}
         <div className="flex-1 overflow-y-auto px-5 pb-4" style={{ minHeight: 0 }}>
@@ -258,23 +400,27 @@ export function ItemCustomizeSheet({ item, onAdd, onClose }: Props) {
           </div>
         </div>
 
-        {/* Footer: quantity + add button (sticky — pinned bottom regardless of scroll) */}
+        {/* Footer: quantity + add button (sticky — pinned bottom regardless of scroll).
+            BY_WEIGHT hides the jar-count stepper — the weight input above IS
+            the quantity. PACKAGED keeps it (multiple jars of the same tier). */}
         <div className="shrink-0 border-t border-border/50 bg-white px-5 py-4 space-y-3">
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="h-9 w-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:border-primary hover:text-primary transition-colors"
-            >
-              <Minus className="h-4 w-4" />
-            </button>
-            <span className="text-lg font-bold text-text w-8 text-center">{quantity}</span>
-            <button
-              onClick={() => setQuantity(quantity + 1)}
-              className="h-9 w-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:border-primary hover:text-primary transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
+          {mode !== "BY_WEIGHT" && (
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="h-9 w-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:border-primary hover:text-primary transition-colors"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <span className="text-lg font-bold text-text w-8 text-center">{quantity}</span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="h-9 w-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:border-primary hover:text-primary transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           <button
             onClick={handleAdd}

@@ -143,10 +143,22 @@ export function MenuItemCard({
         <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-bold text-text tracking-tight">
-              ${item.price.toLocaleString("es-AR")}
+              {item.pricingMode === "PACKAGED" && Array.isArray(item.quantityTiers) && item.quantityTiers.length > 0 ? (
+                <>Desde ${((item.quantityTiers[0] as { price?: number }).price ?? item.price).toLocaleString("es-AR")}</>
+              ) : item.pricingMode === "BY_WEIGHT" && Array.isArray(item.quantityTiers) && item.quantityTiers.length > 0 ? (
+                <>${((item.quantityTiers[0] as { pricePerUnit?: number }).pricePerUnit ?? item.price).toLocaleString("es-AR")}/{item.weightUnit ?? "kg"}</>
+              ) : (
+                <>${item.price.toLocaleString("es-AR")}</>
+              )}
             </span>
-            {item.optionGroups && item.optionGroups.length > 0 && (
+            {item.optionGroups && item.optionGroups.length > 0 && item.pricingMode === "FIXED" && (
               <span className="text-[9px] text-primary font-medium bg-primary/10 rounded px-1 py-0.5">Personalizable</span>
+            )}
+            {item.pricingMode === "PACKAGED" && (
+              <span className="text-[9px] text-emerald-700 font-medium bg-emerald-100 rounded px-1 py-0.5">Elegí tamaño</span>
+            )}
+            {item.pricingMode === "BY_WEIGHT" && (
+              <span className="text-[9px] text-emerald-700 font-medium bg-emerald-100 rounded px-1 py-0.5">Por peso</span>
             )}
           </div>
 

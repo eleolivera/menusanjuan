@@ -9,7 +9,7 @@ import { CategoryNav } from "./CategoryNav";
 import { MenuItemCard } from "./MenuItemCard";
 import { FloatingCart } from "./FloatingCart";
 import { OrderModal } from "./OrderModal";
-import { ItemCustomizeSheet, type SelectedOptions, type ComponentSelection } from "./ItemCustomizeSheet";
+import { ItemCustomizeSheet, type SelectedOptions, type ComponentSelection, type PricingExtras } from "./ItemCustomizeSheet";
 import { Search, X } from "lucide-react";
 import { getCategoryIcon } from "@/lib/category-icon";
 import { OrderStatusBanner } from "./OrderStatusBanner";
@@ -72,6 +72,14 @@ export type CartEntry = {
   componentSelections?: ComponentSelection[];
   optionsDelta: number;
   note: string;
+  // Variable-pricing state. Present when the source item.pricingMode ≠ FIXED.
+  pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+  tierLabel?: string;
+  tierAmount?: number;
+  tierPrice?: number;   // Used by money.ts for PACKAGED unit price
+  weight?: number;      // BY_WEIGHT actual weight
+  weightUnit?: string;
+  quantityTiers?: unknown; // BY_WEIGHT tiers, so money.ts can resolve per-unit rate
 };
 
 let cartKeyCounter = 0;
@@ -298,6 +306,7 @@ export function StoreMenu({
     optionsDelta: number,
     note: string,
     componentSelections?: ComponentSelection[],
+    pricingExtras?: PricingExtras,
   ) => {
     setCart((prev) => [...prev, {
       cartKey: `ck-${++cartKeyCounter}`,
@@ -307,6 +316,15 @@ export function StoreMenu({
       componentSelections,
       optionsDelta,
       note,
+      // Flatten pricingExtras into the CartEntry so money.ts/OrderModal
+      // can read directly. When absent (FIXED), pricingMode stays undefined.
+      pricingMode: pricingExtras?.pricingMode,
+      tierLabel: pricingExtras?.pricingMode === "PACKAGED" ? pricingExtras.tierLabel : undefined,
+      tierAmount: pricingExtras?.pricingMode === "PACKAGED" ? pricingExtras.tierAmount : undefined,
+      tierPrice: pricingExtras?.pricingMode === "PACKAGED" ? pricingExtras.tierPrice : undefined,
+      weight: pricingExtras?.pricingMode === "BY_WEIGHT" ? pricingExtras.weight : undefined,
+      weightUnit: pricingExtras?.pricingMode === "BY_WEIGHT" ? pricingExtras.weightUnit : undefined,
+      quantityTiers: pricingExtras?.pricingMode === "BY_WEIGHT" ? pricingExtras.quantityTiers : undefined,
     }]);
     setCustomizingItem(null);
   }, []);
@@ -342,7 +360,9 @@ export function StoreMenu({
     return cart.filter((e) => e.item.id === itemId).reduce((s, e) => s + e.quantity, 0);
   }
 
-  // Convert cart to the format OrderModal expects
+  // Convert cart to the format OrderModal expects. Variable-pricing fields
+  // (tierPrice, weight, etc.) pass through so money.ts computes correct
+  // totals in OrderModal without extra plumbing.
   const cartForModal = cart.map((e) => ({
     item: e.item,
     quantity: e.quantity,
@@ -351,6 +371,13 @@ export function StoreMenu({
     componentSelections: e.componentSelections,
     optionsDelta: e.optionsDelta,
     note: e.note,
+    pricingMode: e.pricingMode,
+    tierLabel: e.tierLabel,
+    tierAmount: e.tierAmount,
+    tierPrice: e.tierPrice,
+    weight: e.weight,
+    weightUnit: e.weightUnit,
+    quantityTiers: e.quantityTiers,
   }));
 
   return (
@@ -504,8 +531,8 @@ export function StoreMenu({
       {customizingItem && (
         <ItemCustomizeSheet
           item={customizingItem}
-          onAdd={(qty, opts, delta, note, components) =>
-            addCustomized(customizingItem, qty, opts, delta, note, components)
+          onAdd={(qty, opts, delta, note, components, pricingExtras) =>
+            addCustomized(customizingItem, qty, opts, delta, note, components, pricingExtras)
           }
           onClose={() => setCustomizingItem(null)}
         />

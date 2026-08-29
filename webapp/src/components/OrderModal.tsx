@@ -26,31 +26,45 @@ type CartItem = {
   componentSelections?: ComponentSelection[];
   optionsDelta: number;
   note?: string;
+  // Variable-pricing state — flows through from StoreMenu's CartEntry.
+  pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+  tierLabel?: string;
+  tierAmount?: number;
+  tierPrice?: number;
+  weight?: number;
+  weightUnit?: string;
+  quantityTiers?: unknown;
 };
 
-// Adapter: a client-side CartItem into the shape money.ts expects. Under
-// FIXED (all restas today) this collapses to the legacy (item.price +
-// optionsDelta) × quantity math; under PACKAGED / BY_WEIGHT it picks up the
-// tier or per-unit rate for free.
+// Adapter: a client-side CartItem into the shape money.ts expects. Reads
+// the flattened pricing fields from the cart entry itself (populated by
+// StoreMenu's addCustomized from ItemCustomizeSheet's pricingExtras). For
+// FIXED lines everything but pricingMode is undefined → legacy math wins.
 function cartLine(ci: CartItem) {
-  const raw = ci.item as MenuItemData & {
-    pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
-    quantityTiers?: unknown;
-    tierPrice?: number;
-    weight?: number;
-  };
   return {
     unitPrice: ci.item.price,
     optionsDelta: ci.optionsDelta,
     quantity: ci.quantity,
-    pricingMode: raw.pricingMode,
-    tierPrice: raw.tierPrice,
-    weight: raw.weight,
-    quantityTiers: raw.quantityTiers,
+    pricingMode: ci.pricingMode,
+    tierPrice: ci.tierPrice,
+    weight: ci.weight,
+    quantityTiers: ci.quantityTiers,
   };
 }
 function cartLineUnit(ci: CartItem): number { return moneyLineUnit(cartLine(ci)); }
 function cartLineTotal(ci: CartItem): number { return moneyLineTotal(cartLine(ci)); }
+/** Cart-line display prefix: "1× ½ kg de " for PACKAGED, "0,5 kg de " for
+ *  BY_WEIGHT, "3× " for FIXED. Concat with item.name to build the full line. */
+function cartLineDisplay(ci: CartItem): string {
+  if (ci.pricingMode === "PACKAGED" && ci.tierLabel) {
+    return `${ci.quantity}× ${ci.tierLabel} de`;
+  }
+  if (ci.pricingMode === "BY_WEIGHT" && ci.weight !== undefined) {
+    const w = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 }).format(ci.weight);
+    return `${w} ${ci.weightUnit ?? "kg"} de`;
+  }
+  return `${ci.quantity}×`;
+}
 
 export function OrderModal({
   items,
@@ -319,7 +333,7 @@ export function OrderModal({
     return cartItems
       .map((ci) => {
         const linePrice = cartLineTotal(ci);
-        let line = `  ${ci.quantity}x ${ci.item.name} — $${linePrice.toLocaleString("es-AR")}`;
+        let line = `  ${cartLineDisplay(ci)} ${ci.item.name} — $${linePrice.toLocaleString("es-AR")}`;
         // Parent-level options (rare on a promo, common on a normal item)
         if (ci.selectedOptions.length > 0) {
           const optLines = ci.selectedOptions.map((so) => {
@@ -472,6 +486,16 @@ _Pedido realizado desde MenuSanJuan_`;
             componentSelections: ci.componentSelections,
             note: ci.note || "",
             total: cartLineTotal(ci),
+            // Variable-pricing state persists into OrderItem so kanban,
+            // tickets, and receipts can render "2× ¼ kg" / "0,5 kg" and
+            // money.ts can recompute totals mode-aware server-side.
+            pricingMode: ci.pricingMode,
+            tierLabel: ci.tierLabel,
+            tierAmount: ci.tierAmount,
+            tierPrice: ci.tierPrice,
+            weight: ci.weight,
+            weightUnit: ci.weightUnit,
+            quantityTiers: ci.quantityTiers,
           })),
           // total intentionally omitted — server recomputes from items.
           // (Previously we sent grandTotal here which included deliveryFee → double-count
@@ -894,7 +918,7 @@ _Pedido realizado desde MenuSanJuan_`;
                   <div key={ci.cartKey} className="group py-1 flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between text-sm">
-                        <span className="text-text-secondary">{ci.quantity}x {ci.item.name}</span> {/* cart summary — keep integer format for FIXED-only cart entries */}
+                        <span className="text-text-secondary">{cartLineDisplay(ci)} {ci.item.name}</span>
                         <span className="font-semibold text-text">${cartLineTotal(ci).toLocaleString("es-AR")}</span>
                       </div>
                       {ci.selectedOptions.length > 0 && (

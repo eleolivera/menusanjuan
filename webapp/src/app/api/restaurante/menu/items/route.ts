@@ -47,7 +47,20 @@ export async function PATCH(request: NextRequest) {
   if (!dealer) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await request.json();
-  const { id, name, description, price, imageUrl, badge, available, sortOrder, categoryId, components } = body;
+  const { id, name, description, price, imageUrl, badge, available, sortOrder, categoryId, components,
+    pricingMode, quantityTiers, weightUnit, weightStep } = body;
+
+  // Validate pricingMode + supporting fields when present.
+  const VALID_MODES = ["FIXED", "PACKAGED", "BY_WEIGHT"] as const;
+  if (pricingMode !== undefined && !VALID_MODES.includes(pricingMode)) {
+    return NextResponse.json({ error: "pricingMode inválido" }, { status: 400 });
+  }
+  if (weightUnit !== undefined && weightUnit !== null && !["kg", "gr", "L"].includes(weightUnit)) {
+    return NextResponse.json({ error: "weightUnit debe ser kg / gr / L" }, { status: 400 });
+  }
+  if (weightStep !== undefined && weightStep !== null && !(Number(weightStep) > 0)) {
+    return NextResponse.json({ error: "weightStep debe ser > 0" }, { status: 400 });
+  }
 
   if (!id) return NextResponse.json({ error: "Falta id" }, { status: 400 });
 
@@ -143,6 +156,10 @@ export async function PATCH(request: NextRequest) {
       ...(available !== undefined && { available }),
       ...(sortOrder !== undefined && { sortOrder }),
       ...(categoryId !== undefined && { categoryId }),
+      ...(pricingMode !== undefined && { pricingMode }),
+      ...(quantityTiers !== undefined && { quantityTiers }),
+      ...(weightUnit !== undefined && { weightUnit }),
+      ...(weightStep !== undefined && { weightStep: weightStep !== null ? Number(weightStep) : null }),
     },
     include: {
       componentsOf: { orderBy: { sortOrder: "asc" }, include: { childItem: true } },
