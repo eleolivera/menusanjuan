@@ -22,6 +22,9 @@ export type PaymentIntent = "cash" | "transfer" | "mercadopago";
 export type OrderItem = {
   menuItemId: string;
   name: string;
+  // FIXED: integer jar/unit count. PACKAGED: integer jars OF the chosen tier.
+  // BY_WEIGHT: fractional weight (kg) — always paired with `weight` for the
+  // authoritative value; `quantity` mirrors it for legacy display sites.
   quantity: number;
   unitPrice: number;
   total: number;
@@ -39,6 +42,14 @@ export type OrderItem = {
     selectedOptions: { group: string; choices: { name: string; priceDelta: number }[]; delta: number }[];
     optionsDelta: number;
   }[];
+  // Variable-pricing metadata. Present when the source MenuItem had
+  // pricingMode ≠ FIXED. Absent on legacy orders → treated as FIXED.
+  pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+  tierLabel?: string;    // PACKAGED display, e.g. "¼ kg"
+  tierAmount?: number;   // PACKAGED, e.g. 0.25 (kg contents per jar)
+  tierPrice?: number;    // PACKAGED, price of ONE jar at this tier — used by money.ts
+  weight?: number;       // BY_WEIGHT actual weight (in weightUnit)
+  weightUnit?: string;   // "kg" | "gr" | "L" — display
 };
 
 // Re-export money helpers from lib/money.ts (pure, no DB deps — usable in client components)

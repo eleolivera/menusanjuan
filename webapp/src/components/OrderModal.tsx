@@ -11,6 +11,8 @@ import { OrderStatusStepper } from "./OrderStatusStepper";
 import { saveOrderRef } from "@/lib/order-tracker";
 import { ComprobanteUploader } from "./ComprobanteUploader";
 import { X, Plus, Minus, Pencil } from "lucide-react";
+import { lineUnitPrice as moneyLineUnit, lineTotal as moneyLineTotal } from "@/lib/money";
+import { formatItemQuantity } from "@/lib/order-item-display";
 
 type PaymentIntent = "cash" | "transfer" | "mercadopago";
 
@@ -25,6 +27,30 @@ type CartItem = {
   optionsDelta: number;
   note?: string;
 };
+
+// Adapter: a client-side CartItem into the shape money.ts expects. Under
+// FIXED (all restas today) this collapses to the legacy (item.price +
+// optionsDelta) × quantity math; under PACKAGED / BY_WEIGHT it picks up the
+// tier or per-unit rate for free.
+function cartLine(ci: CartItem) {
+  const raw = ci.item as MenuItemData & {
+    pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+    quantityTiers?: unknown;
+    tierPrice?: number;
+    weight?: number;
+  };
+  return {
+    unitPrice: ci.item.price,
+    optionsDelta: ci.optionsDelta,
+    quantity: ci.quantity,
+    pricingMode: raw.pricingMode,
+    tierPrice: raw.tierPrice,
+    weight: raw.weight,
+    quantityTiers: raw.quantityTiers,
+  };
+}
+function cartLineUnit(ci: CartItem): number { return moneyLineUnit(cartLine(ci)); }
+function cartLineTotal(ci: CartItem): number { return moneyLineTotal(cartLine(ci)); }
 
 export function OrderModal({
   items,
@@ -292,7 +318,7 @@ export function OrderModal({
   function formatItemLines(cartItems: CartItem[]): string {
     return cartItems
       .map((ci) => {
-        const linePrice = (ci.item.price + ci.optionsDelta) * ci.quantity;
+        const linePrice = cartLineTotal(ci);
         let line = `  ${ci.quantity}x ${ci.item.name} — $${linePrice.toLocaleString("es-AR")}`;
         // Parent-level options (rare on a promo, common on a normal item)
         if (ci.selectedOptions.length > 0) {
@@ -336,7 +362,7 @@ export function OrderModal({
       deliveryLine = "\n🏪 *Retiro en local* (sin costo de envío)";
     }
 
-    const subtotal = cartItems.reduce((s, ci) => s + (ci.item.price + ci.optionsDelta) * ci.quantity, 0);
+    const subtotal = cartItems.reduce((s, ci) => s + cartLineTotal(ci), 0);
 
     // Payment-intent line — what the customer chose
     const intentLabel =
@@ -395,7 +421,7 @@ _Pedido realizado desde MenuSanJuan_`;
   function buildWhatsAppFromTracking(orderNum: string, td: any): string {
     const tdItems = (td.items as any[]) || [];
     const lines = tdItems.map((it) => {
-      let line = `  ${it.quantity}x ${it.name} — $${(it.total ?? (it.unitPrice * it.quantity)).toLocaleString("es-AR")}`;
+      let line = `  ${formatItemQuantity(it)} ${it.name} — $${(it.total ?? moneyLineTotal(it)).toLocaleString("es-AR")}`;
       if (it.selectedOptions?.length > 0) {
         const optLines = it.selectedOptions.map((so: any) => {
           const choiceNames = so.choices.map((c: any) => c.priceDelta > 0 ? `${c.name} (+$${c.priceDelta.toLocaleString("es-AR")})` : c.name).join(", ");
@@ -445,7 +471,7 @@ _Pedido realizado desde MenuSanJuan_`;
             // each slot's options independently.
             componentSelections: ci.componentSelections,
             note: ci.note || "",
-            total: (ci.item.price + ci.optionsDelta) * ci.quantity,
+            total: cartLineTotal(ci),
           })),
           // total intentionally omitted — server recomputes from items.
           // (Previously we sent grandTotal here which included deliveryFee → double-count
@@ -559,7 +585,7 @@ _Pedido realizado desde MenuSanJuan_`;
                             ))}
                           </div>
                         )}
-                        <div className="text-xs text-text-muted">${(ci.item.price + ci.optionsDelta).toLocaleString("es-AR")} c/u</div>
+                        <div className="text-xs text-text-muted">${cartLineUnit(ci).toLocaleString("es-AR")} c/u</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={() => onRemove(ci.cartKey)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-secondary hover:border-danger hover:text-danger transition-colors">
@@ -570,7 +596,7 @@ _Pedido realizado desde MenuSanJuan_`;
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <div className="text-sm font-bold text-text w-20 text-right">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</div>
+                      <div className="text-sm font-bold text-text w-20 text-right">${cartLineTotal(ci).toLocaleString("es-AR")}</div>
                     </div>
                     {/* Note: show or edit */}
                     {editingNote?.cartKey === ci.cartKey ? (
@@ -868,8 +894,8 @@ _Pedido realizado desde MenuSanJuan_`;
                   <div key={ci.cartKey} className="group py-1 flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between text-sm">
-                        <span className="text-text-secondary">{ci.quantity}x {ci.item.name}</span>
-                        <span className="font-semibold text-text">${((ci.item.price + ci.optionsDelta) * ci.quantity).toLocaleString("es-AR")}</span>
+                        <span className="text-text-secondary">{ci.quantity}x {ci.item.name}</span> {/* cart summary — keep integer format for FIXED-only cart entries */}
+                        <span className="font-semibold text-text">${cartLineTotal(ci).toLocaleString("es-AR")}</span>
                       </div>
                       {ci.selectedOptions.length > 0 && (
                         <div className="text-[10px] text-text-muted ml-4">
@@ -1270,7 +1296,7 @@ _Pedido realizado desde MenuSanJuan_`;
                   <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Tu pedido</div>
                   {(trackingData.items as any[])?.map((item: any, i: number) => (
                     <div key={i} className="flex justify-between text-sm py-0.5">
-                      <span className="text-text-secondary">{item.quantity}x {item.name}</span>
+                      <span className="text-text-secondary">{formatItemQuantity(item)} {item.name}</span>
                       <span className="font-medium text-text">${item.total?.toLocaleString("es-AR")}</span>
                     </div>
                   ))}

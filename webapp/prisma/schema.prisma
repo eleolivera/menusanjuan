@@ -304,7 +304,7 @@ model MenuItem {
   categoryId  String
   name        String
   description String?
-  price       Float // Price in ARS
+  price       Float // Price in ARS (FIXED = per-item; PACKAGED = smallest tier for display; BY_WEIGHT = per-step-of-weight-unit display anchor)
   priceUsd    Float? // Optional USD price
   imageUrl    String?
   badge       String? // "Popular", "Nuevo", etc.
@@ -313,6 +313,15 @@ model MenuItem {
   sortOrder   Int     @default(0)
   stock       Int? // null = unlimited
   minStock    Int? // Alert threshold
+
+  // Variable pricing: FIXED (current default) = single price × integer qty.
+  // PACKAGED = discrete tier ladder (honey jars). BY_WEIGHT = continuous
+  // weight input in `weightStep` increments; per-unit rate from the
+  // highest matching tier's `fromAmount`. Details in `quantityTiers` JSON.
+  pricingMode   String  @default("FIXED") // "FIXED" | "PACKAGED" | "BY_WEIGHT"
+  quantityTiers Json? // Array of tier objects; shape depends on pricingMode
+  weightUnit    String? // "kg" | "gr" | "L" — BY_WEIGHT only
+  weightStep    Float? // Minimum increment for BY_WEIGHT (typical 0.25)
 
   category               MenuCategory        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   optionGroups           OptionGroup[]

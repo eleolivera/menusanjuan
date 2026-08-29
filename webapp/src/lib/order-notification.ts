@@ -5,6 +5,7 @@
 import { sendEmail } from "./email";
 import { prisma } from "./prisma";
 import type { Order, OrderItem } from "./orders-store";
+import { formatItemQuantity } from "./order-item-display";
 
 /**
  * Look up all opted-in DealerMember users for this resta and send a branded
@@ -49,7 +50,7 @@ export async function notifyRestaurantOfNewOrder(order: Order): Promise<void> {
       .map(
         (item) =>
           `<tr>
-            <td style="padding: 6px 0; font-size: 14px; color: #334155; border-bottom: 1px solid #f1f5f9;">${item.quantity}x ${escapeHtml(item.name)}</td>
+            <td style="padding: 6px 0; font-size: 14px; color: #334155; border-bottom: 1px solid #f1f5f9;">${escapeHtml(formatItemQuantity(item))} ${escapeHtml(item.name)}</td>
             <td style="padding: 6px 0; font-size: 14px; color: #334155; text-align: right; border-bottom: 1px solid #f1f5f9;">$ ${item.total.toLocaleString("es-AR")}</td>
           </tr>`
       )

@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import type { Prisma, PrismaClient } from "@/generated/prisma";
 import { RedemptionStatus } from "@/generated/prisma";
 import { normalizePhoneE164 } from "./phone-normalize";
+import { lineTotal as moneyLineTotal } from "./money";
 
 // Re-exported so existing server-side callers (`@/lib/rewards`) keep working.
 // The implementation lives in `./phone-normalize` — a Prisma-free module that
@@ -576,9 +577,10 @@ export async function previewRedemptionCode(params: {
   const items = Array.isArray(params.cartItems) ? params.cartItems : [];
   if (items.length === 0) return { ok: false, error: "empty_cart" };
 
-  const subtotal = items.reduce((s: number, it: { unitPrice?: number; quantity?: number; total?: number; priceOverride?: number | null; optionsDelta?: number | null }) => {
-    const unit = it.priceOverride ?? ((it.unitPrice ?? 0) + (it.optionsDelta ?? 0));
-    return s + unit * (it.quantity ?? 1);
+  const subtotal = items.reduce((s: number, it: any) => {
+    // Mode-aware total so PACKAGED tier prices and BY_WEIGHT rates are
+    // respected. Falls back to it.total if the line pre-computed it.
+    return s + (typeof it.total === "number" ? it.total : moneyLineTotal(it));
   }, 0);
 
   if (kind === "GIFT_ITEM") {

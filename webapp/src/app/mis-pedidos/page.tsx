@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getAllOrderRefs } from "@/lib/order-tracker";
 import { OrderStatusStepper } from "@/components/OrderStatusStepper";
 import { ComprobanteUploader } from "@/components/ComprobanteUploader";
+import { formatItemQuantity } from "@/lib/order-item-display";
 
 type OrderStatus = "GENERATED" | "PAID" | "PROCESSING" | "DELIVERED" | "CANCELLED";
 type PaymentStatus = "UNPAID" | "PAID_UNVERIFIED" | "PAID";
@@ -243,7 +244,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }: { order: TrackedOrd
             <div className="rounded-xl border border-border/50 bg-surface-alt p-3 mb-3">
               {order.items.map((item: any, i: number) => (
                 <div key={i} className="flex justify-between text-sm py-0.5">
-                  <span className="text-text-secondary">{item.quantity}x {item.name}</span>
+                  <span className="text-text-secondary">{formatItemQuantity(item)} {item.name}</span>
                   <span className="font-medium text-text">${item.total?.toLocaleString("es-AR")}</span>
                 </div>
               ))}

@@ -5,6 +5,8 @@ import type { Order, OrderStatus } from "@/lib/orders-store";
 import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCollector";
 import { MoneyInput } from "@/components/MoneyInput";
 import { buildDeliveryInstructions } from "@/lib/delivery-instructions";
+import { lineTotal as moneyLineTotal } from "@/lib/money";
+import { formatItemQuantity } from "@/lib/order-item-display";
 import { ReceiptValidationModal } from "./ReceiptValidationModal";
 import { DriverChip } from "./DriverChip";
 import {
@@ -169,7 +171,7 @@ export function OrderCard({
       : order.deliveryMethod === "delivery" ? "Delivery" : "Retiro";
     const lines: string[] = [`*${order.orderNumber}* · ${dest}`, ""];
     for (const item of (order.items as any[])) {
-      lines.push(`${item.quantity}× ${item.name}`);
+      lines.push(`${formatItemQuantity(item)} ${item.name}`);
       if (item.selectedOptions?.length) {
         const opts = item.selectedOptions
           .map((so: any) => `${so.group}: ${so.choices.map((c: any) => c.name).join(", ")}`)
@@ -348,12 +350,15 @@ export function OrderCard({
                 {batches[batchKey].map((item: any, i: number) => {
                   const hasOverride = item.priceOverride !== undefined && item.priceOverride !== null;
                   const unitPrice = hasOverride ? item.priceOverride : (item.unitPrice ?? 0);
-                  const total = item.total ?? (unitPrice * item.quantity);
+                  // Prefer persisted `item.total`; fall back to mode-aware
+                  // recompute so PACKAGED/BY_WEIGHT lines don't silently show
+                  // `unitPrice × quantity` when we happen to hit the fallback.
+                  const total = item.total ?? moneyLineTotal(item);
                   return (
                     <div key={`${batchKey}-${i}`} className="flex justify-between gap-3 text-sm">
                       <div className="min-w-0">
                         <div className="text-white">
-                          <span className="font-semibold">{item.quantity}×</span> {item.name}
+                          <span className="font-semibold">{formatItemQuantity(item)}</span> {item.name}
                         </div>
                         {item.selectedOptions && item.selectedOptions.length > 0 && (
                           <div className="text-[11px] text-slate-500 pl-5">

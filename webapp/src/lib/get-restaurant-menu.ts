@@ -49,6 +49,10 @@ function mapItemBase(item: {
   rating: number | null;
   available: boolean;
   optionGroups: Parameters<typeof flattenOptionGroups>[0];
+  pricingMode?: string;
+  quantityTiers?: unknown;
+  weightUnit?: string | null;
+  weightStep?: number | null;
 }, fallbackImageUrl: string | null = null): MenuItemData {
   return {
     id: item.id,
@@ -62,6 +66,12 @@ function mapItemBase(item: {
     rating: item.rating || undefined,
     available: item.available,
     optionGroups: flattenOptionGroups(item.optionGroups),
+    // Variable-pricing pass-through. Cast is safe because the Prisma type
+    // narrows pricingMode to string; downstream code checks the discriminant.
+    pricingMode: (item.pricingMode as MenuItemData["pricingMode"]) ?? "FIXED",
+    quantityTiers: (item.quantityTiers as MenuItemData["quantityTiers"]) ?? undefined,
+    weightUnit: item.weightUnit ?? undefined,
+    weightStep: item.weightStep ?? undefined,
   };
 }
 

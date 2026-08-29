@@ -71,19 +71,30 @@ export async function GET(request: NextRequest) {
     paymentIntentVsActual[intent][method] = (paymentIntentVsActual[intent][method] || 0) + 1;
   }
 
-  // Item aggregation
-  const itemMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
+  // Item aggregation. BY_WEIGHT lines are bucketed separately so their
+  // fractional quantities (0.5 kg) don't get summed with integer unit counts
+  // — the client can render two blocks (top items vs top-by-weight).
+  const itemMap: Record<string, { name: string; quantity: number; revenue: number; isWeight: boolean; unit?: string }> = {};
   for (const order of active) {
     for (const item of order.items) {
-      if (itemMap[item.name]) {
-        itemMap[item.name].quantity += item.quantity;
-        itemMap[item.name].revenue += item.total;
+      const isWeight = (item as any).pricingMode === "BY_WEIGHT";
+      const key = isWeight ? `${item.name}::${(item as any).weightUnit ?? "kg"}` : item.name;
+      const quantityIncrement = isWeight ? ((item as any).weight ?? item.quantity) : item.quantity;
+      if (itemMap[key]) {
+        itemMap[key].quantity += quantityIncrement;
+        itemMap[key].revenue += item.total;
       } else {
-        itemMap[item.name] = { name: item.name, quantity: item.quantity, revenue: item.total };
+        itemMap[key] = {
+          name: item.name,
+          quantity: quantityIncrement,
+          revenue: item.total,
+          isWeight,
+          unit: isWeight ? (item as any).weightUnit ?? "kg" : undefined,
+        };
       }
     }
   }
-  const topItems = Object.values(itemMap).sort((a, b) => b.quantity - a.quantity);
+  const topItems = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
 
   // Orders by hour (AR time)
   const hourlyMap: Record<number, { count: number; revenue: number }> = {};

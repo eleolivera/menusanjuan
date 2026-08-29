@@ -27,6 +27,16 @@ export type MenuItemData = {
   /** Promo / combo: when present, this item is composed of other items, each
    * of which can be customized independently in ItemCustomizeSheet. */
   components?: MenuItemComponentData[];
+  /** Variable pricing (Deploy P foundation). FIXED default preserves existing
+   * behavior for every non-Nono-Luis resta. PACKAGED / BY_WEIGHT unlock the
+   * stepper UI in ItemCustomizeSheet + mode-aware totals via money.ts. */
+  pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+  quantityTiers?: Array<
+    | { label: string; amount: number; price: number }              // PACKAGED
+    | { fromAmount: number; pricePerUnit: number }                  // BY_WEIGHT
+  >;
+  weightUnit?: string;   // "kg" | "gr" | "L" — BY_WEIGHT only
+  weightStep?: number;   // Minimum increment, e.g. 0.25 — BY_WEIGHT only
 };
 
 /** A slot within a promo/combo MenuItem — references another menu item

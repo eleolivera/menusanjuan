@@ -1,4 +1,6 @@
 import EscPosEncoder from "esc-pos-encoder";
+import { lineTotal as moneyLineTotal } from "./money";
+import { formatItemQuantity } from "./order-item-display";
 
 /**
  * Server-side generator for ESC/POS print payloads. The desktop agent receives
@@ -8,7 +10,7 @@ import EscPosEncoder from "esc-pos-encoder";
  * Bumped any time the on-paper format changes so we can debug "is the resta
  * on the new code?" — printed in the footer.
  */
-const TICKET_BUILD = "v2026-05-16.esc-1";
+const TICKET_BUILD = "v2026-08-29.esc-1";
 
 type OrderItem = {
   name: string;
@@ -16,6 +18,11 @@ type OrderItem = {
   unitPrice: number;
   optionsDelta?: number;
   note?: string;
+  // Variable-pricing pass-throughs so mode-aware totals compute correctly.
+  pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+  tierPrice?: number;
+  weight?: number;
+  quantityTiers?: unknown;
 };
 
 export type EscOrder = {
@@ -114,8 +121,8 @@ export function buildOrderTicket(order: EscOrder, driverUrl: string | null): Uin
 
   // Items — use the encoder's table layout so qty+name on the left, price on the right
   for (const it of order.items) {
-    const left = `${it.quantity}x ${noTildes(it.name)}`;
-    const total = (it.unitPrice + (it.optionsDelta || 0)) * it.quantity;
+    const left = `${formatItemQuantity(it)} ${noTildes(it.name)}`;
+    const total = moneyLineTotal(it);
     enc.table(
       [
         { width: 22, align: "left" },

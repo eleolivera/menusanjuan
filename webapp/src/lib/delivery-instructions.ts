@@ -1,4 +1,5 @@
 import type { Order } from "@/lib/orders-store";
+import { formatItemQuantity } from "@/lib/order-item-display";
 
 /**
  * Builds a single block of text the cashier can paste into the resta's
@@ -28,7 +29,7 @@ export function buildDeliveryInstructions(order: Order, restaurantName: string):
   lines.push("Items:");
   const items = (order.items as Array<{ name: string; quantity: number }> | undefined) || [];
   for (const it of items) {
-    lines.push(`• ${it.quantity}x ${it.name}`);
+    lines.push(`• ${formatItemQuantity(it)} ${it.name}`);
   }
 
   lines.push("");

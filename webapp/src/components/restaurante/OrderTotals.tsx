@@ -12,18 +12,25 @@ export function OrderTotals({ orders }: { orders: Order[] }) {
   const activeOrders = [...paid, ...processing, ...delivered];
   const activeTotal = activeOrders.reduce((s, o) => s + o.total, 0);
 
-  // Aggregate item consumption across active orders
-  const itemAggregation: Record<string, { name: string; quantity: number; total: number }> = {};
+  // Aggregate item consumption across active orders. BY_WEIGHT lines are
+  // bucketed separately so a "0.7 kg de nueces" doesn't get summed with a
+  // "3 hamburguesas" into "3.7 units" in the top-items table.
+  const itemAggregation: Record<string, { name: string; quantity: number; total: number; isWeight: boolean; unit?: string }> = {};
   for (const order of activeOrders) {
     for (const item of order.items) {
-      if (itemAggregation[item.name]) {
-        itemAggregation[item.name].quantity += item.quantity;
-        itemAggregation[item.name].total += item.total;
+      const isWeight = item.pricingMode === "BY_WEIGHT";
+      const key = isWeight ? `${item.name}::${item.weightUnit ?? "kg"}` : item.name;
+      const quantityIncrement = isWeight ? (item.weight ?? item.quantity) : item.quantity;
+      if (itemAggregation[key]) {
+        itemAggregation[key].quantity += quantityIncrement;
+        itemAggregation[key].total += item.total;
       } else {
-        itemAggregation[item.name] = {
+        itemAggregation[key] = {
           name: item.name,
-          quantity: item.quantity,
+          quantity: quantityIncrement,
           total: item.total,
+          isWeight,
+          unit: isWeight ? item.weightUnit ?? "kg" : undefined,
         };
       }
     }
@@ -112,7 +119,9 @@ export function OrderTotals({ orders }: { orders: Order[] }) {
                   <td className="px-5 py-2.5 text-sm text-white">{item.name}</td>
                   <td className="px-5 py-2.5 text-sm text-center">
                     <span className="inline-flex items-center justify-center rounded-lg bg-primary/15 px-2.5 py-0.5 text-xs font-bold text-primary">
-                      {item.quantity}
+                      {item.isWeight
+                        ? `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(item.quantity)} ${item.unit}`
+                        : item.quantity}
                     </span>
                   </td>
                   <td className="px-5 py-2.5 text-sm text-right font-semibold text-white">
@@ -126,7 +135,9 @@ export function OrderTotals({ orders }: { orders: Order[] }) {
                 <td className="px-5 py-3 text-sm font-bold text-white">TOTAL</td>
                 <td className="px-5 py-3 text-sm text-center">
                   <span className="inline-flex items-center justify-center rounded-lg bg-white/10 px-2.5 py-0.5 text-xs font-bold text-white">
-                    {aggregatedItems.reduce((s, i) => s + i.quantity, 0)}
+                    {/* Count-based total sums only unit-count lines (FIXED /
+                        PACKAGED); BY_WEIGHT lines have their own bucket. */}
+                    {aggregatedItems.filter((i) => !i.isWeight).reduce((s, i) => s + i.quantity, 0)}
                   </span>
                 </td>
                 <td className="px-5 py-3 text-sm text-right font-extrabold text-white">

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { lineTotal as moneyLineTotal } from "@/lib/money";
+import { formatItemQuantity } from "@/lib/order-item-display";
 
 // Build stamp — printed at the bottom of the ticket so we can verify a fresh
 // deploy made it to the printer. Bump whenever shipping a meaningful change.
-const TICKET_BUILD = "v2026-06-12.a";
+const TICKET_BUILD = "v2026-08-29.a";
 
 type Item = {
   name: string;
@@ -19,6 +21,12 @@ type Item = {
     label: string;
     selectedOptions?: { group: string; choices: { name: string }[] }[];
   }[];
+  // Variable-pricing fields passed through so mode-aware totals compute
+  // correctly (PACKAGED tierPrice, BY_WEIGHT weight + quantityTiers).
+  pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+  tierPrice?: number;
+  weight?: number;
+  quantityTiers?: unknown;
 };
 
 type Props = {
@@ -70,10 +78,7 @@ export function TicketView({ order, driverUrl }: Props) {
     return () => clearTimeout(t);
   }, [qrLoaded]);
 
-  const subtotal = order.items.reduce(
-    (s, it) => s + (it.unitPrice + (it.optionsDelta || 0)) * it.quantity,
-    0,
-  );
+  const subtotal = order.items.reduce((s, it) => s + moneyLineTotal(it), 0);
   const grandTotal = subtotal + order.deliveryFee;
   const dateStr = new Date(order.createdAt).toLocaleString("es-AR", {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
@@ -186,7 +191,7 @@ export function TicketView({ order, driverUrl }: Props) {
               {order.items.map((it, i) => (
                 <tr key={i} className="align-top">
                   <td className="pr-2 py-0.5">
-                    <div>{it.quantity}x {it.name}</div>
+                    <div>{formatItemQuantity(it)} {it.name}</div>
                     {it.selectedOptions && it.selectedOptions.length > 0 && (
                       <div className="text-[9px] pl-3">
                         {it.selectedOptions.map((so) => `${so.group}: ${so.choices.map((c) => c.name).join(", ")}`).join(" / ")}
@@ -215,7 +220,7 @@ export function TicketView({ order, driverUrl }: Props) {
                     {it.overrideNote && <div className="text-[9px] italic pl-3">- {it.overrideNote}</div>}
                   </td>
                   <td className="text-right whitespace-nowrap py-0.5">
-                    {ars((it.unitPrice + (it.optionsDelta || 0)) * it.quantity)}
+                    {ars(moneyLineTotal(it))}
                   </td>
                 </tr>
               ))}

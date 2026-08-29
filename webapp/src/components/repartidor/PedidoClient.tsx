@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCollector";
+import { lineTotal as moneyLineTotal } from "@/lib/money";
+import { formatItemQuantity } from "@/lib/order-item-display";
 
 type Item = {
   name: string;
@@ -11,6 +13,11 @@ type Item = {
   unitPrice: number;
   optionsDelta?: number;
   note?: string;
+  // Variable-pricing pass-throughs.
+  pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+  tierPrice?: number;
+  weight?: number;
+  quantityTiers?: unknown;
 };
 
 type Props = {
@@ -210,11 +217,11 @@ export function PedidoClient({ order }: Props) {
             {order.items.map((it, i) => (
               <div key={i} className="flex justify-between text-sm">
                 <span className="text-slate-300">
-                  {it.quantity}× {it.name}
+                  {formatItemQuantity(it)} {it.name}
                   {it.note && <span className="block text-[10px] text-slate-500 italic">{it.note}</span>}
                 </span>
                 <span className="text-slate-200 shrink-0">
-                  {formatARS((it.unitPrice + (it.optionsDelta || 0)) * it.quantity)}
+                  {formatARS(moneyLineTotal(it))}
                 </span>
               </div>
             ))}

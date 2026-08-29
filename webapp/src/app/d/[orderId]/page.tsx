@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { PaymentCollector, type CollectedPayment } from "@/components/PaymentCollector";
+import { lineTotal as moneyLineTotal } from "@/lib/money";
+import { formatItemQuantity } from "@/lib/order-item-display";
 
 type OrderItem = {
   itemId?: string;
@@ -13,6 +15,11 @@ type OrderItem = {
   optionsDelta?: number;
   note?: string;
   options?: Array<{ name: string }> | string[];
+  // Variable-pricing pass-throughs so line totals compute correctly.
+  pricingMode?: "FIXED" | "PACKAGED" | "BY_WEIGHT";
+  tierPrice?: number;
+  weight?: number;
+  quantityTiers?: unknown;
 };
 
 type DriverOrder = {
@@ -229,10 +236,10 @@ export default function DriverPage() {
             {order.items.map((it, i) => (
               <div key={i} className="flex justify-between text-sm">
                 <span className="text-slate-300">
-                  {it.quantity}× {it.name}
+                  {formatItemQuantity(it)} {it.name}
                   {it.note && <span className="block text-[10px] text-slate-500 italic">{it.note}</span>}
                 </span>
-                <span className="text-slate-200 shrink-0">{formatARS((it.unitPrice + (it.optionsDelta || 0)) * it.quantity)}</span>
+                <span className="text-slate-200 shrink-0">{formatARS(moneyLineTotal(it))}</span>
               </div>
             ))}
           </div>
