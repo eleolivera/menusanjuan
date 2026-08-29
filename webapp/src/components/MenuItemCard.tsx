@@ -126,8 +126,10 @@ export function MenuItemCard({
       ) : placeholderIcon ? (
         <div className={`relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl ${placeholderIcon.bgClass}`}>
           <placeholderIcon.Icon
-            weight="duotone"
-            className={`h-12 w-12 ${placeholderIcon.iconClass}`}
+            width={44}
+            height={44}
+            strokeWidth={1.75}
+            className={placeholderIcon.iconClass}
           />
           {item.badge && (
             <span className="absolute top-1 left-1 rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
