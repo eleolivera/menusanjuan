@@ -484,6 +484,7 @@ export function StoreMenu({
                         item={catIdx === 0 && itemIdx < 3 ? { ...item, badge: item.badge || "Popular" } : item}
                         totalInCart={getTotalQty(item.id)}
                         onClick={() => addItem(item)}
+                        categoryName={category.name}
                       />
                     ))}
                 </div>

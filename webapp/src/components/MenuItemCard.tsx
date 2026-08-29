@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Image from "next/image";
 import type { MenuItemData } from "@/data/menus";
+import { iconForItem } from "@/lib/menu-item-icon";
 
 function isVideo(url: string): boolean {
   const lower = url.toLowerCase();
@@ -71,12 +72,20 @@ export function MenuItemCard({
   item,
   totalInCart,
   onClick,
+  categoryName,
 }: {
   item: MenuItemData;
   totalInCart: number;
   onClick: () => void;
+  /** Category name of the item's section. Optional — used to pick a
+   *  category-appropriate Phosphor placeholder icon when the item has no
+   *  imageUrl. Search-result contexts may omit it; keyword fallback still fires. */
+  categoryName?: string;
 }) {
   const hasQty = totalInCart > 0;
+  // Resolve a placeholder icon lazily so items with a real imageUrl never
+  // pay the lookup cost.
+  const placeholderIcon = !item.imageUrl ? iconForItem(item.name, categoryName) : null;
 
   return (
     <button
@@ -94,8 +103,8 @@ export function MenuItemCard({
         </div>
       )}
 
-      {/* Image or Video */}
-      {item.imageUrl && (
+      {/* Image, video, or Phosphor placeholder icon */}
+      {item.imageUrl ? (
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200">
           {isVideo(item.imageUrl) ? (
             <VideoThumb src={item.imageUrl} alt={item.name} />
@@ -114,7 +123,19 @@ export function MenuItemCard({
             </span>
           )}
         </div>
-      )}
+      ) : placeholderIcon ? (
+        <div className={`relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl ${placeholderIcon.bgClass}`}>
+          <placeholderIcon.Icon
+            weight="duotone"
+            className={`h-12 w-12 ${placeholderIcon.iconClass}`}
+          />
+          {item.badge && (
+            <span className="absolute top-1 left-1 rounded-md bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+              {item.badge}
+            </span>
+          )}
+        </div>
+      ) : null}
 
       {/* Info */}
       <div className="flex flex-1 flex-col justify-between min-w-0">
