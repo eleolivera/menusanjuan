@@ -103,6 +103,12 @@ model Dealer {
   logoUrl                String?
   coverUrl               String?
   cuisineType            String    @default("General") // Comida Rápida, Parrilla, Pizzería, etc.
+  // Broad kind of business: RESTAURANT (default — sold hot/prepared food) or
+  // STORE (an almacén, tienda, kiosco, panadería — sold packaged goods often
+  // by weight). Drives customer-facing copy (Menú vs Productos) and
+  // owner-side wizard framing. Not a hard behavior toggle — every downstream
+  // flow (menu, orders, delivery, POS) works identically for both.
+  dealerType             String    @default("RESTAURANT") // "RESTAURANT" | "STORE"
   isActive               Boolean   @default(true)
   isVerified             Boolean   @default(false) // Owner identity verified
   claimedAt              DateTime? // When a real owner claimed this

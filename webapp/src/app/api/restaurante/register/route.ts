@@ -25,7 +25,9 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = await request.json();
-    const { email, password, restaurantName, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl } = body;
+    const { email, password, restaurantName, phone, address, latitude, longitude, cuisineType, description, logoUrl, coverUrl, dealerType } = body;
+    // Whitelist dealerType — anything else silently falls back to RESTAURANT.
+    const safeDealerType = dealerType === "STORE" ? "STORE" : "RESTAURANT";
 
     if (!restaurantName || !phone) {
       return NextResponse.json({ error: "Nombre y teléfono son obligatorios" }, { status: 400 });
@@ -61,6 +63,7 @@ export async function POST(request: NextRequest) {
             description: description || null,
             logoUrl: logoUrl || null,
             coverUrl: coverUrl || null,
+            dealerType: safeDealerType,
           },
         });
 
@@ -124,6 +127,7 @@ export async function POST(request: NextRequest) {
           description: description || null,
           logoUrl: logoUrl || null,
           coverUrl: coverUrl || null,
+          dealerType: safeDealerType,
         },
       });
 

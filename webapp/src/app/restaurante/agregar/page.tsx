@@ -72,8 +72,8 @@ export default function AgregarRestaurantePage() {
       <header className="sticky top-0 z-40 border-b border-white/5 bg-slate-950/80 backdrop-blur px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Agregar restaurante</h1>
-            <p className="text-xs text-slate-500">Reclamá uno existente o creá uno nuevo</p>
+            <h1 className="text-xl font-bold text-white">Agregar negocio</h1>
+            <p className="text-xs text-slate-500">Restaurante, tienda o almacén — reclamá uno existente o creá uno nuevo</p>
           </div>
           <button
             onClick={() => router.back()}
@@ -95,9 +95,9 @@ export default function AgregarRestaurantePage() {
               ➕
             </div>
             <div className="flex-1">
-              <h2 className="text-sm font-bold text-white">Crear un restaurante nuevo</h2>
+              <h2 className="text-sm font-bold text-white">Crear un negocio nuevo</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Todavía no está en MenuSanJuan. Cargá los datos y empezá desde cero.
+                Todavía no está en MenuSanJuan. Elegí si es restaurante o tienda y empezá desde cero.
               </p>
             </div>
             <span className="text-slate-500 self-center">→</span>
@@ -113,7 +113,7 @@ export default function AgregarRestaurantePage() {
             <div className="flex-1">
               <h2 className="text-sm font-bold text-white">Reclamar uno existente</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Ya cargamos tu restaurante. Encontralo, pedí el reclamo, y te contactamos con un
+                Ya cargamos tu negocio. Encontralo, pedí el reclamo, y te contactamos con un
                 código para confirmar que sos el dueño.
               </p>
             </div>

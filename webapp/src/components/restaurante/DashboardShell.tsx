@@ -309,7 +309,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-base leading-none">
                     +
                   </span>
-                  <span className="font-medium">Agregar restaurante</span>
+                  <span className="font-medium">Agregar restaurante o tienda</span>
                 </button>
               </div>
             </div>

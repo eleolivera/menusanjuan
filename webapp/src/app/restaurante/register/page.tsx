@@ -54,6 +54,9 @@ function RegisterPage() {
   const [restaurantName, setRestaurantName] = useState("");
   const [phone, setPhone] = useState("");
   const [cuisineType, setCuisineType] = useState("");
+  // Broad business type — drives copy on this wizard + on downstream customer
+  // surfaces (Menú vs Productos, etc.). Owner picks at the top of Step 3.
+  const [dealerType, setDealerType] = useState<"RESTAURANT" | "STORE">("RESTAURANT");
 
   // Verification
   const [verifyCode, setVerifyCode] = useState("");
@@ -246,9 +249,10 @@ function RegisterPage() {
 
   // New restaurant flow
   async function handleCreateRestaurant() {
-    if (!restaurantName.trim()) { setError("Ingresá el nombre de tu restaurante"); return; }
+    const kind = dealerType === "STORE" ? "tu tienda" : "tu restaurante";
+    if (!restaurantName.trim()) { setError(`Ingresá el nombre de ${kind}`); return; }
     if (!phone.trim()) { setError("Ingresá tu número de WhatsApp"); return; }
-    if (!cuisineType) { setError("Seleccioná el tipo de cocina"); return; }
+    if (!cuisineType) { setError(dealerType === "STORE" ? "Seleccioná el rubro" : "Seleccioná el tipo de cocina"); return; }
 
     setLoading(true);
     setError("");
@@ -257,7 +261,7 @@ function RegisterPage() {
       const res = await fetch("/api/restaurante/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restaurantName, phone, cuisineType }),
+        body: JSON.stringify({ restaurantName, phone, cuisineType, dealerType }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); setLoading(false); return; }
@@ -285,10 +289,14 @@ function RegisterPage() {
             M
           </div>
           <h1 className="text-2xl font-extrabold text-text tracking-tight">
-            {step === 1 ? "Registrar mi Restaurante" : step === 2 ? "Creá tu Cuenta" : step === 2.5 ? "Verificá tu Email" : step === 3 ? "Datos del Restaurante" : "¡Listo!"}
+            {step === 1 ? "Registrá tu Negocio"
+              : step === 2 ? "Creá tu Cuenta"
+              : step === 2.5 ? "Verificá tu Email"
+              : step === 3 ? (dealerType === "STORE" ? "Datos de la Tienda" : "Datos del Restaurante")
+              : "¡Listo!"}
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {step === 1 ? "¿Tu restaurante ya está en MenuSanJuan?" : step === 2 ? "Tus datos para iniciar sesión" : step === 2.5 ? "Revisá tu bandeja de entrada" : step === 3 ? "Info básica — podés completar después" : ""}
+            {step === 1 ? "¿Tu negocio ya está en MenuSanJuan?" : step === 2 ? "Tus datos para iniciar sesión" : step === 2.5 ? "Revisá tu bandeja de entrada" : step === 3 ? "Info básica — podés completar después" : ""}
           </p>
         </div>
 
@@ -498,18 +506,55 @@ function RegisterPage() {
             </div>
           )}
 
-          {/* Step 3: Restaurant details (new only) */}
+          {/* Step 3: Business details (new only). Owner first picks the broad
+              type (restaurante vs tienda) — that toggles copy on the fields
+              below and drives dealerType on the created row. */}
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-text">Nombre del restaurante</label>
+                <label className="mb-1.5 block text-sm font-medium text-text">¿Qué tipo de negocio es?</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDealerType("RESTAURANT")}
+                    className={`rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                      dealerType === "RESTAURANT"
+                        ? "border-primary bg-primary/5"
+                        : "border-border/50 bg-white hover:border-primary/30"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">🍽️</div>
+                    <div className={`text-sm font-bold ${dealerType === "RESTAURANT" ? "text-primary" : "text-text"}`}>Restaurante</div>
+                    <div className="text-[10px] text-text-muted mt-0.5">Comida preparada, delivery o retiro</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDealerType("STORE")}
+                    className={`rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                      dealerType === "STORE"
+                        ? "border-primary bg-primary/5"
+                        : "border-border/50 bg-white hover:border-primary/30"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">🛒</div>
+                    <div className={`text-sm font-bold ${dealerType === "STORE" ? "text-primary" : "text-text"}`}>Tienda o Almacén</div>
+                    <div className="text-[10px] text-text-muted mt-0.5">Miel, frutos secos, kiosco, panadería…</div>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-text">
+                  {dealerType === "STORE" ? "Nombre de la tienda" : "Nombre del restaurante"}
+                </label>
                 <input type="text" value={restaurantName} onChange={(e) => setRestaurantName(e.target.value)}
-                  placeholder="Ej: Puerto Pachatas"
+                  placeholder={dealerType === "STORE" ? "Ej: El Nono Luis" : "Ej: Puerto Pachatas"}
                   className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" />
               </div>
-              <PhoneInput value={phone} onChange={setPhone} label="WhatsApp del restaurante" placeholder="264 555 1234" required />
+              <PhoneInput value={phone} onChange={setPhone} label={dealerType === "STORE" ? "WhatsApp de la tienda" : "WhatsApp del restaurante"} placeholder="264 555 1234" required />
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-text">Tipo de cocina</label>
+                <label className="mb-1.5 block text-sm font-medium text-text">
+                  {dealerType === "STORE" ? "Rubro" : "Tipo de cocina"}
+                </label>
                 <CuisineMultiSelect selected={cuisineType ? [cuisineType] : []} onChange={(vals) => setCuisineType(vals[vals.length - 1] || "")} />
               </div>
             </div>
