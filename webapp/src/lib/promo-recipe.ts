@@ -180,8 +180,10 @@ export function suggestRadiusKm(dealer: PromoDealer): number {
   return 4;
 }
 
+// Canonical host is www — apex 307-redirects to it. Give Meta the final URL
+// so its link checker doesn't flag a redirect and the landing skips a hop.
 export function promoLink(dealer: PromoDealer, campaign = "promo"): string {
-  return `https://menusanjuan.com/${dealer.slug}?utm_source=ig&utm_medium=paid&utm_campaign=${encodeURIComponent(campaign)}`;
+  return `https://www.menusanjuan.com/${dealer.slug}?utm_source=ig&utm_medium=paid&utm_campaign=${encodeURIComponent(campaign)}`;
 }
 
 const ITEM_EMOJI: Array<{ re: RegExp; emoji: string }> = [
