@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       paymentReceiptUrl: rawReceiptUrl,
       redemptionCode: rawCode,
       useReward: rawUseReward,
+      attribution: rawAttribution,
     } = body;
 
     if (!restauranteSlug || !customerName || !customerPhone || !items?.length) {
@@ -60,6 +61,16 @@ export async function POST(request: NextRequest) {
         ? rawReceiptUrl
         : null;
     const paymentStatus = paymentReceiptUrl ? "PAID_UNVERIFIED" : "UNPAID";
+
+    // Marketing attribution (from ?utm_* on the store page, relayed by the
+    // client). Optional. Printable-ASCII only + length-capped — these values
+    // render in dashboards and badges. Medium/campaign only kept when a
+    // source is present so we never store half an attribution.
+    const cleanUtm = (v: unknown): string | null =>
+      typeof v === "string" ? v.replace(/[^\x20-\x7E]/g, "").trim().slice(0, 64) || null : null;
+    const utmSource = cleanUtm(rawAttribution?.utmSource);
+    const utmMedium = utmSource ? cleanUtm(rawAttribution?.utmMedium) : null;
+    const utmCampaign = utmSource ? cleanUtm(rawAttribution?.utmCampaign) : null;
 
     // Rewards: upsert the phone-keyed Customer record so the order links to it
     // for punch accrual. Best-effort — never block order creation if it fails.
@@ -168,6 +179,9 @@ export async function POST(request: NextRequest) {
       paymentReceiptUrl,
       paymentStatus,
       customerId,
+      utmSource,
+      utmMedium,
+      utmCampaign,
     });
 
     // Attach the Redemption to this Order + spend the punches. Best-effort:

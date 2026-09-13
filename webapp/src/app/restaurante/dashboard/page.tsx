@@ -38,6 +38,7 @@ type Analytics = {
   };
   statusBreakdown: Record<string, number>;
   topItems: { name: string; quantity: number; revenue: number }[];
+  ordersBySource?: { source: string; medium: string | null; campaign: string | null; count: number; revenue: number }[];
   hourlyBreakdown: { hour: number; label: string; count: number; revenue: number }[];
   dailyBreakdown: { date: string; label: string; count: number; revenue: number; delivered: number; cancelled: number }[];
 };
@@ -309,6 +310,43 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </div>
+
+        {/* Pedidos desde anuncios — marketing attribution (only when there is any) */}
+        {data.ordersBySource && data.ordersBySource.length > 0 && (
+          <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
+            <div className="border-b border-white/5 px-5 py-3 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white">📣 Pedidos desde anuncios</h3>
+              <span className="text-[11px] text-slate-500">links con utm_source (Promocionar)</span>
+            </div>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/5 text-xs text-slate-500">
+                  <th className="px-5 py-2.5 text-left font-semibold">Origen</th>
+                  <th className="px-5 py-2.5 text-left font-semibold">Campaña</th>
+                  <th className="px-5 py-2.5 text-center font-semibold">Pedidos</th>
+                  <th className="px-5 py-2.5 text-right font-semibold">Ingresos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.ordersBySource.map((s) => (
+                  <tr key={`${s.source}|${s.campaign ?? ""}`} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                    <td className="px-5 py-2.5 text-sm text-white">
+                      {s.source === "ig" ? "Instagram" : s.source}
+                      {s.medium === "paid" && (
+                        <span className="ml-1.5 rounded bg-fuchsia-400/15 px-1 text-[9px] font-bold text-fuchsia-300">ANUNCIO</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-2.5 text-sm text-slate-400">{s.campaign ?? "—"}</td>
+                    <td className="px-5 py-2.5 text-center">
+                      <span className="inline-flex items-center justify-center rounded-lg bg-primary/15 px-2.5 py-0.5 text-xs font-bold text-primary">{s.count}</span>
+                    </td>
+                    <td className="px-5 py-2.5 text-sm text-right font-semibold text-white">${fmt(s.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Top Items + Status Breakdown */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

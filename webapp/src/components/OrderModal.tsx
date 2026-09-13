@@ -53,6 +53,26 @@ function cartLine(ci: CartItem) {
 }
 function cartLineUnit(ci: CartItem): number { return moneyLineUnit(cartLine(ci)); }
 function cartLineTotal(ci: CartItem): number { return moneyLineTotal(cartLine(ci)); }
+
+// Marketing attribution captured by StoreMenu from ?utm_* on landing
+// (sessionStorage, keyed per resta). Best-effort: null for organic/direct
+// visits or when storage is blocked. Sent with the order so the Kanban can
+// badge it and the dashboard can count "pedidos desde anuncios".
+function readAttribution(slug: string): { utmSource: string; utmMedium: string | null; utmCampaign: string | null } | null {
+  try {
+    const raw = sessionStorage.getItem(`msj_attr:${slug}`);
+    if (!raw) return null;
+    const a = JSON.parse(raw) as { utmSource?: unknown; utmMedium?: unknown; utmCampaign?: unknown };
+    if (typeof a?.utmSource !== "string" || !a.utmSource) return null;
+    return {
+      utmSource: a.utmSource,
+      utmMedium: typeof a.utmMedium === "string" ? a.utmMedium : null,
+      utmCampaign: typeof a.utmCampaign === "string" ? a.utmCampaign : null,
+    };
+  } catch {
+    return null;
+  }
+}
 /** Cart-line display prefix: "1× ½ kg de " for PACKAGED, "0,5 kg de " for
  *  BY_WEIGHT, "3× " for FIXED. Concat with item.name to build the full line. */
 function cartLineDisplay(ci: CartItem): string {
@@ -504,6 +524,7 @@ _Pedido realizado desde MenuSanJuan_`;
           deliveryFee,
           notes,
           paymentIntent,
+          attribution: readAttribution(restauranteSlug),
           paymentReceiptUrl: checkoutReceiptUrl,
           // Optional gift code — server re-validates before applying.
           redemptionCode: codeState.status === "ok" ? codeState.code : undefined,

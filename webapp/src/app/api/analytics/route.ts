@@ -59,6 +59,21 @@ export async function GET(request: NextRequest) {
   const paymentMethodBreakdown = groupCount(delivered, (o) => (o.paymentMethod || "unknown") as string);
   const deliveryMethodBreakdown = groupCount(delivered, (o) => (o.deliveryMethod || "delivery") as string);
 
+  // Marketing attribution — orders that arrived via a tracked link
+  // (?utm_source=…, set by Promocionar). Non-cancelled orders grouped by
+  // source + campaign so the dashboard can show "pedidos desde anuncios"
+  // and compare campaigns against each other.
+  const sourceMap: Record<string, { source: string; medium: string | null; campaign: string | null; count: number; revenue: number }> = {};
+  for (const o of orders) {
+    if (o.status === "CANCELLED" || !o.utmSource) continue;
+    const campaign = o.utmCampaign || null;
+    const key = `${o.utmSource}|${campaign ?? ""}`;
+    if (!sourceMap[key]) sourceMap[key] = { source: o.utmSource, medium: o.utmMedium || null, campaign, count: 0, revenue: 0 };
+    sourceMap[key].count++;
+    sourceMap[key].revenue += o.total;
+  }
+  const ordersBySource = Object.values(sourceMap).sort((a, b) => b.count - a.count);
+
   // paymentIntent (what customer said at checkout) × paymentMethod (what was
   // actually recorded). Surfaces mismatches — e.g. intent=transfer but
   // method=cash means the cashier ended up taking cash instead. Only orders
@@ -176,5 +191,6 @@ export async function GET(request: NextRequest) {
     paymentMethodBreakdown,
     deliveryMethodBreakdown,
     paymentIntentVsActual,
+    ordersBySource,
   });
 }

@@ -100,6 +100,11 @@ export type Order = {
   paymentReceiptAt: string | null;
   paymentAssumed: boolean;
   source: string | null;
+  // Marketing attribution (?utm_* on landing). Null for organic / direct /
+  // legacy. "ig" + "paid" = came from a Promocionar campaign.
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -290,6 +295,9 @@ function mapOrder(dbOrder: any): Order {
     paymentReceiptAt: dbOrder.paymentReceiptAt ? dbOrder.paymentReceiptAt.toISOString() : null,
     paymentAssumed: !!dbOrder.paymentAssumed,
     source: dbOrder.source || null,
+    utmSource: dbOrder.utmSource || null,
+    utmMedium: dbOrder.utmMedium || null,
+    utmCampaign: dbOrder.utmCampaign || null,
     createdAt: dbOrder.createdAt.toISOString(),
     updatedAt: dbOrder.updatedAt.toISOString(),
   };
@@ -320,6 +328,10 @@ export async function createOrder(data: {
   paymentReceiptUrl?: string | null;
   paymentAssumed?: boolean;
   source?: string | null;
+  // Marketing attribution from ?utm_* on the store page (Promocionar links).
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
   initialStatus?: OrderStatus; // For POS to skip GENERATED
   customerId?: string | null;  // Link to the Customer row for rewards
 }): Promise<Order> {
@@ -363,6 +375,9 @@ export async function createOrder(data: {
           paymentReceiptAt: data.paymentReceiptUrl ? new Date() : null,
           paymentAssumed: data.paymentAssumed ?? false,
           source: data.source ?? "web",
+          utmSource: data.utmSource ?? null,
+          utmMedium: data.utmMedium ?? null,
+          utmCampaign: data.utmCampaign ?? null,
           customerId: data.customerId ?? null,
           ...(data.initialStatus ? { status: data.initialStatus as PrismaOrderStatus } : {}),
         },

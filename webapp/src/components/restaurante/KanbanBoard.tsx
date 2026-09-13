@@ -167,6 +167,14 @@ export function KanbanBoard({
                             <span className="rounded bg-red-400/15 px-1 text-[8px] font-bold text-red-400">SIN PAGAR</span>
                           )}
                           {hasUpdates && <span className="rounded bg-amber-400/15 px-1 text-[8px] font-bold text-amber-400 animate-pulse">ACTUALIZADO</span>}
+                          {order.utmSource && (
+                            <span
+                              className="rounded bg-fuchsia-400/15 px-1 text-[8px] font-bold text-fuchsia-300"
+                              title={`Vino de ${order.utmSource}${order.utmMedium === "paid" ? " (anuncio)" : ""}${order.utmCampaign ? ` · ${order.utmCampaign}` : ""}`}
+                            >
+                              {order.utmSource === "ig" ? "IG" : order.utmSource.toUpperCase().slice(0, 6)}
+                            </span>
+                          )}
                         </div>
                         <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold flex items-center gap-1 ${methodChip.color}`}>
                           <span>{methodChip.emoji}</span>

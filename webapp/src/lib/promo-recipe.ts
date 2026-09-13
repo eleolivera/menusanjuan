@@ -182,8 +182,11 @@ export function suggestRadiusKm(dealer: PromoDealer): number {
 
 // Canonical host is www — apex 307-redirects to it. Give Meta the final URL
 // so its link checker doesn't flag a redirect and the landing skips a hop.
-export function promoLink(dealer: PromoDealer, campaign = "promo"): string {
-  return `https://www.menusanjuan.com/${dealer.slug}?utm_source=ig&utm_medium=paid&utm_campaign=${encodeURIComponent(campaign)}`;
+export function promoLink(dealer: PromoDealer, campaign = "promo", itemId?: string): string {
+  // ?item=<id> makes the store page open that item's picker on landing —
+  // two fewer taps between the ad and "Agregar al pedido" for single-item promos.
+  const item = itemId ? `item=${encodeURIComponent(itemId)}&` : "";
+  return `https://www.menusanjuan.com/${dealer.slug}?${item}utm_source=ig&utm_medium=paid&utm_campaign=${encodeURIComponent(campaign)}`;
 }
 
 const ITEM_EMOJI: Array<{ re: RegExp; emoji: string }> = [
@@ -202,8 +205,8 @@ function emojiFor(name: string): string {
 }
 
 /** Spanish IG caption. Voseo, short lines, link last so it's tappable in the bio/CTA. */
-export function buildCaption(dealer: PromoDealer, items: PromoItem[], opts?: { campaign?: string }): string {
-  const link = promoLink(dealer, opts?.campaign);
+export function buildCaption(dealer: PromoDealer, items: PromoItem[], opts?: { campaign?: string; itemId?: string }): string {
+  const link = promoLink(dealer, opts?.campaign, opts?.itemId);
   const where = dealer.city && dealer.city !== "San Juan" ? dealer.city : "San Juan";
   const modes = [dealer.deliveryEnabled ? "Delivery" : null, dealer.pickupEnabled ? "Retiro" : null].filter(Boolean).join(" y ");
   const { resumen } = hoursToAdsetSchedule(dealer.pickupHours || dealer.deliveryHours || dealer.openHours);
@@ -234,13 +237,13 @@ export function buildCaption(dealer: PromoDealer, items: PromoItem[], opts?: { c
 export function buildReceta(
   dealer: PromoDealer,
   items: PromoItem[],
-  opts?: { campaign?: string; dias?: number; diarioArs?: number },
+  opts?: { campaign?: string; dias?: number; diarioArs?: number; itemId?: string },
 ): Receta {
   const dias = opts?.dias ?? 5;
   const sugeridoDiario = Math.max(META_MIN_DAILY_ARS, opts?.diarioArs ?? 2000);
   const totalArs = sugeridoDiario * dias;
   const radioKm = suggestRadiusKm(dealer);
-  const link = promoLink(dealer, opts?.campaign);
+  const link = promoLink(dealer, opts?.campaign, opts?.itemId);
   const pin = dealer.latitude != null && dealer.longitude != null ? { lat: dealer.latitude, lng: dealer.longitude } : null;
   const horario = hoursToAdsetSchedule(dealer.pickupHours || dealer.deliveryHours || dealer.openHours);
   const hasSchedule = horario.adsetSchedule.length > 0;

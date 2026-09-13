@@ -44,8 +44,10 @@ async function main() {
   mkdirSync(OUT, { recursive: true });
   const base = `${slug}-${items.length}items`;
   writeFileSync(path.join(OUT, `${base}.png`), png);
-  const caption = buildCaption(promoDealer, items, { campaign: "sample" });
-  const receta = buildReceta(promoDealer, items, { campaign: "sample" });
+  // Mirror the API route: single-item promos deep-link to that item's picker.
+  const itemId = items.length === 1 ? items[0].id : undefined;
+  const caption = buildCaption(promoDealer, items, { campaign: "sample", itemId });
+  const receta = buildReceta(promoDealer, items, { campaign: "sample", itemId });
   writeFileSync(path.join(OUT, `${base}.caption.txt`), caption);
   writeFileSync(path.join(OUT, `${base}.receta.json`), JSON.stringify(receta, null, 2));
 

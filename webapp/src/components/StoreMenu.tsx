@@ -294,6 +294,47 @@ export function StoreMenu({
   }, [searchParams, categories]);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
+  // Ad-landing helpers (Promocionar). Runs once on mount:
+  //  • ?utm_* → sessionStorage `msj_attr:{slug}` (first-touch per resta) so
+  //    OrderModal can attach attribution to the order.
+  //  • ?item=<id> → open that item's picker immediately + scroll to its
+  //    category, so a single-item ad lands two taps from "Agregar al pedido".
+  // Both are no-ops without the params — organic traffic is unaffected.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+
+    const utmSource = params.get("utm_source");
+    if (utmSource) {
+      const key = `msj_attr:${restaurant.slug}`;
+      try {
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, JSON.stringify({
+            utmSource,
+            utmMedium: params.get("utm_medium"),
+            utmCampaign: params.get("utm_campaign"),
+            at: Date.now(),
+          }));
+        }
+      } catch { /* storage blocked — attribution is best-effort */ }
+    }
+
+    const itemId = params.get("item");
+    if (itemId) {
+      for (const cat of categories) {
+        const found = cat.items.find((i) => i.id === itemId && i.available);
+        if (found) {
+          setActiveCategory(cat.id);
+          setCustomizingItem(found);
+          setTimeout(() => sectionRefs.current[cat.id]?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+          break;
+        }
+      }
+    }
+    // Intentionally mount-only: URL params are a landing concern, not state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // All item taps open the customization sheet
   const addItem = useCallback((item: MenuItemData) => {
     setCustomizingItem(item);

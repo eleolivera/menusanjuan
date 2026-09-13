@@ -423,6 +423,13 @@ export function OrderCard({
           <div className="text-sm font-semibold text-white">{order.customerName}</div>
           <div className="text-xs text-slate-400">{order.customerPhone}</div>
           {order.customerAddress && <div className="text-xs text-slate-400">{order.customerAddress}</div>}
+          {order.utmSource && (
+            <div className="text-[11px] text-fuchsia-300">
+              📣 Origen: {order.utmSource === "ig" ? "Instagram" : order.utmSource}
+              {order.utmMedium === "paid" ? " (anuncio)" : ""}
+              {order.utmCampaign ? ` · ${order.utmCampaign}` : ""}
+            </div>
+          )}
           {order.notes && (
             <div className="mt-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[11px] text-amber-200">
               📝 {order.notes}

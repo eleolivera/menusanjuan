@@ -45,8 +45,9 @@ export async function GET(request: NextRequest) {
   const campaign = `promo-${new Date().toISOString().slice(0, 10)}`;
   return NextResponse.json({
     items: items.map((i) => ({ id: i.id, name: i.name, price: i.price })),
-    caption: buildCaption(promoDealer, items, { campaign }),
-    receta: buildReceta(promoDealer, items, { campaign, dias, diarioArs: diario }),
+    // Single-item promos deep-link straight to that item's picker.
+    caption: buildCaption(promoDealer, items, { campaign, itemId: items.length === 1 ? items[0].id : undefined }),
+    receta: buildReceta(promoDealer, items, { campaign, dias, diarioArs: diario, itemId: items.length === 1 ? items[0].id : undefined }),
     creativeUrl: `/api/restaurante/promocionar/creative?items=${encodeURIComponent(ids.join(","))}`,
   });
 }

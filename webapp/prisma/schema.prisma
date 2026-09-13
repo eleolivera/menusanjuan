@@ -466,6 +466,13 @@ model Order {
   // set when the driver taps "Retiré el pedido" between accept and deliver.
   assignedDriverId    String?
   pickedUpAt          DateTime?
+  // Marketing attribution captured on the store page from ?utm_* params and
+  // sent with the order. Distinct from `source` (device channel). Null for
+  // organic / direct / legacy orders. utmSource "ig" + utmMedium "paid" =
+  // came from a Promocionar campaign; utmCampaign identifies which one.
+  utmSource           String?
+  utmMedium           String?
+  utmCampaign         String?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
