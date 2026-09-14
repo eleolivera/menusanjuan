@@ -2,20 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOrder, updateOrderStatus, markWhatsAppSent } from "@/lib/orders-store";
 import type { OrderStatus } from "@/lib/orders-store";
 import { prisma } from "@/lib/prisma";
-import { getRestauranteFromSession } from "@/lib/restaurante-auth";
+import { getRestauranteFromSession, getFullSession } from "@/lib/restaurante-auth";
+import { getAdminSession } from "@/lib/admin-auth";
 import { incrementPunchesForOrder } from "@/lib/rewards";
 
 const VALID_STATUSES: OrderStatus[] = ["GENERATED", "PAID", "PROCESSING", "DELIVERED", "CANCELLED"];
 
-// GET — single order
+// GET — single order.
+//
+// Gated. Previously this returned the full order (customer name, phone,
+// address, coordinates) to anyone holding the cuid — and order ids travel in
+// URLs (driver links forwarded on WhatsApp, /pagar links, browser history).
+// Allowed callers, in order of cheapness:
+//   1. ?token=<customerAccessToken>  — the customer's own tracking link
+//   2. an owner/staff session for the order's resta (any of their restas)
+//   3. an admin session
+// Every in-app reader already uses the token-gated /track, /driver and
+// /receipt routes, so no legitimate consumer should hit the 401 branch.
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const order = await getOrder(id);
   if (!order) {
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+  }
+
+  const token = request.nextUrl.searchParams.get("token");
+  let allowed = !!(token && order.customerAccessToken && token === order.customerAccessToken);
+
+  if (!allowed) {
+    const full = await getFullSession();
+    if (full?.restaurants.some((r) => r.slug === order.restauranteSlug)) allowed = true;
+  }
+  if (!allowed && (await getAdminSession())) allowed = true;
+
+  if (!allowed) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   return NextResponse.json(order);
 }
