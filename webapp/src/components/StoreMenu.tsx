@@ -317,6 +317,24 @@ export function StoreMenu({
           }));
         }
       } catch { /* storage blocked — attribution is best-effort */ }
+
+      // Click beacon — lets the dashboard show clicks → orders per campaign.
+      // Fire-and-forget; keepalive so it survives an immediate navigation.
+      // Only fires on tracked landings, so organic visits never hit it.
+      try {
+        fetch("/api/promo/click", {
+          method: "POST",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slug: restaurant.slug,
+            utmSource,
+            utmMedium: params.get("utm_medium"),
+            utmCampaign: params.get("utm_campaign"),
+            itemId: params.get("item"),
+          }),
+        }).catch(() => {});
+      } catch { /* never block the page on telemetry */ }
     }
 
     const itemId = params.get("item");

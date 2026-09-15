@@ -38,7 +38,8 @@ type Analytics = {
   };
   statusBreakdown: Record<string, number>;
   topItems: { name: string; quantity: number; revenue: number }[];
-  ordersBySource?: { source: string; medium: string | null; campaign: string | null; count: number; revenue: number }[];
+  ordersBySource?: { source: string; medium: string | null; campaign: string | null; count: number; revenue: number; clicks?: number }[];
+  adClicksTotal?: number;
   hourlyBreakdown: { hour: number; label: string; count: number; revenue: number }[];
   dailyBreakdown: { date: string; label: string; count: number; revenue: number; delivered: number; cancelled: number }[];
 };
@@ -311,11 +312,11 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Pedidos desde anuncios — marketing attribution (only when there is any) */}
-        {data.ordersBySource && data.ordersBySource.length > 0 && (
+        {/* Anuncios — clicks → pedidos funnel from tracked links (only when there is any) */}
+        {((data.ordersBySource && data.ordersBySource.length > 0) || (data.adClicksTotal ?? 0) > 0) && (
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 overflow-hidden">
             <div className="border-b border-white/5 px-5 py-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">📣 Pedidos desde anuncios</h3>
+              <h3 className="text-sm font-bold text-white">📣 Anuncios: clics y pedidos</h3>
               <span className="text-[11px] text-slate-500">links con utm_source (Promocionar)</span>
             </div>
             <table className="w-full">
@@ -323,12 +324,14 @@ export default function AnalyticsPage() {
                 <tr className="border-b border-white/5 text-xs text-slate-500">
                   <th className="px-5 py-2.5 text-left font-semibold">Origen</th>
                   <th className="px-5 py-2.5 text-left font-semibold">Campaña</th>
+                  <th className="px-5 py-2.5 text-center font-semibold">Clics</th>
                   <th className="px-5 py-2.5 text-center font-semibold">Pedidos</th>
+                  <th className="px-5 py-2.5 text-center font-semibold">Conv.</th>
                   <th className="px-5 py-2.5 text-right font-semibold">Ingresos</th>
                 </tr>
               </thead>
               <tbody>
-                {data.ordersBySource.map((s) => (
+                {(data.ordersBySource ?? []).map((s) => (
                   <tr key={`${s.source}|${s.campaign ?? ""}`} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
                     <td className="px-5 py-2.5 text-sm text-white">
                       {s.source === "ig" ? "Instagram" : s.source}
@@ -337,12 +340,23 @@ export default function AnalyticsPage() {
                       )}
                     </td>
                     <td className="px-5 py-2.5 text-sm text-slate-400">{s.campaign ?? "—"}</td>
+                    <td className="px-5 py-2.5 text-center text-sm text-slate-300">{s.clicks ?? 0}</td>
                     <td className="px-5 py-2.5 text-center">
                       <span className="inline-flex items-center justify-center rounded-lg bg-primary/15 px-2.5 py-0.5 text-xs font-bold text-primary">{s.count}</span>
+                    </td>
+                    <td className="px-5 py-2.5 text-center text-sm text-slate-300">
+                      {s.clicks ? `${Math.round((s.count / s.clicks) * 100)}%` : "—"}
                     </td>
                     <td className="px-5 py-2.5 text-sm text-right font-semibold text-white">${fmt(s.revenue)}</td>
                   </tr>
                 ))}
+                {(data.ordersBySource ?? []).length === 0 && (data.adClicksTotal ?? 0) > 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-3 text-sm text-slate-400">
+                      {data.adClicksTotal} clic{data.adClicksTotal === 1 ? "" : "s"} desde anuncios en el período, todavía sin pedidos.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

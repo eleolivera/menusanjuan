@@ -164,6 +164,24 @@ model Dealer {
   @@index([sourceProfileId])
 }
 
+// ─── Promo click beacon ───
+// One row per store-page landing that carried ?utm_source (i.e. came from a
+// tracked link — Promocionar ads). Written fire-and-forget from the client
+// so organic traffic never touches it. Paired with Order.utm* this gives the
+// dashboard a clicks → orders funnel per campaign without needing Vercel or
+// Meta access. No PII: slug + utm fields + optional deep-linked item only.
+model PromoClick {
+  id          String   @id @default(cuid())
+  dealerSlug  String
+  utmSource   String
+  utmMedium   String?
+  utmCampaign String?
+  itemId      String? // ?item= deep link, if present
+  createdAt   DateTime @default(now())
+
+  @@index([dealerSlug, createdAt])
+}
+
 // ─── Dealer members (multi-user access per resta) ───
 // Additive to Dealer.accountId (which still points to the single "owner"
 // Account). Every dealer has exactly ONE role="OWNER" row (backfilled +

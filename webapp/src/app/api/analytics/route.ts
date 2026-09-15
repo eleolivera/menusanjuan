@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrdersByDateRange, getDateRange } from "@/lib/orders-store";
 import type { Order, OrderItem } from "@/lib/orders-store";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -72,7 +73,28 @@ export async function GET(request: NextRequest) {
     sourceMap[key].count++;
     sourceMap[key].revenue += o.total;
   }
-  const ordersBySource = Object.values(sourceMap).sort((a, b) => b.count - a.count);
+  // Click beacon (PromoClick) for the same window → clicks per source+campaign.
+  // Merged into ordersBySource so each row reads clicks → orders → conv%.
+  // Campaigns with clicks but no orders yet still get a row (that's the
+  // "ad is delivering but nobody bought" signal we couldn't see before).
+  const clickRows = await prisma.promoClick.groupBy({
+    by: ["utmSource", "utmMedium", "utmCampaign"],
+    where: { dealerSlug: restaurante, createdAt: { gte: start, lte: end } },
+    _count: { _all: true },
+  });
+  const clicksByKey: Record<string, number> = {};
+  let adClicksTotal = 0;
+  for (const c of clickRows) {
+    const key = `${c.utmSource}|${c.utmCampaign ?? ""}`;
+    clicksByKey[key] = (clicksByKey[key] || 0) + c._count._all;
+    adClicksTotal += c._count._all;
+    if (!sourceMap[key]) {
+      sourceMap[key] = { source: c.utmSource, medium: c.utmMedium || null, campaign: c.utmCampaign || null, count: 0, revenue: 0 };
+    }
+  }
+  const ordersBySource = Object.values(sourceMap)
+    .map((s) => ({ ...s, clicks: clicksByKey[`${s.source}|${s.campaign ?? ""}`] || 0 }))
+    .sort((a, b) => b.count - a.count || b.clicks - a.clicks);
 
   // paymentIntent (what customer said at checkout) × paymentMethod (what was
   // actually recorded). Surfaces mismatches — e.g. intent=transfer but
@@ -192,5 +214,6 @@ export async function GET(request: NextRequest) {
     deliveryMethodBreakdown,
     paymentIntentVsActual,
     ordersBySource,
+    adClicksTotal,
   });
 }
