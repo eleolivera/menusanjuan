@@ -307,34 +307,53 @@ export function StoreMenu({
     const utmSource = params.get("utm_source");
     if (utmSource) {
       const key = `msj_attr:${restaurant.slug}`;
-      try {
-        if (!sessionStorage.getItem(key)) {
-          sessionStorage.setItem(key, JSON.stringify({
+      const now = Date.now();
+      const ATTR_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7-day first-touch window
+      const BEACON_DEDUP_MS = 60 * 1000;           // reloads / double-mounts within 1 min = one click
+
+      // Attribution record — localStorage (not session) so a customer who
+      // taps the ad, browses, closes Instagram and comes back tonight in the
+      // same browser still gets attributed. First-touch within 7 days wins;
+      // a different campaign after expiry starts a new window.
+      let prev: { at?: number; utmSource?: string; utmCampaign?: string } | null = null;
+      try { prev = JSON.parse(localStorage.getItem(key) || "null"); } catch { prev = null; }
+      const prevFresh = !!prev?.at && now - prev.at < ATTR_TTL_MS;
+      if (!prevFresh) {
+        try {
+          localStorage.setItem(key, JSON.stringify({
             utmSource,
             utmMedium: params.get("utm_medium"),
             utmCampaign: params.get("utm_campaign"),
-            at: Date.now(),
+            at: now,
           }));
-        }
-      } catch { /* storage blocked — attribution is best-effort */ }
+        } catch { /* storage blocked — attribution is best-effort */ }
+      }
 
       // Click beacon — lets the dashboard show clicks → orders per campaign.
-      // Fire-and-forget; keepalive so it survives an immediate navigation.
-      // Only fires on tracked landings, so organic visits never hit it.
-      try {
-        fetch("/api/promo/click", {
-          method: "POST",
-          keepalive: true,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            slug: restaurant.slug,
-            utmSource,
-            utmMedium: params.get("utm_medium"),
-            utmCampaign: params.get("utm_campaign"),
-            itemId: params.get("item"),
-          }),
-        }).catch(() => {});
-      } catch { /* never block the page on telemetry */ }
+      // Deduped: a reload or double-mount of the same tracked URL within a
+      // minute counts once. Uses its own key so re-landing days later (a
+      // genuine second visit) still counts as a click even though the
+      // attribution record above stays first-touch.
+      const beaconKey = `msj_click:${restaurant.slug}:${utmSource}:${params.get("utm_campaign") ?? ""}`;
+      let lastBeacon = 0;
+      try { lastBeacon = Number(sessionStorage.getItem(beaconKey) || 0); } catch { lastBeacon = 0; }
+      if (now - lastBeacon > BEACON_DEDUP_MS) {
+        try { sessionStorage.setItem(beaconKey, String(now)); } catch { /* ignore */ }
+        try {
+          fetch("/api/promo/click", {
+            method: "POST",
+            keepalive: true,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              slug: restaurant.slug,
+              utmSource,
+              utmMedium: params.get("utm_medium"),
+              utmCampaign: params.get("utm_campaign"),
+              itemId: params.get("item"),
+            }),
+          }).catch(() => {});
+        } catch { /* never block the page on telemetry */ }
+      }
     }
 
     const itemId = params.get("item");

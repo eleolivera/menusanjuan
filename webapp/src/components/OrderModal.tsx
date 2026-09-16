@@ -59,11 +59,15 @@ function cartLineTotal(ci: CartItem): number { return moneyLineTotal(cartLine(ci
 // visits or when storage is blocked. Sent with the order so the Kanban can
 // badge it and the dashboard can count "pedidos desde anuncios".
 function readAttribution(slug: string): { utmSource: string; utmMedium: string | null; utmCampaign: string | null } | null {
+  const ATTR_TTL_MS = 7 * 24 * 60 * 60 * 1000; // must match StoreMenu's first-touch window
   try {
-    const raw = sessionStorage.getItem(`msj_attr:${slug}`);
+    // localStorage is the 7-day record StoreMenu writes; sessionStorage is
+    // read as a fallback for tabs that landed before this change shipped.
+    const raw = localStorage.getItem(`msj_attr:${slug}`) ?? sessionStorage.getItem(`msj_attr:${slug}`);
     if (!raw) return null;
-    const a = JSON.parse(raw) as { utmSource?: unknown; utmMedium?: unknown; utmCampaign?: unknown };
+    const a = JSON.parse(raw) as { utmSource?: unknown; utmMedium?: unknown; utmCampaign?: unknown; at?: unknown };
     if (typeof a?.utmSource !== "string" || !a.utmSource) return null;
+    if (typeof a.at === "number" && Date.now() - a.at > ATTR_TTL_MS) return null; // expired window
     return {
       utmSource: a.utmSource,
       utmMedium: typeof a.utmMedium === "string" ? a.utmMedium : null,
